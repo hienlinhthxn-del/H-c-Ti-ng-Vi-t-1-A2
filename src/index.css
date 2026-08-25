@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    font-family: 'Nunito', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  body {
+    font-family: 'Nunito', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #1e293b;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Textbook Typography - Sách Giáo Khoa Tiếng Việt 1 */
+.font-sgk {
+  font-family: 'Nunito', 'Be Vietnam Pro', -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.font-sgk-title {
+  font-family: 'Nunito', 'Be Vietnam Pro', sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.font-reading {
+  font-family: 'Nunito', 'Be Vietnam Pro', sans-serif;
+  line-height: 2.1;
+  letter-spacing: 0.02em;
+  word-spacing: 0.08em;
+}
+
+.font-handwriting {
+  font-family: 'Mali', 'Patrick Hand', cursive, sans-serif;
+  letter-spacing: 0.03em;
+}
+
+/* Grid ruled notebook style (Vở ô ly) */
+.oly-grid {
+  background-size: 20px 20px;
+  background-image: 
+    linear-gradient(to right, rgba(59, 130, 246, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(59, 130, 246, 0.15) 1px, transparent 1px);
+}

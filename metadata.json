@@ -1,0 +1,6 @@
+{
+  "name": "Học Tiếng Việt Lớp 1 - Kết Nối Tri Thức",
+  "description": "Ứng dụng học tập Tiếng Việt lớp 1 theo bộ sách Kết nối tri thức với cuộc sống, bao gồm đầy đủ Tập 1 (83 bài với 3 phần đọc âm, tiếng, từ ngữ và câu) và Tập 2 theo 8 chủ điểm bài học, luyện viết ô li, đánh vần thông minh và bài tập tương tác.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
