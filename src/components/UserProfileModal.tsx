@@ -15,7 +15,8 @@ import {
   ShieldCheck, 
   RotateCcw,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Search
 } from 'lucide-react';
 import { AppUserProfile, UserRole } from '../types';
 import { userProfileService, AVATAR_OPTIONS } from '../services/userProfileService';
@@ -36,6 +37,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [activeUser, setActiveUser] = useState<AppUserProfile>(userProfileService.getActiveUser());
   const [activeTab, setActiveTab] = useState<'profiles' | 'add_new' | 'sync'>('profiles');
   const [roleFilter, setRoleFilter] = useState<'all' | 'student' | 'teacher' | 'parent'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // New user form state
   const [newName, setNewName] = useState('');
@@ -145,8 +147,15 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   };
 
   const filteredUsers = users.filter(u => {
-    if (roleFilter === 'all') return true;
-    return u.role === roleFilter;
+    if (roleFilter !== 'all' && u.role !== roleFilter) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchName = u.name.toLowerCase().includes(q);
+      const matchCode = u.studentCode?.toLowerCase().includes(q);
+      const matchClass = u.classroom?.toLowerCase().includes(q);
+      return matchName || matchCode || matchClass;
+    }
+    return true;
   });
 
   return (
@@ -169,7 +178,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-black">Hệ Thống Đa Người Dùng</h2>
+                <h2 className="text-lg sm:text-xl font-black">Danh Sách Học Sinh & Người Dùng</h2>
                 <span className="bg-white/25 px-2 py-0.5 rounded-full text-[11px] font-bold">
                   {users.length} Hồ sơ
                 </span>
@@ -201,7 +210,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Danh Sách Người Dùng</span>
+            <span>Danh Sách Lớp ({users.filter(u => u.role === 'student').length} HS)</span>
           </button>
 
           <button
@@ -214,7 +223,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             }`}
           >
             <UserPlus className="w-4 h-4" />
-            <span>Thêm Hồ Sơ Mới</span>
+            <span>Thêm Học Sinh Mới</span>
           </button>
 
           <button
@@ -235,13 +244,34 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         {activeTab === 'profiles' && (
           <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
             
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                id="search-user-profile-input"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="🔍 Tìm nhanh theo tên học sinh (vd: Hoài An, Phương Anh, Diệp, Phúc...)"
+                className="w-full pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200 focus:border-amber-500 focus:bg-white rounded-2xl text-xs sm:text-sm font-medium transition-all outline-none"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
             {/* Filter by Role */}
             <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-600">Lọc theo:</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-bold text-slate-600">Lọc:</span>
                 {[
                   { id: 'all', label: 'Tất cả' },
-                  { id: 'student', label: '🎒 Học sinh' },
+                  { id: 'student', label: `🎒 Học sinh (${users.filter(u => u.role === 'student').length})` },
                   { id: 'teacher', label: '👩‍🏫 Giáo viên' },
                   { id: 'parent', label: '👨‍👩‍👧 Phụ huynh' }
                 ].map((f) => (
@@ -260,7 +290,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
 
               <span className="text-xs text-slate-500 font-medium">
-                {filteredUsers.length} người
+                Tìm thấy: <span className="font-bold text-amber-700">{filteredUsers.length}</span> hồ sơ
               </span>
             </div>
 

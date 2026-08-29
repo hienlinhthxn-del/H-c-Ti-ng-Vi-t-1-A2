@@ -6,55 +6,54 @@ import {
   StudentStatus 
 } from '../types';
 
-const CLASSES_STORAGE_KEY = 'tiengviet1_classes_list_v1';
-const STUDENTS_STORAGE_KEY = 'tiengviet1_students_roster_v1';
-const CURRENT_CLASS_KEY = 'tiengviet1_current_class_id_v1';
+const CLASSES_STORAGE_KEY = 'tiengviet1_classes_list_v2';
+const STUDENTS_STORAGE_KEY = 'tiengviet1_students_roster_v2';
+const CURRENT_CLASS_KEY = 'tiengviet1_current_class_id_v2';
 
 // Initial Sample Classes
 const DEFAULT_CLASSES: ClassRoom[] = [
   {
     id: 'lop-1a1',
-    name: 'Lớp 1A1',
+    name: 'Lớp 1A',
     grade: 'Khối 1',
     schoolYear: '2024 - 2025',
-    homeroomTeacher: 'Cô Nguyễn Thị Lan',
-    totalStudents: 18,
-    currentTargetLesson: 45
-  },
-  {
-    id: 'lop-1a2',
-    name: 'Lớp 1A2',
-    grade: 'Khối 1',
-    schoolYear: '2024 - 2025',
-    homeroomTeacher: 'Cô Trần Hải Yến',
-    totalStudents: 16,
-    currentTargetLesson: 42
+    homeroomTeacher: 'Cô Mai Linh',
+    totalStudents: 28,
+    currentTargetLesson: 35
   }
 ];
 
-// Generate realistic default student roster with varied progress for demo/real classroom usage
+// Generate 28 students roster matching the official class image
 const generateDefaultStudents = (): StudentProfile[] => {
-  const avatars = ['👦', '👧', '🧒', '👶'];
-  
   const studentNames = [
-    { code: 'HS01', name: 'Nguyễn Gia Bảo', gender: 'male', status: 'excellent', lessonsCount: 46, recs: 14, writes: 32, stars: 138, note: 'Đọc to, rõ ràng, phát âm chuẩn các âm khó gi/d, tr/ch.' },
-    { code: 'HS02', name: 'Trần Bảo Anh', gender: 'female', status: 'excellent', lessonsCount: 45, recs: 15, writes: 35, stars: 142, note: 'Giọng đọc truyền cảm, ngắt nghỉ đúng dấu câu, viết chữ đều nét.' },
-    { code: 'HS03', name: 'Lê Minh Khang', gender: 'male', status: 'good', lessonsCount: 42, recs: 11, writes: 28, stars: 118, note: 'Chăm chỉ luyện đọc, cần rèn thêm vần uy/uya.' },
-    { code: 'HS04', name: 'Phạm Ngọc Mai', gender: 'female', status: 'excellent', lessonsCount: 48, recs: 18, writes: 38, stars: 156, note: 'Trạng nguyên nhí của lớp, đọc lưu loát mọi bài thơ văn.' },
-    { code: 'HS05', name: 'Hoàng Đức Anh', gender: 'male', status: 'good', lessonsCount: 39, recs: 8, writes: 24, stars: 102, note: 'Đọc tiến bộ rõ rệt, nét chữ rê bút chưa thật mềm.' },
-    { code: 'HS06', name: 'Vũ Quỳnh Chi', gender: 'female', status: 'good', lessonsCount: 41, recs: 10, writes: 27, stars: 112, note: 'Thuộc bảng chữ cái nhanh, giọng đọc vang và tự tin.' },
-    { code: 'HS07', name: 'Đặng Tuấn Kiệt', gender: 'male', status: 'needs_support', lessonsCount: 22, recs: 4, writes: 12, stars: 58, note: 'Hay nhầm lẫn dấu hỏi/ngã và âm s/x. Cần kèm thêm 15p sau giờ học.' },
-    { code: 'HS08', name: 'Bùi Thảo Linh', gender: 'female', status: 'good', lessonsCount: 40, recs: 9, writes: 29, stars: 115, note: 'Đọc tốt phần từ ngữ ứng dụng, chữ viết sạch sẽ.' },
-    { code: 'HS09', name: 'Ngô Quang Huy', gender: 'male', status: 'average', lessonsCount: 32, recs: 6, writes: 18, stars: 84, note: 'Đọc còn hơi chậm, cần luyện ghép vần có âm đệm o/u.' },
-    { code: 'HS10', name: 'Đỗ Hà My', gender: 'female', status: 'excellent', lessonsCount: 44, recs: 12, writes: 31, stars: 130, note: 'Phát âm chuẩn âm đầu và thanh điệu, tích cực phát biểu.' },
-    { code: 'HS11', name: 'Dương Tiến Dũng', gender: 'male', status: 'needs_support', lessonsCount: 19, recs: 3, writes: 10, stars: 49, note: 'Chưa vững vần đôi iê/yê, ươ, uô. Cần hỗ trợ thẻ từ tại nhà.' },
-    { code: 'HS12', name: 'Lý Kim Ngân', gender: 'female', status: 'good', lessonsCount: 38, recs: 8, writes: 26, stars: 105, note: 'Đọc trôi chảy các bài văn ngắn, ngoan ngoãn.' },
-    { code: 'HS13', name: 'Trịnh Đình Trọng', gender: 'male', status: 'average', lessonsCount: 30, recs: 5, writes: 16, stars: 76, note: 'Cần chú ý tư thế ngồi viết và cách cầm bút 3 ngón.' },
-    { code: 'HS14', name: 'Võ Phương Linh', gender: 'female', status: 'excellent', lessonsCount: 43, recs: 13, writes: 33, stars: 135, note: 'Giọng đọc ngọt ngào, đọc thơ có ngữ điệu diễn cảm.' },
-    { code: 'HS15', name: 'Mai Văn Hùng', gender: 'male', status: 'good', lessonsCount: 37, recs: 7, writes: 23, stars: 98, note: 'Đọc to dõng dạc, cần lưu ý ngắt giọng ở dấu phẩy.' },
-    { code: 'HS16', name: 'Chu Thu Trang', gender: 'female', status: 'good', lessonsCount: 39, recs: 8, writes: 25, stars: 108, note: 'Nhớ bài lâu, hoàn thành đầy đủ bài tập cô giao.' },
-    { code: 'HS17', name: 'Phan Quốc Bảo', gender: 'male', status: 'average', lessonsCount: 28, recs: 4, writes: 14, stars: 70, note: 'Đọc câu dài còn ngắt quãng, đang cải thiện tốt.' },
-    { code: 'HS18', name: 'Lương Ánh Tuyết', gender: 'female', status: 'good', lessonsCount: 41, recs: 11, writes: 30, stars: 122, note: 'Nắm chắc cấu tạo tiếng và mô hình đánh vần KNTT.' }
+    { code: 'HS01', name: 'Tòng Hoài An', gender: 'male', status: 'excellent', lessonsCount: 32, recs: 10, writes: 24, stars: 96, note: 'Đọc to, rõ ràng, phát âm tốt.' },
+    { code: 'HS02', name: 'Lò Huyền Anh', gender: 'female', status: 'excellent', lessonsCount: 30, recs: 12, writes: 25, stars: 92, note: 'Giọng đọc truyền cảm, nét chữ đều đẹp.' },
+    { code: 'HS03', name: 'Nguyễn Hoàng Tú Anh', gender: 'male', status: 'good', lessonsCount: 28, recs: 9, writes: 22, stars: 84, note: 'Chăm chỉ luyện đọc bài mới.' },
+    { code: 'HS04', name: 'Nguyễn Phương Anh', gender: 'female', status: 'excellent', lessonsCount: 33, recs: 14, writes: 28, stars: 102, note: 'Đọc diễn cảm, tích cực phát biểu.' },
+    { code: 'HS05', name: 'Mùa Ngọc Bích', gender: 'female', status: 'good', lessonsCount: 27, recs: 8, writes: 20, stars: 80, note: 'Phát âm chuẩn âm đầu và dấu thanh.' },
+    { code: 'HS06', name: 'Nguyễn Ngọc Diệp', gender: 'female', status: 'good', lessonsCount: 29, recs: 9, writes: 21, stars: 86, note: 'Nắm chắc bài, chữ viết sạch sẽ.' },
+    { code: 'HS07', name: 'Lê Nguyễn Linh Đan', gender: 'female', status: 'excellent', lessonsCount: 34, recs: 15, writes: 29, stars: 105, note: 'Đọc lưu loát, giọng đọc trong trẻo.' },
+    { code: 'HS08', name: 'Nguyễn Hải Đăng', gender: 'male', status: 'good', lessonsCount: 26, recs: 7, writes: 19, stars: 78, note: 'Có nhiều tiến bộ khi đọc từ ứng dụng.' },
+    { code: 'HS09', name: 'Tô Hải Đăng', gender: 'male', status: 'good', lessonsCount: 28, recs: 8, writes: 20, stars: 82, note: 'Đọc to dõng dạc, tự tin.' },
+    { code: 'HS10', name: 'Giàng Hương Giang', gender: 'female', status: 'good', lessonsCount: 25, recs: 7, writes: 18, stars: 74, note: 'Thuộc bảng âm vần nhanh.' },
+    { code: 'HS11', name: 'Lò Thị Ngọc Hân', gender: 'female', status: 'good', lessonsCount: 27, recs: 8, writes: 21, stars: 81, note: 'Ngoan ngoãn, rèn đọc chăm chỉ.' },
+    { code: 'HS12', name: 'Giàng Ngọc Bảo Hân', gender: 'female', status: 'excellent', lessonsCount: 31, recs: 11, writes: 26, stars: 94, note: 'Đọc trôi chảy, diễn cảm.' },
+    { code: 'HS13', name: 'Nguyễn Văn Khải', gender: 'male', status: 'good', lessonsCount: 24, recs: 6, writes: 17, stars: 72, note: 'Cần chú ý thêm thanh hỏi/ngã.' },
+    { code: 'HS14', name: 'Nguyễn Khang', gender: 'male', status: 'good', lessonsCount: 26, recs: 7, writes: 18, stars: 76, note: 'Đọc tốt tiếng có âm đệm.' },
+    { code: 'HS15', name: 'Tòng Minh Khôi', gender: 'male', status: 'average', lessonsCount: 20, recs: 5, writes: 14, stars: 60, note: 'Đang tiến bộ dần từng ngày.' },
+    { code: 'HS16', name: 'Đặng Anh Khôi', gender: 'male', status: 'good', lessonsCount: 27, recs: 8, writes: 20, stars: 80, note: 'Đọc tốt các câu ứng dụng ngắn.' },
+    { code: 'HS17', name: 'Khoàng Trang Lê', gender: 'female', status: 'good', lessonsCount: 25, recs: 7, writes: 19, stars: 75, note: 'Chữ viết sạch đẹp, ngay ngắn.' },
+    { code: 'HS18', name: 'Đoàn Khánh Linh', gender: 'female', status: 'excellent', lessonsCount: 32, recs: 12, writes: 27, stars: 98, note: 'Đọc bài lưu loát, giọng hay.' },
+    { code: 'HS19', name: 'Nguyễn Hoàng Long', gender: 'male', status: 'good', lessonsCount: 26, recs: 7, writes: 18, stars: 78, note: 'Hăng hái đọc bài và luyện viết.' },
+    { code: 'HS20', name: 'Nông Ngọc Khải Minh', gender: 'male', status: 'good', lessonsCount: 28, recs: 9, writes: 22, stars: 85, note: 'Nhớ mặt chữ nhanh, phát âm chuẩn.' },
+    { code: 'HS21', name: 'Phạm Hải Nam', gender: 'male', status: 'good', lessonsCount: 27, recs: 8, writes: 20, stars: 80, note: 'Đọc tốt các bài tập đọc 1.' },
+    { code: 'HS22', name: 'Tòng Thị Kim Ngân', gender: 'female', status: 'good', lessonsCount: 26, recs: 7, writes: 19, stars: 78, note: 'Đọc rõ ràng, ngắt nghỉ đúng chỗ.' },
+    { code: 'HS23', name: 'Trần Bảo Ngân', gender: 'female', status: 'excellent', lessonsCount: 33, recs: 13, writes: 28, stars: 100, note: 'Đọc bài rất lưu loát và biểu cảm.' },
+    { code: 'HS24', name: 'Cao Đăng Phúc', gender: 'male', status: 'good', lessonsCount: 24, recs: 6, writes: 17, stars: 72, note: 'Cần luyện thêm vần khó.' },
+    { code: 'HS25', name: 'Nguyễn Ngọc Anh Tú', gender: 'male', status: 'good', lessonsCount: 29, recs: 10, writes: 23, stars: 88, note: 'Năng nổ, phát âm to rõ.' },
+    { code: 'HS26', name: 'Vừ Chí Thiện', gender: 'male', status: 'average', lessonsCount: 21, recs: 5, writes: 15, stars: 62, note: 'Cần kèm thêm ghép âm cuối.' },
+    { code: 'HS27', name: 'Sùng Minh Thư', gender: 'female', status: 'good', lessonsCount: 25, recs: 7, writes: 18, stars: 76, note: 'Tập trung học tập tốt.' },
+    { code: 'HS28', name: 'Lò Nhã Uyên', gender: 'female', status: 'good', lessonsCount: 28, recs: 9, writes: 21, stars: 84, note: 'Đọc chuẩn tiếng và từ ngữ.' }
   ];
 
   return studentNames.map((s, idx) => {
@@ -122,12 +121,19 @@ class ClassAnalyticsService {
     try {
       const raw = localStorage.getItem(STUDENTS_STORAGE_KEY);
       if (raw) {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length >= 20) {
+          return parsed;
+        }
       }
     } catch (e) {
       console.error('Failed to load students from storage:', e);
     }
-    return generateDefaultStudents();
+    const defaults = generateDefaultStudents();
+    try {
+      localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(defaults));
+    } catch (e) {}
+    return defaults;
   }
 
   private loadCurrentClassId(): string {

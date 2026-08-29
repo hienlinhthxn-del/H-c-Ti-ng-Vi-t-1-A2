@@ -1,80 +1,69 @@
 import { AppUserProfile, UserRole } from '../types';
 import { achievementService } from './achievementService';
 
-const USERS_STORAGE_KEY = 'tiengviet1_multi_users_v1';
-const ACTIVE_USER_ID_KEY = 'tiengviet1_active_user_id_v1';
+const USERS_STORAGE_KEY = 'tiengviet1_multi_users_v2';
+const ACTIVE_USER_ID_KEY = 'tiengviet1_active_user_id_v2';
 
 export const AVATAR_OPTIONS = {
-  student: ['🐰', '🐻', '🐱', '🐼', '🦁', '🚀', '🦄', '🐯', '🦊', '🐶', '🐸', '🐨', '🐥', '🦖', '🌟'],
+  student: ['🐰', '🐻', '🐱', '🐼', '🦁', '🚀', '🦄', '🐯', '🦊', '🐶', '🐸', '🐨', '🐥', '🦖', '🌟', '🌸', '💎', '🌿', '🎀', '🌻', '🐲', '📚'],
   teacher: ['👩‍🏫', '👨‍🏫', '🎓', '📚', '🖋️'],
   parent: ['👨‍👩‍👧', '👩‍👧', '👨‍👦', '🏡', '❤️', '🌟']
 };
 
+export const CLASS_ROSTER_STUDENTS = [
+  { code: 'HS01', name: 'Tòng Hoài An', gender: 'male' as const, avatar: '🐰' },
+  { code: 'HS02', name: 'Lò Huyền Anh', gender: 'female' as const, avatar: '🌸' },
+  { code: 'HS03', name: 'Nguyễn Hoàng Tú Anh', gender: 'male' as const, avatar: '🚀' },
+  { code: 'HS04', name: 'Nguyễn Phương Anh', gender: 'female' as const, avatar: '🐱' },
+  { code: 'HS05', name: 'Mùa Ngọc Bích', gender: 'female' as const, avatar: '💎' },
+  { code: 'HS06', name: 'Nguyễn Ngọc Diệp', gender: 'female' as const, avatar: '🌿' },
+  { code: 'HS07', name: 'Lê Nguyễn Linh Đan', gender: 'female' as const, avatar: '🦄' },
+  { code: 'HS08', name: 'Nguyễn Hải Đăng', gender: 'male' as const, avatar: '🦁' },
+  { code: 'HS09', name: 'Tô Hải Đăng', gender: 'male' as const, avatar: '🌟' },
+  { code: 'HS10', name: 'Giàng Hương Giang', gender: 'female' as const, avatar: '🐻' },
+  { code: 'HS11', name: 'Lò Thị Ngọc Hân', gender: 'female' as const, avatar: '🎀' },
+  { code: 'HS12', name: 'Giàng Ngọc Bảo Hân', gender: 'female' as const, avatar: '🦊' },
+  { code: 'HS13', name: 'Nguyễn Văn Khải', gender: 'male' as const, avatar: '🐯' },
+  { code: 'HS14', name: 'Nguyễn Khang', gender: 'male' as const, avatar: '🚀' },
+  { code: 'HS15', name: 'Tòng Minh Khôi', gender: 'male' as const, avatar: '🐶' },
+  { code: 'HS16', name: 'Đặng Anh Khôi', gender: 'male' as const, avatar: '🐼' },
+  { code: 'HS17', name: 'Khoàng Trang Lê', gender: 'female' as const, avatar: '🌻' },
+  { code: 'HS18', name: 'Đoàn Khánh Linh', gender: 'female' as const, avatar: '🐰' },
+  { code: 'HS19', name: 'Nguyễn Hoàng Long', gender: 'male' as const, avatar: '🐲' },
+  { code: 'HS20', name: 'Nông Ngọc Khải Minh', gender: 'male' as const, avatar: '🐨' },
+  { code: 'HS21', name: 'Phạm Hải Nam', gender: 'male' as const, avatar: '🦁' },
+  { code: 'HS22', name: 'Tòng Thị Kim Ngân', gender: 'female' as const, avatar: '🐥' },
+  { code: 'HS23', name: 'Trần Bảo Ngân', gender: 'female' as const, avatar: '🌸' },
+  { code: 'HS24', name: 'Cao Đăng Phúc', gender: 'male' as const, avatar: '🐸' },
+  { code: 'HS25', name: 'Nguyễn Ngọc Anh Tú', gender: 'male' as const, avatar: '🌟' },
+  { code: 'HS26', name: 'Vừ Chí Thiện', gender: 'male' as const, avatar: '🦖' },
+  { code: 'HS27', name: 'Sùng Minh Thư', gender: 'female' as const, avatar: '📚' },
+  { code: 'HS28', name: 'Lò Nhã Uyên', gender: 'female' as const, avatar: '🐱' }
+];
+
 const DEFAULT_PROFILES: AppUserProfile[] = [
-  {
-    id: 'student_dieulinh',
-    name: 'Bé Diệu Linh',
-    role: 'student',
-    avatar: '🐰',
-    studentCode: 'HS01',
-    classroom: 'Lớp 1A',
-    gender: 'female',
-    starsCount: 18,
-    completedLessonKeys: [
-      'vol1_1', 'vol1_2', 'vol1_3', 'vol1_4', 'vol1_5',
-      'vol1_6', 'vol1_7', 'vol1_8', 'vol1_9', 'vol1_10',
-      'vol1_11', 'vol1_12', 'vol1_13', 'vol1_14', 'vol1_15',
-      'vol1_16', 'vol1_17', 'vol1_18'
-    ],
-    unlockedBadgeIds: ['first_lesson', 'reading_3', 'reading_5', 'reading_10', 'rec_first'],
-    totalRecordingsCount: 3,
-    createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
-    lastActiveAt: new Date().toISOString()
-  },
-  {
-    id: 'student_baonam',
-    name: 'Bé Bảo Nam',
-    role: 'student',
-    avatar: '🦁',
-    studentCode: 'HS02',
-    classroom: 'Lớp 1A',
-    gender: 'male',
-    starsCount: 28,
-    completedLessonKeys: [
-      'vol1_1', 'vol1_2', 'vol1_3', 'vol1_4', 'vol1_5',
-      'vol1_6', 'vol1_7', 'vol1_8', 'vol1_9', 'vol1_10',
-      'vol1_11', 'vol1_12', 'vol1_13', 'vol1_14', 'vol1_15',
-      'vol1_16', 'vol1_17', 'vol1_18', 'vol1_19', 'vol1_20',
-      'vol1_21', 'vol1_22', 'vol1_23', 'vol1_24', 'vol1_25',
-      'vol1_26', 'vol1_27', 'vol1_28'
-    ],
-    unlockedBadgeIds: ['first_lesson', 'reading_3', 'reading_5', 'reading_10', 'reading_20', 'vol1_champion', 'rec_first', 'rec_5'],
-    totalRecordingsCount: 6,
-    createdAt: new Date(Date.now() - 40 * 86400000).toISOString(),
-    lastActiveAt: new Date().toISOString()
-  },
-  {
-    id: 'student_tuankiet',
-    name: 'Bé Tuấn Kiệt',
-    role: 'student',
-    avatar: '🚀',
-    studentCode: 'HS03',
-    classroom: 'Lớp 1A',
-    gender: 'male',
-    starsCount: 6,
-    completedLessonKeys: ['vol1_1', 'vol1_2', 'vol1_3', 'vol1_4', 'vol1_5', 'vol1_6'],
-    unlockedBadgeIds: ['first_lesson', 'reading_3', 'reading_5'],
-    totalRecordingsCount: 1,
-    createdAt: new Date(Date.now() - 15 * 86400000).toISOString(),
-    lastActiveAt: new Date().toISOString()
-  },
+  ...CLASS_ROSTER_STUDENTS.map((st, idx) => ({
+    id: `student_hs_${st.code.toLowerCase()}`,
+    name: st.name,
+    role: 'student' as UserRole,
+    avatar: st.avatar,
+    studentCode: st.code,
+    classroom: 'Lớp 1',
+    gender: st.gender,
+    starsCount: idx < 5 ? 12 + idx * 3 : Math.max(2, 20 - idx),
+    completedLessonKeys: Array.from({ length: Math.min(25, Math.max(3, 20 - idx)) }, (_, i) => `vol1_${i + 1}`),
+    unlockedBadgeIds: ['first_lesson', 'reading_3'],
+    totalRecordingsCount: idx % 3 === 0 ? 3 : idx % 2 === 0 ? 2 : 1,
+    createdAt: new Date(Date.now() - (30 + idx) * 86400000).toISOString(),
+    lastActiveAt: new Date(Date.now() - idx * 3600000).toISOString()
+  })),
   {
     id: 'teacher_mailinh',
     name: 'Cô Mai Linh',
     role: 'teacher',
     avatar: '👩‍🏫',
-    classroom: 'Lớp 1A - Trường Tiểu học Chu Văn An',
-    pinCode: '',
+    classroom: 'Lớp 1',
+    pinCode: '1234',
     starsCount: 0,
     completedLessonKeys: [],
     unlockedBadgeIds: [],
@@ -83,12 +72,12 @@ const DEFAULT_PROFILES: AppUserProfile[] = [
     lastActiveAt: new Date().toISOString()
   },
   {
-    id: 'parent_dieulinh',
-    name: 'Mẹ bé Diệu Linh',
+    id: 'parent_lop1',
+    name: 'Phụ Huynh Học Sinh',
     role: 'parent',
     avatar: '👨‍👩‍👧',
-    classroom: 'Lớp 1A',
-    linkedStudentIds: ['student_dieulinh'],
+    classroom: 'Lớp 1',
+    linkedStudentIds: ['student_hs_hs01'],
     starsCount: 0,
     completedLessonKeys: [],
     unlockedBadgeIds: [],
@@ -102,7 +91,7 @@ type UserChangeListener = (activeUser: AppUserProfile, allUsers: AppUserProfile[
 
 class UserProfileService {
   private users: AppUserProfile[] = [];
-  private activeUserId: string = 'student_dieulinh';
+  private activeUserId: string = 'student_hs_hs01';
   private listeners: UserChangeListener[] = [];
 
   constructor() {
@@ -114,6 +103,11 @@ class UserProfileService {
       const storedUsers = localStorage.getItem(USERS_STORAGE_KEY);
       if (storedUsers) {
         this.users = JSON.parse(storedUsers);
+        // If users list is outdated (doesn't have 28 students), merge/seed default roster
+        if (this.users.filter(u => u.role === 'student').length < 10) {
+          this.users = DEFAULT_PROFILES;
+          this.saveUsers();
+        }
       } else {
         this.users = DEFAULT_PROFILES;
         this.saveUsers();
@@ -128,7 +122,7 @@ class UserProfileService {
     } catch (e) {
       console.error('Error initializing UserProfileService:', e);
       this.users = DEFAULT_PROFILES;
-      this.activeUserId = 'student_dieulinh';
+      this.activeUserId = 'student_hs_hs01';
     }
   }
 
