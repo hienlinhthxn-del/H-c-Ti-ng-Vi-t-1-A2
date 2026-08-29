@@ -1,6 +1,7 @@
 import { AppUserProfile } from '../types';
 import { userProfileService } from './userProfileService';
 import { GoogleAccountInfo } from '../types';
+import { TEACHER_HIEN_PHAN_AVATAR_SVG } from '../components/UserAvatar';
 
 const TEACHER_AUTH_KEY = 'tiengviet1_teacher_auth_session_v2';
 const DEFAULT_TEACHER_PIN = '1234';
@@ -109,9 +110,9 @@ class TeacherAuthService {
     if (!targetTeacher) {
       // Create a default teacher if none exists
       targetTeacher = userProfileService.createUser({
-        name: 'Cô Mai Linh',
+        name: 'Cô Hiền Phan',
         role: 'teacher',
-        avatar: '👩‍🏫',
+        avatar: TEACHER_HIEN_PHAN_AVATAR_SVG,
         classroom: 'Lớp 1A',
         pinCode: DEFAULT_TEACHER_PIN
       });

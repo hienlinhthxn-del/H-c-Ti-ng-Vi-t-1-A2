@@ -10,6 +10,8 @@ import { teacherAudioService, TeacherAudioItem } from '../services/teacherAudioS
 import { recordingStorageService } from '../services/recordingStorageService';
 import { classAnalyticsService } from '../services/classAnalyticsService';
 import { speechService } from '../services/speechService';
+import { userProfileService } from '../services/userProfileService';
+import { UserAvatar } from './UserAvatar';
 import { ClassAnalyticsView } from './ClassAnalyticsView';
 import { 
   BookOpen, 
@@ -258,7 +260,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
       {/* Banner Header for Teachers */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 p-6 sm:p-8 text-white shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
+          <div className="space-y-3 max-w-2xl">
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-black uppercase tracking-wider text-amber-100 border border-white/20">
                 <span>👩‍🏫 Cổng Giáo Viên • Chuyên Môn Khối 1</span>
@@ -268,6 +270,23 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                 <span>Đã xác thực bảo mật</span>
               </div>
             </div>
+            
+            <div className="flex items-center gap-3.5 bg-white/15 backdrop-blur-md p-2.5 sm:p-3 rounded-2xl border border-white/25 w-fit">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 overflow-hidden shrink-0 shadow-inner flex items-center justify-center">
+                <UserAvatar 
+                  avatar={userProfileService.getUsersByRole('teacher')[0]?.avatar} 
+                  name={userProfileService.getUsersByRole('teacher')[0]?.name || 'Cô Hiền Phan'} 
+                  size="lg" 
+                />
+              </div>
+              <div>
+                <div className="text-xs text-amber-200 font-bold uppercase tracking-wider">Giáo viên chủ nhiệm</div>
+                <div className="text-base sm:text-lg font-black text-white">
+                  {userProfileService.getUsersByRole('teacher')[0]?.name || 'Cô Hiền Phan'}
+                </div>
+              </div>
+            </div>
+
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-reading">
               Không Gian Dạy Học & Biên Soạn Giáo Án
             </h1>

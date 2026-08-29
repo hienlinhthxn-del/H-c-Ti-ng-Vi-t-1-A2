@@ -42,17 +42,26 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
   const [isPlayingAI, setIsPlayingAI] = useState<boolean>(false);
   const [isPlayingSavedTeacher, setIsPlayingSavedTeacher] = useState<boolean>(false);
   const [teacherName, setTeacherName] = useState<string>(() => {
-    return localStorage.getItem('tv1_teacher_name') || 'Cô giáo';
+    return localStorage.getItem('tv1_teacher_name') || 'Cô Hiền Phan';
   });
   const [micError, setMicError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [, setAudioUpdateVersion] = useState<number>(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<number | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Existing audio if any
+  // Subscribe to teacherAudioService for live updates
+  useEffect(() => {
+    const unsub = teacherAudioService.subscribe(() => {
+      setAudioUpdateVersion(v => v + 1);
+    });
+    return unsub;
+  }, []);
+
+  // Existing audio if any (re-evaluated on update)
   const existingAudio = effectiveText ? teacherAudioService.getAudioByText(effectiveText) : undefined;
 
   useEffect(() => {
@@ -157,6 +166,19 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
     speechService.playSoundEffect('sparkle');
   };
 
+  const handleDiscardRecordedTake = () => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+    }
+    setIsPlayingPreview(false);
+    setAudioBlobUrl(null);
+    setAudioBase64(null);
+    setRecordDuration(0);
+    speechService.playSoundEffect('pop');
+    setToastMessage('Đã hủy bản thu vừa thực hiện. Bạn có thể thu lại bản mới bất cứ lúc nào!');
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
   const playPreviewAudio = () => {
     if (!audioBlobUrl) return;
     if (isPlayingPreview && previewAudioRef.current) {
@@ -236,13 +258,15 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
 
   const handleDeleteSavedAudio = () => {
     if (!effectiveText) return;
-    if (window.confirm(`Bạn có chắc muốn xoá giọng đọc mẫu của "${effectiveText}" và quay lại phát âm AI mặc định?`)) {
+    if (window.confirm(`Thầy Cô có chắc muốn xoá giọng đọc mẫu của "${effectiveText}" khi chưa ưng ý và chuyển về phát âm chuẩn AI mặc định?`)) {
       teacherAudioService.deleteAudioByText(effectiveText);
       speechService.playSoundEffect('pop');
-      setToastMessage('Đã xoá giọng mẫu! Hệ thống sẽ dùng phát âm AI.');
-      setTimeout(() => {
-        onClose();
-      }, 1000);
+      if (isPlayingSavedTeacher) {
+        teacherAudioService.stopCurrentAudio();
+        setIsPlayingSavedTeacher(false);
+      }
+      setToastMessage(`Đã xoá giọng mẫu của "${effectiveText}"! Hệ thống đã chuyển về phát âm AI.`);
+      setTimeout(() => setToastMessage(null), 3000);
     }
   };
 
@@ -268,7 +292,7 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
             </div>
             <div>
               <h3 className="font-extrabold text-lg leading-tight flex items-center gap-1.5 font-serif">
-                <span>Chỉnh sửa Giọng đọc mẫu của Giáo viên</span>
+                <span>Thu âm & Chỉnh sửa Giọng mẫu Giáo viên</span>
               </h3>
               <p className="text-xs text-amber-100 font-medium">
                 {effectiveDisplayTitle || (target.lessonId ? `Bài ${target.lessonId}` : 'Luyện phát âm chuẩn')}
@@ -298,19 +322,30 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
           {/* Target Text Showcase Card */}
           <div className="bg-gradient-to-b from-amber-50/70 to-orange-50/40 rounded-2xl p-5 border border-amber-200 text-center relative overflow-hidden shadow-inner">
             <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 bg-amber-200/80 px-2.5 py-0.5 rounded-full inline-block mb-2">
-              Nội dung giáo viên cần đọc mẫu
+              Nội dung giáo viên đọc mẫu
             </span>
             <div className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 font-reading py-2 leading-relaxed">
               {effectiveText}
             </div>
 
-            {/* Current Voice Status Badge */}
+            {/* Current Voice Status Badge & Delete button */}
             <div className="mt-3 flex items-center justify-center gap-2 flex-wrap text-xs font-bold">
               {existingAudio ? (
-                <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300 shadow-2xs">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  Đã có giọng mẫu của {existingAudio.teacherName || 'Cô giáo'}
-                </span>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-100/90 text-emerald-900 rounded-full border border-emerald-300 shadow-2xs">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Đã lưu giọng mẫu của {existingAudio.teacherName || 'Cô giáo'}
+                  </span>
+                  <button
+                    id="delete-existing-audio-badge-btn"
+                    onClick={handleDeleteSavedAudio}
+                    className="ml-1 text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded-full text-[11px] font-black border border-rose-200 transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Xoá giọng mẫu khi chưa ưng ý"
+                  >
+                    <Trash2 className="w-3 h-3 text-rose-600" />
+                    <span>Xoá giọng này</span>
+                  </button>
+                </div>
               ) : (
                 <span className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-700 rounded-full border border-slate-300">
                   <Bot className="w-3.5 h-3.5 text-blue-500" />
@@ -409,18 +444,18 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
               )}
             </div>
 
-            {/* Preview of newly recorded audio */}
+            {/* Preview of newly recorded audio & Discard/Delete options */}
             {audioBlobUrl && !isRecording && (
-              <div className="p-3.5 bg-white rounded-xl border border-amber-300 flex items-center justify-between gap-3 animate-fadeIn shadow-xs">
+              <div className="p-3.5 bg-white rounded-2xl border-2 border-amber-400 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 animate-fadeIn shadow-xs">
                 <div className="flex items-center gap-2 text-xs font-bold text-amber-950">
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span>Bản thu mới ({formatTime(recordDuration)})</span>
+                  <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span>Bản thu vừa thực hiện ({formatTime(recordDuration)})</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   <button
                     id="play-new-preview-btn"
                     onClick={playPreviewAudio}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl text-xs font-bold transition-all cursor-pointer"
                   >
                     {isPlayingPreview ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                     <span>{isPlayingPreview ? 'Tạm dừng' : 'Nghe thử'}</span>
@@ -429,11 +464,21 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
                   <button
                     id="re-record-btn"
                     onClick={startRecording}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                    title="Thu âm lại"
+                    className="flex items-center gap-1 px-3 py-1.5 text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                    title="Thu âm lại bản khác"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Thu lại</span>
+                  </button>
+
+                  <button
+                    id="discard-new-take-btn"
+                    onClick={handleDiscardRecordedTake}
+                    className="flex items-center gap-1 px-3 py-1.5 text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                    title="Hủy bản thu vừa thu khi chưa ưng ý"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Hủy bản này</span>
                   </button>
                 </div>
               </div>
@@ -449,7 +494,7 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
                 type="text"
                 value={teacherName}
                 onChange={(e) => setTeacherName(e.target.value)}
-                placeholder="VD: Cô Linh, Cô Mai..."
+                placeholder="VD: Cô Hiền Phan..."
                 className="flex-1 px-3 py-1.5 text-xs bg-white rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-800"
               />
             </div>
@@ -459,7 +504,7 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
           <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/80 flex items-start gap-2 text-[11px] text-amber-900 leading-relaxed">
             <HelpCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <strong>Lưu ý cho Giáo viên:</strong> Khi bạn lưu giọng đọc mẫu, mọi nút bấm phát âm (hình chiếc loa 🔊 hoặc khi bấm vào thẻ chữ/từ/câu) sẽ tự động phát giọng đọc của bạn thay vì giọng máy AI. Dữ liệu được lưu an toàn trên máy của bạn.
+              <strong>Lưu ý cho Giáo viên:</strong> Khi lưu giọng đọc mẫu, mọi nút phát âm (hình chiếc loa 🔊 hoặc khi bấm thẻ chữ/từ/câu) sẽ phát giọng đọc của cô giáo. Nếu chưa ưng ý, cô có thể bấm <strong>"Xóa giọng mẫu"</strong> hoặc <strong>"Hủy bản này"</strong> để thu âm lại bất cứ lúc nào.
             </div>
           </div>
 
@@ -471,10 +516,11 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
             <button
               id="delete-teacher-audio-btn"
               onClick={handleDeleteSavedAudio}
-              className="flex items-center gap-1.5 px-3.5 py-2 text-rose-700 hover:bg-rose-100 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              title="Xoá giọng mẫu khi chưa ưng ý và chuyển về phát âm AI"
             >
               <Trash2 className="w-4 h-4" />
-              <span>Xoá giọng mẫu & Dùng lại AI</span>
+              <span>Xoá giọng mẫu (Dùng lại AI)</span>
             </button>
           ) : (
             <div />

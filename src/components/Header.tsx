@@ -19,6 +19,7 @@ import {
   Cloud
 } from 'lucide-react';
 import { UserRole, AppUserProfile } from '../types';
+import { UserAvatar } from './UserAvatar';
 
 interface HeaderProps {
   userRole: UserRole;
@@ -184,7 +185,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center gap-1.5 px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white rounded-xl text-[11px] font-black border border-white/30 backdrop-blur-md transition-all active:scale-95 cursor-pointer shrink-0"
               title="Quản lý đa người dùng, chuyển đổi tài khoản học sinh / giáo viên"
             >
-              <span className="text-sm leading-none">{activeUser?.avatar || '👤'}</span>
+              <UserAvatar avatar={activeUser?.avatar} name={activeUser?.name} size="xs" />
               <span className="max-w-[80px] sm:max-w-[120px] truncate">{activeUser?.name || 'Đa người dùng'}</span>
               <span className="text-[10px] opacity-80 hidden sm:inline">🔄 Đổi</span>
             </button>

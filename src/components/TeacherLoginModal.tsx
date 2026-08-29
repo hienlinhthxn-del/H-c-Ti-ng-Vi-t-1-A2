@@ -213,7 +213,7 @@ export const TeacherLoginModal: React.FC<TeacherLoginModalProps> = ({
                     >
                       {teachers.map(t => (
                         <option key={t.id} value={t.id}>
-                          {t.avatar} {t.name} ({t.classroom || 'Lớp 1'})
+                          {t.avatar?.startsWith('data:') || t.avatar?.startsWith('http') ? '👩‍🏫' : t.avatar} {t.name} ({t.classroom || 'Lớp 1'})
                         </option>
                       ))}
                     </select>

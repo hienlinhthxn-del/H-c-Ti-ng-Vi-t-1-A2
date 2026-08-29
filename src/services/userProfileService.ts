@@ -1,13 +1,14 @@
 import { AppUserProfile, UserRole } from '../types';
 import { achievementService } from './achievementService';
 import { classAnalyticsService } from './classAnalyticsService';
+import { TEACHER_HIEN_PHAN_AVATAR_SVG } from '../components/UserAvatar';
 
-const USERS_STORAGE_KEY = 'tiengviet1_multi_users_v2';
-const ACTIVE_USER_ID_KEY = 'tiengviet1_active_user_id_v2';
+const USERS_STORAGE_KEY = 'tiengviet1_multi_users_v4';
+const ACTIVE_USER_ID_KEY = 'tiengviet1_active_user_id_v4';
 
 export const AVATAR_OPTIONS = {
   student: ['🐰', '🐻', '🐱', '🐼', '🦁', '🚀', '🦄', '🐯', '🦊', '🐶', '🐸', '🐨', '🐥', '🦖', '🌟', '🌸', '💎', '🌿', '🎀', '🌻', '🐲', '📚'],
-  teacher: ['👩‍🏫', '👨‍🏫', '🎓', '📚', '🖋️'],
+  teacher: [TEACHER_HIEN_PHAN_AVATAR_SVG, '👩‍🏫', '👨‍🏫', '🎓', '📚', '🖋️'],
   parent: ['👨‍👩‍👧', '👩‍👧', '👨‍👦', '🏡', '❤️', '🌟']
 };
 
@@ -43,7 +44,7 @@ export const CLASS_ROSTER_STUDENTS = [
 ];
 
 const DEFAULT_PROFILES: AppUserProfile[] = [
-  ...CLASS_ROSTER_STUDENTS.map((st, idx) => ({
+  ...CLASS_ROSTER_STUDENTS.map((st) => ({
     id: `student_hs_${st.code.toLowerCase()}`,
     name: st.name,
     role: 'student' as UserRole,
@@ -51,25 +52,25 @@ const DEFAULT_PROFILES: AppUserProfile[] = [
     studentCode: st.code,
     classroom: 'Lớp 1',
     gender: st.gender,
-    starsCount: idx < 5 ? 12 + idx * 3 : Math.max(2, 20 - idx),
-    completedLessonKeys: Array.from({ length: Math.min(25, Math.max(3, 20 - idx)) }, (_, i) => `vol1_${i + 1}`),
-    unlockedBadgeIds: ['first_lesson', 'reading_3'],
-    totalRecordingsCount: idx % 3 === 0 ? 3 : idx % 2 === 0 ? 2 : 1,
-    createdAt: new Date(Date.now() - (30 + idx) * 86400000).toISOString(),
-    lastActiveAt: new Date(Date.now() - idx * 3600000).toISOString()
+    starsCount: 0,
+    completedLessonKeys: [],
+    unlockedBadgeIds: [],
+    totalRecordingsCount: 0,
+    createdAt: new Date().toISOString(),
+    lastActiveAt: new Date().toISOString()
   })),
   {
-    id: 'teacher_mailinh',
-    name: 'Cô Mai Linh',
+    id: 'teacher_hienphan',
+    name: 'Cô Hiền Phan',
     role: 'teacher',
-    avatar: '👩‍🏫',
+    avatar: TEACHER_HIEN_PHAN_AVATAR_SVG,
     classroom: 'Lớp 1',
     pinCode: '1234',
     starsCount: 0,
     completedLessonKeys: [],
     unlockedBadgeIds: [],
     totalRecordingsCount: 0,
-    createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
+    createdAt: new Date().toISOString(),
     lastActiveAt: new Date().toISOString()
   },
   {
@@ -83,7 +84,7 @@ const DEFAULT_PROFILES: AppUserProfile[] = [
     completedLessonKeys: [],
     unlockedBadgeIds: [],
     totalRecordingsCount: 0,
-    createdAt: new Date(Date.now() - 25 * 86400000).toISOString(),
+    createdAt: new Date().toISOString(),
     lastActiveAt: new Date().toISOString()
   }
 ];
@@ -432,10 +433,29 @@ class UserProfileService {
     }
   }
 
+  // Reset all student progress to 0 (clean slate with names preserved)
+  public resetAllProgress() {
+    this.users = this.users.map(u => {
+      if (u.role === 'student') {
+        return {
+          ...u,
+          starsCount: 0,
+          completedLessonKeys: [],
+          unlockedBadgeIds: [],
+          totalRecordingsCount: 0,
+          lastActiveAt: new Date().toISOString()
+        };
+      }
+      return u;
+    });
+    this.saveUsers();
+    this.notify();
+  }
+
   // Reset to sample profiles
   public resetToDefaultProfiles() {
     this.users = [...DEFAULT_PROFILES];
-    this.activeUserId = 'student_dieulinh';
+    this.activeUserId = this.users[0]?.id || 'teacher_hienphan';
     this.saveUsers();
     this.saveActiveUserId();
     this.notify();

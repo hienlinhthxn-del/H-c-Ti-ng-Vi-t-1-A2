@@ -375,7 +375,7 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                       return (
                         <div
                           key={idx}
-                          className={`p-3 rounded-xl border flex items-center justify-between ${
+                          className={`p-3 rounded-xl border flex items-center justify-between gap-2 ${
                             hasAudio ? 'bg-emerald-50/60 border-emerald-300' : 'bg-slate-50 border-slate-200'
                           }`}
                         >
@@ -385,19 +385,55 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                               {hasAudio ? 'Đã có giọng cô 🌟' : 'Giọng AI'}
                             </span>
                           </div>
-                          <button
-                            onClick={() => onOpenRecorder({
-                              text: letter,
-                              volume: 'vol1',
-                              lessonId: currentVol1Lesson.id,
-                              lessonTitle: `Bài ${currentVol1Lesson.lessonNumber}: ${currentVol1Lesson.title}`,
-                              section: 'letter'
-                            })}
-                            className="p-2 bg-white hover:bg-orange-100 text-orange-600 rounded-xl border border-slate-200 shadow-2xs transition-all cursor-pointer"
-                            title="Thu âm mẫu cho âm này"
-                          >
-                            <Mic className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            {hasAudio && (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    if (playingKey === letter) {
+                                      teacherAudioService.stopCurrentAudio();
+                                      setPlayingKey(null);
+                                    } else {
+                                      speechService.stop();
+                                      setPlayingKey(letter);
+                                      teacherAudioService.playAudio(letter, () => setPlayingKey(null));
+                                    }
+                                  }}
+                                  className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                  title="Nghe thử giọng mẫu đã thu"
+                                >
+                                  {playingKey === letter ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Xóa giọng mẫu của "${letter}" khi chưa ưng ý và chuyển về phát âm AI?`)) {
+                                      teacherAudioService.deleteAudioByText(letter);
+                                      speechService.playSoundEffect('pop');
+                                      setStatusMessage({ text: `Đã xóa giọng mẫu của "${letter}"`, isError: false });
+                                      setTimeout(() => setStatusMessage(null), 2500);
+                                    }
+                                  }}
+                                  className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs transition-all cursor-pointer"
+                                  title="Xóa giọng mẫu khi chưa ưng ý"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => onOpenRecorder({
+                                text: letter,
+                                volume: 'vol1',
+                                lessonId: currentVol1Lesson.id,
+                                lessonTitle: `Bài ${currentVol1Lesson.lessonNumber}: ${currentVol1Lesson.title}`,
+                                section: 'letter'
+                              })}
+                              className="p-1.5 bg-white hover:bg-orange-100 text-orange-600 rounded-lg border border-slate-200 shadow-2xs transition-all cursor-pointer"
+                              title={hasAudio ? "Thu lại giọng mẫu" : "Thu âm mẫu cho âm này"}
+                            >
+                              <Mic className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -415,7 +451,7 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                       return (
                         <div
                           key={idx}
-                          className={`p-3 rounded-xl border flex items-center justify-between ${
+                          className={`p-3 rounded-xl border flex items-center justify-between gap-2 ${
                             hasAudio ? 'bg-emerald-50/60 border-emerald-300' : 'bg-slate-50 border-slate-200'
                           }`}
                         >
@@ -425,19 +461,55 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                               {hasAudio ? 'Đã có giọng cô 🌟' : 'Giọng AI'}
                             </span>
                           </div>
-                          <button
-                            onClick={() => onOpenRecorder({
-                              text: item.word,
-                              volume: 'vol1',
-                              lessonId: currentVol1Lesson.id,
-                              lessonTitle: `Bài ${currentVol1Lesson.lessonNumber}: ${currentVol1Lesson.title}`,
-                              section: 'word'
-                            })}
-                            className="p-2 bg-white hover:bg-orange-100 text-orange-600 rounded-xl border border-slate-200 shadow-2xs transition-all cursor-pointer"
-                            title="Thu âm mẫu từ này"
-                          >
-                            <Mic className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            {hasAudio && (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    if (playingKey === item.word) {
+                                      teacherAudioService.stopCurrentAudio();
+                                      setPlayingKey(null);
+                                    } else {
+                                      speechService.stop();
+                                      setPlayingKey(item.word);
+                                      teacherAudioService.playAudio(item.word, () => setPlayingKey(null));
+                                    }
+                                  }}
+                                  className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                  title="Nghe thử giọng mẫu"
+                                >
+                                  {playingKey === item.word ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Xóa giọng mẫu của từ "${item.word}" khi chưa ưng ý?`)) {
+                                      teacherAudioService.deleteAudioByText(item.word);
+                                      speechService.playSoundEffect('pop');
+                                      setStatusMessage({ text: `Đã xóa giọng mẫu của "${item.word}"`, isError: false });
+                                      setTimeout(() => setStatusMessage(null), 2500);
+                                    }
+                                  }}
+                                  className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs transition-all cursor-pointer"
+                                  title="Xóa giọng mẫu khi chưa ưng ý"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => onOpenRecorder({
+                                text: item.word,
+                                volume: 'vol1',
+                                lessonId: currentVol1Lesson.id,
+                                lessonTitle: `Bài ${currentVol1Lesson.lessonNumber}: ${currentVol1Lesson.title}`,
+                                section: 'word'
+                              })}
+                              className="p-1.5 bg-white hover:bg-orange-100 text-orange-600 rounded-lg border border-slate-200 shadow-2xs transition-all cursor-pointer"
+                              title={hasAudio ? "Thu lại từ này" : "Thu âm mẫu từ này"}
+                            >
+                              <Mic className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -453,19 +525,39 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                     <p className="text-sm font-reading text-slate-800 leading-relaxed">
                       {currentVol1Lesson.part3_SentenceAndPractice.readingPassage}
                     </p>
-                    <button
-                      onClick={() => onOpenRecorder({
-                        text: currentVol1Lesson.part3_SentenceAndPractice.readingPassage,
-                        volume: 'vol1',
-                        lessonId: currentVol1Lesson.id,
-                        lessonTitle: `Bài ${currentVol1Lesson.lessonNumber}: ${currentVol1Lesson.title}`,
-                        section: 'passage'
-                      })}
-                      className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all shrink-0 cursor-pointer"
-                    >
-                      <Mic className="w-3.5 h-3.5" />
-                      <span>Thu âm đoạn văn 🎙️</span>
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {teacherAudioService.hasAudioForText(currentVol1Lesson.part3_SentenceAndPractice.readingPassage) && (
+                        <button
+                          onClick={() => {
+                            const text = currentVol1Lesson.part3_SentenceAndPractice.readingPassage;
+                            if (window.confirm('Xóa giọng đọc mẫu đoạn văn này khi chưa ưng ý?')) {
+                              teacherAudioService.deleteAudioByText(text);
+                              speechService.playSoundEffect('pop');
+                              setStatusMessage({ text: 'Đã xóa giọng mẫu của đoạn văn', isError: false });
+                              setTimeout(() => setStatusMessage(null), 2500);
+                            }
+                          }}
+                          className="flex items-center gap-1 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold border border-rose-200 transition-all cursor-pointer"
+                          title="Xóa giọng mẫu đoạn văn khi chưa ưng ý"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Xóa giọng</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onOpenRecorder({
+                          text: currentVol1Lesson.part3_SentenceAndPractice.readingPassage,
+                          volume: 'vol1',
+                          lessonId: currentVol1Lesson.id,
+                          lessonTitle: `Bài ${currentVol1Lesson.lessonNumber}: ${currentVol1Lesson.title}`,
+                          section: 'passage'
+                        })}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all shrink-0 cursor-pointer"
+                      >
+                        <Mic className="w-3.5 h-3.5" />
+                        <span>{teacherAudioService.hasAudioForText(currentVol1Lesson.part3_SentenceAndPractice.readingPassage) ? 'Thu lại đoạn văn 🎙️' : 'Thu âm đoạn văn 🎙️'}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

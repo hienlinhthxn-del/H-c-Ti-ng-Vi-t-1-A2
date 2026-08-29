@@ -6,9 +6,9 @@ import {
   StudentStatus 
 } from '../types';
 
-const CLASSES_STORAGE_KEY = 'tiengviet1_classes_list_v2';
-const STUDENTS_STORAGE_KEY = 'tiengviet1_students_roster_v2';
-const CURRENT_CLASS_KEY = 'tiengviet1_current_class_id_v2';
+const CLASSES_STORAGE_KEY = 'tiengviet1_classes_list_v4';
+const STUDENTS_STORAGE_KEY = 'tiengviet1_students_roster_v4';
+const CURRENT_CLASS_KEY = 'tiengviet1_current_class_id_v4';
 
 // Initial Sample Classes
 const DEFAULT_CLASSES: ClassRoom[] = [
@@ -17,78 +17,62 @@ const DEFAULT_CLASSES: ClassRoom[] = [
     name: 'Lớp 1A',
     grade: 'Khối 1',
     schoolYear: '2024 - 2025',
-    homeroomTeacher: 'Cô Mai Linh',
+    homeroomTeacher: 'Cô Hiền Phan',
     totalStudents: 28,
     currentTargetLesson: 35
   }
 ];
 
-// Generate 28 students roster matching the official class image
+// Generate 28 students roster matching the official class image (fresh state: 0 lessons, 0 stars, 0 recs)
 const generateDefaultStudents = (): StudentProfile[] => {
   const studentNames = [
-    { code: 'HS01', name: 'Tòng Hoài An', gender: 'male', status: 'excellent', lessonsCount: 32, recs: 10, writes: 24, stars: 96, note: 'Đọc to, rõ ràng, phát âm tốt.' },
-    { code: 'HS02', name: 'Lò Huyền Anh', gender: 'female', status: 'excellent', lessonsCount: 30, recs: 12, writes: 25, stars: 92, note: 'Giọng đọc truyền cảm, nét chữ đều đẹp.' },
-    { code: 'HS03', name: 'Nguyễn Hoàng Tú Anh', gender: 'male', status: 'good', lessonsCount: 28, recs: 9, writes: 22, stars: 84, note: 'Chăm chỉ luyện đọc bài mới.' },
-    { code: 'HS04', name: 'Nguyễn Phương Anh', gender: 'female', status: 'excellent', lessonsCount: 33, recs: 14, writes: 28, stars: 102, note: 'Đọc diễn cảm, tích cực phát biểu.' },
-    { code: 'HS05', name: 'Mùa Ngọc Bích', gender: 'female', status: 'good', lessonsCount: 27, recs: 8, writes: 20, stars: 80, note: 'Phát âm chuẩn âm đầu và dấu thanh.' },
-    { code: 'HS06', name: 'Nguyễn Ngọc Diệp', gender: 'female', status: 'good', lessonsCount: 29, recs: 9, writes: 21, stars: 86, note: 'Nắm chắc bài, chữ viết sạch sẽ.' },
-    { code: 'HS07', name: 'Lê Nguyễn Linh Đan', gender: 'female', status: 'excellent', lessonsCount: 34, recs: 15, writes: 29, stars: 105, note: 'Đọc lưu loát, giọng đọc trong trẻo.' },
-    { code: 'HS08', name: 'Nguyễn Hải Đăng', gender: 'male', status: 'good', lessonsCount: 26, recs: 7, writes: 19, stars: 78, note: 'Có nhiều tiến bộ khi đọc từ ứng dụng.' },
-    { code: 'HS09', name: 'Tô Hải Đăng', gender: 'male', status: 'good', lessonsCount: 28, recs: 8, writes: 20, stars: 82, note: 'Đọc to dõng dạc, tự tin.' },
-    { code: 'HS10', name: 'Giàng Hương Giang', gender: 'female', status: 'good', lessonsCount: 25, recs: 7, writes: 18, stars: 74, note: 'Thuộc bảng âm vần nhanh.' },
-    { code: 'HS11', name: 'Lò Thị Ngọc Hân', gender: 'female', status: 'good', lessonsCount: 27, recs: 8, writes: 21, stars: 81, note: 'Ngoan ngoãn, rèn đọc chăm chỉ.' },
-    { code: 'HS12', name: 'Giàng Ngọc Bảo Hân', gender: 'female', status: 'excellent', lessonsCount: 31, recs: 11, writes: 26, stars: 94, note: 'Đọc trôi chảy, diễn cảm.' },
-    { code: 'HS13', name: 'Nguyễn Văn Khải', gender: 'male', status: 'good', lessonsCount: 24, recs: 6, writes: 17, stars: 72, note: 'Cần chú ý thêm thanh hỏi/ngã.' },
-    { code: 'HS14', name: 'Nguyễn Khang', gender: 'male', status: 'good', lessonsCount: 26, recs: 7, writes: 18, stars: 76, note: 'Đọc tốt tiếng có âm đệm.' },
-    { code: 'HS15', name: 'Tòng Minh Khôi', gender: 'male', status: 'average', lessonsCount: 20, recs: 5, writes: 14, stars: 60, note: 'Đang tiến bộ dần từng ngày.' },
-    { code: 'HS16', name: 'Đặng Anh Khôi', gender: 'male', status: 'good', lessonsCount: 27, recs: 8, writes: 20, stars: 80, note: 'Đọc tốt các câu ứng dụng ngắn.' },
-    { code: 'HS17', name: 'Khoàng Trang Lê', gender: 'female', status: 'good', lessonsCount: 25, recs: 7, writes: 19, stars: 75, note: 'Chữ viết sạch đẹp, ngay ngắn.' },
-    { code: 'HS18', name: 'Đoàn Khánh Linh', gender: 'female', status: 'excellent', lessonsCount: 32, recs: 12, writes: 27, stars: 98, note: 'Đọc bài lưu loát, giọng hay.' },
-    { code: 'HS19', name: 'Nguyễn Hoàng Long', gender: 'male', status: 'good', lessonsCount: 26, recs: 7, writes: 18, stars: 78, note: 'Hăng hái đọc bài và luyện viết.' },
-    { code: 'HS20', name: 'Nông Ngọc Khải Minh', gender: 'male', status: 'good', lessonsCount: 28, recs: 9, writes: 22, stars: 85, note: 'Nhớ mặt chữ nhanh, phát âm chuẩn.' },
-    { code: 'HS21', name: 'Phạm Hải Nam', gender: 'male', status: 'good', lessonsCount: 27, recs: 8, writes: 20, stars: 80, note: 'Đọc tốt các bài tập đọc 1.' },
-    { code: 'HS22', name: 'Tòng Thị Kim Ngân', gender: 'female', status: 'good', lessonsCount: 26, recs: 7, writes: 19, stars: 78, note: 'Đọc rõ ràng, ngắt nghỉ đúng chỗ.' },
-    { code: 'HS23', name: 'Trần Bảo Ngân', gender: 'female', status: 'excellent', lessonsCount: 33, recs: 13, writes: 28, stars: 100, note: 'Đọc bài rất lưu loát và biểu cảm.' },
-    { code: 'HS24', name: 'Cao Đăng Phúc', gender: 'male', status: 'good', lessonsCount: 24, recs: 6, writes: 17, stars: 72, note: 'Cần luyện thêm vần khó.' },
-    { code: 'HS25', name: 'Nguyễn Ngọc Anh Tú', gender: 'male', status: 'good', lessonsCount: 29, recs: 10, writes: 23, stars: 88, note: 'Năng nổ, phát âm to rõ.' },
-    { code: 'HS26', name: 'Vừ Chí Thiện', gender: 'male', status: 'average', lessonsCount: 21, recs: 5, writes: 15, stars: 62, note: 'Cần kèm thêm ghép âm cuối.' },
-    { code: 'HS27', name: 'Sùng Minh Thư', gender: 'female', status: 'good', lessonsCount: 25, recs: 7, writes: 18, stars: 76, note: 'Tập trung học tập tốt.' },
-    { code: 'HS28', name: 'Lò Nhã Uyên', gender: 'female', status: 'good', lessonsCount: 28, recs: 9, writes: 21, stars: 84, note: 'Đọc chuẩn tiếng và từ ngữ.' }
+    { code: 'HS01', name: 'Tòng Hoài An', gender: 'male' },
+    { code: 'HS02', name: 'Lò Huyền Anh', gender: 'female' },
+    { code: 'HS03', name: 'Nguyễn Hoàng Tú Anh', gender: 'male' },
+    { code: 'HS04', name: 'Nguyễn Phương Anh', gender: 'female' },
+    { code: 'HS05', name: 'Mùa Ngọc Bích', gender: 'female' },
+    { code: 'HS06', name: 'Nguyễn Ngọc Diệp', gender: 'female' },
+    { code: 'HS07', name: 'Lê Nguyễn Linh Đan', gender: 'female' },
+    { code: 'HS08', name: 'Nguyễn Hải Đăng', gender: 'male' },
+    { code: 'HS09', name: 'Tô Hải Đăng', gender: 'male' },
+    { code: 'HS10', name: 'Giàng Hương Giang', gender: 'female' },
+    { code: 'HS11', name: 'Lò Thị Ngọc Hân', gender: 'female' },
+    { code: 'HS12', name: 'Giàng Ngọc Bảo Hân', gender: 'female' },
+    { code: 'HS13', name: 'Nguyễn Văn Khải', gender: 'male' },
+    { code: 'HS14', name: 'Nguyễn Khang', gender: 'male' },
+    { code: 'HS15', name: 'Tòng Minh Khôi', gender: 'male' },
+    { code: 'HS16', name: 'Đặng Anh Khôi', gender: 'male' },
+    { code: 'HS17', name: 'Khoàng Trang Lê', gender: 'female' },
+    { code: 'HS18', name: 'Đoàn Khánh Linh', gender: 'female' },
+    { code: 'HS19', name: 'Nguyễn Hoàng Long', gender: 'male' },
+    { code: 'HS20', name: 'Nông Ngọc Khải Minh', gender: 'male' },
+    { code: 'HS21', name: 'Phạm Hải Nam', gender: 'male' },
+    { code: 'HS22', name: 'Tòng Thị Kim Ngân', gender: 'female' },
+    { code: 'HS23', name: 'Trần Bảo Ngân', gender: 'female' },
+    { code: 'HS24', name: 'Cao Đăng Phúc', gender: 'male' },
+    { code: 'HS25', name: 'Nguyễn Ngọc Anh Tú', gender: 'male' },
+    { code: 'HS26', name: 'Vừ Chí Thiện', gender: 'male' },
+    { code: 'HS27', name: 'Sùng Minh Thư', gender: 'female' },
+    { code: 'HS28', name: 'Lò Nhã Uyên', gender: 'female' }
   ];
 
-  return studentNames.map((s, idx) => {
-    // Generate completed lessons
-    const completedList: StudentCompletedLesson[] = [];
-    for (let i = 1; i <= s.lessonsCount; i++) {
-      completedList.push({
-        lessonKey: `vol1_${i}`,
-        volume: 'vol1',
-        lessonNumber: i,
-        lessonTitle: `Bài ${i}`,
-        completedAt: new Date(Date.now() - (s.lessonsCount - i) * 86400000 * 1.5).toISOString(),
-        scoreStars: Math.floor(Math.random() * 2) + 4, // 4 or 5 stars
-        practiceType: i % 3 === 0 ? 'recording' : i % 2 === 0 ? 'writing' : 'reading'
-      });
-    }
-
-    return {
-      id: `student_${idx + 1}`,
-      studentCode: s.code,
-      name: s.name,
-      gender: s.gender as 'male' | 'female',
-      classId: 'lop-1a1',
-      avatar: s.gender === 'female' ? '👧' : '👦',
-      dob: '2018-05-15',
-      completedLessons: completedList,
-      recordingsCount: s.recs,
-      writingCount: s.writes,
-      starsCount: s.stars,
-      streakDays: Math.floor(Math.random() * 5) + 2,
-      status: s.status as StudentStatus,
-      teacherNotes: s.note,
-      lastActiveAt: new Date(Date.now() - Math.floor(Math.random() * 86400000 * 3)).toISOString()
-    };
-  });
+  return studentNames.map((s, idx) => ({
+    id: `student_${idx + 1}`,
+    studentCode: s.code,
+    name: s.name,
+    gender: s.gender as 'male' | 'female',
+    classId: 'lop-1a1',
+    avatar: s.gender === 'female' ? '👧' : '👦',
+    dob: '2018-05-15',
+    completedLessons: [],
+    recordingsCount: 0,
+    writingCount: 0,
+    starsCount: 0,
+    streakDays: 0,
+    status: 'average' as StudentStatus,
+    teacherNotes: '',
+    lastActiveAt: new Date().toISOString()
+  }));
 };
 
 type ClassAnalyticsSubscriber = () => void;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   User, 
@@ -16,12 +16,14 @@ import {
   RotateCcw,
   CheckCircle2,
   AlertCircle,
-  Search
+  Search,
+  Camera
 } from 'lucide-react';
 import { AppUserProfile, UserRole } from '../types';
 import { userProfileService, AVATAR_OPTIONS } from '../services/userProfileService';
 import { classAnalyticsService } from '../services/classAnalyticsService';
 import { speechService } from '../services/speechService';
+import { UserAvatar } from './UserAvatar';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -174,8 +176,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         {/* Modal Header */}
         <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-4 sm:p-6 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shadow-inner">
-              {activeUser.avatar}
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner overflow-hidden">
+              <UserAvatar avatar={activeUser.avatar} name={activeUser.name} size="lg" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -337,18 +339,44 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] font-bold text-slate-700 block mb-1">Biểu tượng Avatar:</label>
-                          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-                            {(AVATAR_OPTIONS[user.role] || AVATAR_OPTIONS.student).map((av) => (
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] font-bold text-slate-700">Avatar / Ảnh đại diện:</label>
+                            <label className="text-[10px] text-amber-700 font-bold hover:underline cursor-pointer flex items-center gap-1">
+                              <Camera className="w-3 h-3" />
+                              <span>Tải ảnh từ máy</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = () => {
+                                      if (typeof reader.result === 'string') {
+                                        setEditAvatar(reader.result);
+                                      }
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                            <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border-2 border-amber-500 flex items-center justify-center bg-white shadow-2xs">
+                              <UserAvatar avatar={editAvatar} size="sm" />
+                            </div>
+                            {(AVATAR_OPTIONS[user.role] || AVATAR_OPTIONS.student).map((av, idx) => (
                               <button
-                                key={av}
+                                key={idx}
                                 type="button"
                                 onClick={() => setEditAvatar(av)}
-                                className={`w-8 h-8 rounded-lg text-lg flex items-center justify-center transition-all cursor-pointer ${
-                                  editAvatar === av ? 'bg-amber-500 shadow-xs scale-110' : 'bg-white border border-slate-200'
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                                  editAvatar === av ? 'bg-amber-500 shadow-xs scale-110 ring-2 ring-amber-300' : 'bg-white border border-slate-200'
                                 }`}
                               >
-                                {av}
+                                <UserAvatar avatar={av} size="xs" />
                               </button>
                             ))}
                           </div>
@@ -377,8 +405,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-2xl shadow-inner shrink-0">
-                        {user.avatar}
+                      <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center shadow-inner shrink-0 overflow-hidden">
+                        <UserAvatar avatar={user.avatar} name={user.name} size="lg" />
                       </div>
 
                       <div className="min-w-0 flex-1">
@@ -550,22 +578,48 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
             {/* Avatar Selector */}
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1.5">
-                Chọn biểu tượng đại diện (Avatar):
-              </label>
-              <div className="flex items-center gap-2 overflow-x-auto p-2 bg-amber-50/60 rounded-2xl border border-amber-200 no-scrollbar">
-                {(AVATAR_OPTIONS[newRole] || AVATAR_OPTIONS.student).map((av) => (
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-slate-700">
+                  Chọn biểu tượng đại diện (Avatar):
+                </label>
+                <label className="text-[11px] text-amber-700 font-bold hover:underline cursor-pointer flex items-center gap-1">
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Tải ảnh đại diện từ máy 📷</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          if (typeof reader.result === 'string') {
+                            setNewAvatar(reader.result);
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              <div className="flex items-center gap-2 overflow-x-auto p-2.5 bg-amber-50/60 rounded-2xl border border-amber-200 no-scrollbar">
+                <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border-2 border-amber-500 flex items-center justify-center bg-white shadow-xs">
+                  <UserAvatar avatar={newAvatar} size="md" />
+                </div>
+                {(AVATAR_OPTIONS[newRole] || AVATAR_OPTIONS.student).map((av, idx) => (
                   <button
-                    key={av}
+                    key={idx}
                     type="button"
                     onClick={() => setNewAvatar(av)}
-                    className={`w-10 h-10 rounded-xl text-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                       newAvatar === av
                         ? 'bg-amber-500 shadow-md scale-110 ring-2 ring-amber-300'
                         : 'bg-white border border-slate-200 hover:scale-105'
                     }`}
                   >
-                    {av}
+                    <UserAvatar avatar={av} size="sm" />
                   </button>
                 ))}
               </div>
@@ -635,7 +689,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <span className="font-bold text-xs text-slate-900">2. Nạp lại hồ sơ mẫu</span>
                 </div>
                 <p className="text-[11px] text-slate-600">
-                  Tải lại 5 hồ sơ mẫu chuẩn (Bé Diệu Linh, Bé Bảo Nam, Bé Tuấn Kiệt, Cô Mai Linh...).
+                  Tải lại 28 học sinh và Giáo viên chủ nhiệm (Cô Hiền Phan...).
                 </p>
                 <button
                   type="button"

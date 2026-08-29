@@ -1,6 +1,7 @@
 import React from 'react';
 import { BookOpen, BookCheck, Volume2, Edit3, Award, Users, GraduationCap, Sparkles } from 'lucide-react';
 import { UserRole, AppUserProfile } from '../types';
+import { UserAvatar } from './UserAvatar';
 
 interface MobileNavBarProps {
   userRole: UserRole;
@@ -130,8 +131,8 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
           onClick={onOpenProfileModal}
           className="flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all text-amber-700 font-medium cursor-pointer"
         >
-          <div className="p-1 rounded-xl bg-amber-100/90 text-amber-900 border border-amber-300/80 shadow-2xs">
-            <span className="text-sm leading-none">{activeUser?.avatar || '👤'}</span>
+          <div className="p-0.5 rounded-xl bg-amber-100/90 text-amber-900 border border-amber-300/80 shadow-2xs overflow-hidden flex items-center justify-center">
+            <UserAvatar avatar={activeUser?.avatar} name={activeUser?.name} size="xs" />
           </div>
           <span className="text-[9px] mt-0.5 whitespace-nowrap max-w-[48px] truncate font-bold">{activeUser?.name?.split(' ').pop() || 'Đổi hồ sơ'}</span>
         </button>
