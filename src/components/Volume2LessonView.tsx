@@ -1,10 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Volume2Lesson, RecordingTargetInfo, AchievementBadge } from '../types';
+import { Volume2Lesson, RecordingTargetInfo } from '../types';
 import { speechService } from '../services/speechService';
 import { lessonStorageService } from '../services/lessonStorageService';
-import { achievementService } from '../services/achievementService';
-import { VoiceRecordButton } from './VoiceRecordButton';
-import { Volume2, CheckCircle2, ChevronLeft, ChevronRight, Sparkles, BookOpen, PenTool, HelpCircle, Lightbulb, Edit3, Mic, Type, Check } from 'lucide-react';
+import { teacherAudioService } from '../services/teacherAudioService';
+import { TeacherAudioTarget } from './TeacherAudioRecorderModal';
+import {
+  Volume2,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ArrowLeft,
+  Sparkles,
+  PenTool,
+  HelpCircle,
+  Lightbulb,
+  Edit3,
+  Mic,
+  Type
+} from 'lucide-react';
 
 interface Volume2LessonViewProps {
   lesson: Volume2Lesson;
@@ -16,7 +29,8 @@ interface Volume2LessonViewProps {
   onAddStar: () => void;
   onEditLesson?: () => void;
   onOpenVoiceRecorder?: (target: RecordingTargetInfo) => void;
-  onUnlockBadges?: (badges: AchievementBadge[]) => void;
+  onOpenTeacherRecorder?: (target: TeacherAudioTarget) => void;
+  onBackToList?: () => void;
 }
 
 export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
@@ -29,45 +43,65 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
   onAddStar,
   onEditLesson,
   onOpenVoiceRecorder,
-  onUnlockBadges
+  onOpenTeacherRecorder,
+  onBackToList
 }) => {
   const [fontSizeMode, setFontSizeMode] = useState<'normal' | 'large' | 'huge'>('normal');
+  const [isTeacherVoiceEditMode, setIsTeacherVoiceEditMode] = useState<boolean>(false);
   const [selectedAnswers, setSelectedAnswers] = useState<{ [key: string]: number }>({});
   const [showAnswerFor, setShowAnswerFor] = useState<{ [key: string]: boolean }>({});
   const [spellingSelections, setSpellingSelections] = useState<{ [key: number]: string }>({});
-  const [isCompleted, setIsCompleted] = useState<boolean>(() => achievementService.isLessonCompleted('vol2', lesson.id));
+  const [, setAudioVersion] = useState<number>(0);
 
+  // Subscribe to teacher audio changes
   useEffect(() => {
-    setIsCompleted(achievementService.isLessonCompleted('vol2', lesson.id));
-  }, [lesson.id]);
+    const unsub = teacherAudioService.subscribe(() => {
+      setAudioVersion(v => v + 1);
+    });
+    return unsub;
+  }, []);
 
   const isCustomized = lessonStorageService.isVolume2Customized(lesson.id);
 
-  const handleToggleCompletion = () => {
-    const nextState = !isCompleted;
-    setIsCompleted(nextState);
-    const { newlyCompleted, newBadges } = achievementService.setLessonCompleted('vol2', lesson.id, nextState);
-    
-    if (newlyCompleted) {
-      speechService.playSoundEffect('fanfare');
-      speechService.speak('Chúc mừng bé đã hoàn thành bài đọc hiểu Tập 2!');
-      onAddStar();
-
-      if (newBadges.length > 0 && onUnlockBadges) {
-        onUnlockBadges(newBadges);
-      }
-    } else {
-      speechService.playSoundEffect('pop');
+  const handleTeacherRecordClick = (e: React.MouseEvent, text: string, sectionTitle: string) => {
+    e.stopPropagation();
+    if (onOpenTeacherRecorder) {
+      onOpenTeacherRecorder({
+        targetText: text,
+        volume: 'vol2',
+        lessonId: lesson.id,
+        lessonNumber: lesson.lessonNumber,
+        lessonTitle: `${lesson.title} (${lesson.topicTitle})`,
+        sectionTitle
+      });
     }
   };
 
   const handleSelectQuiz = (qId: string, optIdx: number, correctOpt: number | undefined) => {
     setSelectedAnswers(prev => ({ ...prev, [qId]: optIdx }));
     if (correctOpt !== undefined && optIdx === correctOpt) {
-      speechService.playSoundEffect('success');
-      onAddStar();
+      const alreadyAnswered = selectedAnswers[qId] === correctOpt;
+      if (!alreadyAnswered) {
+        const nextAnswers = { ...selectedAnswers, [qId]: optIdx };
+        const questions = lesson.comprehensionQuestions || [];
+        const answeredCount = questions.filter(
+          q => q.correctOption !== undefined && nextAnswers[q.id] === q.correctOption
+        ).length;
+
+        if (questions.length > 0 && answeredCount === questions.length) {
+          speechService.playSoundEffect('sectionComplete');
+          setTimeout(() => {
+            speechService.speak('Hoan hô bé! Bé đã trả lời đúng toàn bộ câu hỏi đọc hiểu!');
+          }, 500);
+        } else {
+          speechService.playSoundEffect('correct');
+        }
+        onAddStar();
+      } else {
+        speechService.playSoundEffect('correct');
+      }
     } else {
-      speechService.playSoundEffect('pop');
+      speechService.playSoundEffect('tryAgain');
     }
   };
 
@@ -78,509 +112,405 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
 
   // Dynamic font sizing
   const readingFontSizeClass = fontSizeMode === 'huge'
-    ? 'text-2xl sm:text-3xl md:text-4xl leading-[2.4] tracking-wide'
+    ? 'text-2xl sm:text-3xl leading-[2.3]'
     : fontSizeMode === 'large'
-    ? 'text-xl sm:text-2xl md:text-3xl leading-[2.3] tracking-wide'
-    : 'text-lg sm:text-xl md:text-2xl leading-[2.2] tracking-wide';
+    ? 'text-xl sm:text-2xl leading-[2.2]'
+    : 'text-lg sm:text-xl leading-[2.1]';
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 font-sgk">
+    <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 font-sgk">
       
-      {/* Thematic Header */}
-      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 rounded-3xl p-6 sm:p-8 text-white shadow-lg mb-6 relative overflow-hidden">
-        <div className="absolute right-0 bottom-0 opacity-10 translate-x-8 translate-y-8 pointer-events-none">
-          <BookOpen className="w-64 h-64" />
-        </div>
+      {/* Top Action & Navigation Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        {onBackToList ? (
+          <button
+            id="back-to-vol2-list-btn"
+            onClick={onBackToList}
+            className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-teal-700 hover:text-teal-800 bg-white hover:bg-teal-50/70 border border-teal-200/80 px-3.5 py-1.5 rounded-full shadow-2xs transition-all active:scale-95 cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Quay lại chủ điểm Tập 2</span>
+          </button>
+        ) : <div />}
 
-        <div className="relative z-10">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-black tracking-wide uppercase">
-                Tập 2 • {lesson.topicTitle}
-              </span>
-              <span className="bg-emerald-300 text-emerald-950 px-2.5 py-0.5 rounded-full text-xs font-bold">
-                Trang {lesson.pageRange}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Quick Font Size Switcher */}
+          <div className="flex items-center gap-1 bg-white border border-slate-200/80 p-1 rounded-xl shadow-2xs">
+            <span className="text-slate-400 text-xs px-1 flex items-center gap-1">
+              <Type className="w-3.5 h-3.5" />
+            </span>
+            <button
+              onClick={() => setFontSizeMode('normal')}
+              className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                fontSizeMode === 'normal' ? 'bg-teal-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+              title="Cỡ chữ chuẩn SGK"
+            >
+              Chuẩn
+            </button>
+            <button
+              onClick={() => setFontSizeMode('large')}
+              className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                fontSizeMode === 'large' ? 'bg-teal-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+              title="Cỡ chữ Lớn"
+            >
+              Lớn
+            </button>
+            <button
+              onClick={() => setFontSizeMode('huge')}
+              className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                fontSizeMode === 'huge' ? 'bg-teal-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+              title="Cỡ chữ Rất Lớn"
+            >
+              Rất lớn
+            </button>
+          </div>
+
+          {/* Toggle Teacher Voice Recording / Editing Mode */}
+          {onOpenTeacherRecorder && (
+            <button
+              id="toggle-vol2-teacher-voice-mode-btn"
+              onClick={() => {
+                setIsTeacherVoiceEditMode(!isTeacherVoiceEditMode);
+                speechService.playSoundEffect('pop');
+              }}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full font-bold text-xs sm:text-sm shadow-2xs transition-all active:scale-95 cursor-pointer border ${
+                isTeacherVoiceEditMode
+                  ? 'bg-teal-700 hover:bg-teal-800 text-white border-teal-800 ring-2 ring-teal-300'
+                  : 'bg-teal-50 hover:bg-teal-100 text-teal-900 border-teal-300/80'
+              }`}
+              title="Bật/tắt chế độ cho phép Giáo viên thu âm giọng mẫu chuẩn cho từng đoạn văn, từ vựng và câu hỏi"
+            >
+              <Mic className="w-3.5 h-3.5" />
+              <span>{isTeacherVoiceEditMode ? 'Đang sửa giọng GV' : 'Sửa giọng mẫu GV'}</span>
+            </button>
+          )}
+
+          {/* Edit Lesson Button */}
+          {onEditLesson && (
+            <button
+              id="edit-current-vol2-lesson-btn"
+              onClick={onEditLesson}
+              className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200/80 px-3.5 py-1.5 rounded-full shadow-2xs transition-all active:scale-95 cursor-pointer"
+              title="Chỉnh sửa bài học Tập 2 này"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Sửa bài</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Streamlined Lesson Card */}
+      <div className="bg-white rounded-[28px] sm:rounded-[32px] shadow-lg shadow-teal-900/5 border border-teal-200/70 overflow-hidden relative border-t-4 border-t-teal-600">
+        <div className="p-5 sm:p-8 lg:p-10 space-y-8 sm:space-y-10">
+          
+          {/* Lesson Header */}
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-800 bg-teal-100/80 px-2.5 py-0.5 rounded-full">
+                {lesson.topicTitle}
               </span>
               {isCustomized && (
-                <span className="bg-white text-emerald-800 px-2.5 py-0.5 rounded-full text-xs font-black flex items-center gap-1 shadow-2xs">
-                  <Sparkles className="w-3 h-3 text-emerald-600 fill-emerald-500" />
+                <span className="bg-teal-100 text-teal-800 px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-teal-600 fill-teal-500" />
                   Đã tùy chỉnh bởi GV
                 </span>
               )}
             </div>
-
-            {/* Quick Font Size Switcher for Textbook Reading */}
-            <div className="flex items-center gap-1 bg-black/20 p-1 rounded-xl backdrop-blur-xs">
-              <span className="text-white/80 text-[11px] px-1.5 flex items-center gap-1">
-                <Type className="w-3.5 h-3.5" />
-                <span>Cỡ chữ:</span>
-              </span>
-              <button
-                onClick={() => setFontSizeMode('normal')}
-                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  fontSizeMode === 'normal' ? 'bg-white text-emerald-800 shadow-xs' : 'text-white/80 hover:text-white'
-                }`}
-                title="Cỡ chữ chuẩn SGK"
-              >
-                Chuẩn SGK
-              </button>
-              <button
-                onClick={() => setFontSizeMode('large')}
-                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  fontSizeMode === 'large' ? 'bg-white text-emerald-800 shadow-xs' : 'text-white/80 hover:text-white'
-                }`}
-                title="Cỡ chữ Lớn cho bé"
-              >
-                Lớn (A+)
-              </button>
-              <button
-                onClick={() => setFontSizeMode('huge')}
-                className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  fontSizeMode === 'huge' ? 'bg-white text-emerald-800 shadow-xs' : 'text-white/80 hover:text-white'
-                }`}
-                title="Cỡ chữ Rất Lớn"
-              >
-                Rất lớn (A++)
-              </button>
-            </div>
-          </div>
-
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black font-sgk-title tracking-tight mt-1">
-            {lesson.title}
-          </h1>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2 sm:gap-3">
-            {/* Completion Toggle Button */}
-            <button
-              id="toggle-vol2-completed-btn"
-              onClick={handleToggleCompletion}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer border ${
-                isCompleted
-                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-400'
-                  : 'bg-white/95 hover:bg-white text-emerald-950 border-white/60'
-              }`}
-              title={isCompleted ? 'Bé đã hoàn thành bài học này (bấm để hủy)' : 'Bấm để đánh dấu đã đọc xong bài này'}
-            >
-              {isCompleted ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-200 fill-emerald-600" />
-                  <span>Đã đọc xong ⭐</span>
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4 text-emerald-700" />
-                  <span>Đánh dấu đã đọc</span>
-                </>
-              )}
-            </button>
-
-            {onOpenVoiceRecorder && (
-              <VoiceRecordButton
-                target={{
-                  volume: 'vol2',
-                  lessonId: lesson.id,
-                  lessonNumber: lesson.lessonNumber,
-                  lessonTitle: `${lesson.title} (${lesson.topicTitle})`,
-                  sectionTitle: 'Toàn bộ bài đọc',
-                  targetText: `${lesson.reading.title}\n\n${lesson.reading.content.join('\n\n')}`,
-                  referenceAudioText: `${lesson.reading.title}. ${lesson.reading.content.join(' ')}`
-                }}
-                onOpenRecorder={onOpenVoiceRecorder}
-                variant="pill"
-                label="Bé thu âm cả bài đọc"
-              />
-            )}
-
-            {onEditLesson && (
-              <button
-                id="edit-current-vol2-lesson-btn"
-                onClick={onEditLesson}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-950/40 hover:bg-emerald-950/60 text-white rounded-2xl font-bold text-xs sm:text-sm shadow-md border border-white/25 transition-all active:scale-95 cursor-pointer"
-                title="Chỉnh sửa nội dung bài học Tập 2 này (dành cho giáo viên)"
-              >
-                <Edit3 className="w-4 h-4 text-emerald-300" />
-                <span>Chỉnh sửa bài</span>
-              </button>
-            )}
-
-            <button
-              id="read-full-story-btn"
-              onClick={handleReadFullArticle}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-2xl font-bold text-sm shadow-md transition-all active:scale-95 cursor-pointer"
-            >
-              <Volume2 className="w-5 h-5 text-emerald-600" />
-              <span>Nghe đọc toàn bộ bài</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-6">
-
-        {/* ========================================================
-            1. KHỞI ĐỘNG (WARM UP)
-           ======================================================== */}
-        {lesson.warmup && (
-          <div className="bg-amber-50/70 rounded-3xl p-5 sm:p-6 border border-amber-200 shadow-xs">
-            <div className="flex items-center gap-2 text-amber-900 font-bold text-sm uppercase tracking-wider mb-2">
-              <Lightbulb className="w-4 h-4 text-amber-600" />
-              <span>Khởi động & Liên hệ trải nghiệm</span>
-            </div>
-            <p className="text-base sm:text-lg text-slate-900 font-reading leading-relaxed">
-              {lesson.warmup.prompt}
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 font-serif tracking-tight">
+              Bài {lesson.lessonNumber}: {lesson.title}
+            </h1>
+            <p className="text-sm font-medium text-teal-700 italic mt-1 font-serif">
+              Trang {lesson.pageRange} • Tập 2
             </p>
           </div>
-        )}
 
-        {/* ========================================================
-            2. ĐỌC VĂN BẢN / BÀI THƠ / TRUYỆN
-           ======================================================== */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-emerald-100">
-          <div className="flex items-center justify-between pb-4 border-b border-emerald-100 mb-6">
-            <div className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center font-black text-sm font-sgk-title">
-                📖
-              </span>
-              <div>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 font-sgk-title">
-                  {lesson.reading.title}
-                </h2>
-                {lesson.reading.author && (
-                  <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-                    Tác giả: {lesson.reading.author}
-                  </p>
-                )}
+          {/* 1. KHỞI ĐỘNG */}
+          {lesson.warmup && (
+            <div className="bg-amber-50/70 rounded-2xl p-4 sm:p-5 border border-amber-200/80 space-y-2">
+              <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                <Lightbulb className="w-4 h-4 text-amber-600" />
+                <span>Khởi động & Trò chuyện</span>
               </div>
+              <p className="text-base text-slate-800 font-serif leading-relaxed">
+                {lesson.warmup.prompt}
+              </p>
             </div>
-          </div>
+          )}
 
-          {/* Reading Body */}
-          <div className="space-y-4 my-4">
-            {lesson.reading.content.map((paragraph, idx) => (
-              <div
-                key={idx}
-                className="group relative p-5 rounded-2xl bg-emerald-50/20 hover:bg-emerald-50/60 border border-transparent hover:border-emerald-200 transition-all"
-              >
-                <p className={`text-slate-900 font-reading whitespace-pre-line ${readingFontSizeClass}`}>
-                  {paragraph}
-                </p>
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  {onOpenVoiceRecorder && (
-                    <VoiceRecordButton
-                      target={{
+          {/* 2. BÀI ĐỌC CHÍNH */}
+          <div className="bg-[#f2faf7] rounded-3xl p-5 sm:p-7 border border-teal-100 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-teal-100 text-teal-700 font-bold flex items-center justify-center text-sm font-serif shadow-2xs">
+                  1
+                </span>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-teal-800 font-serif">
+                    {lesson.reading.title}
+                  </h2>
+                  {lesson.reading.author && (
+                    <p className="text-xs text-slate-500 font-medium">
+                      Tác giả: {lesson.reading.author}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  id="speak-vol2-reading-btn"
+                  onClick={handleReadFullArticle}
+                  className="w-9 h-9 rounded-xl border border-slate-200/80 bg-white hover:bg-teal-50 text-teal-600 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
+                  title="Nghe đọc toàn bộ bài đọc"
+                >
+                  <Volume2 className="w-4 h-4" />
+                </button>
+
+                {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
+                  <button
+                    onClick={(e) => handleTeacherRecordClick(e, `${lesson.reading.title}. ${lesson.reading.content.join(' ')}`, 'Toàn bộ bài đọc')}
+                    className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl shadow-xs transition-all cursor-pointer"
+                    title="Thu âm giọng đọc mẫu cô giáo cho cả bài đọc"
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>Thu mẫu cả bài</span>
+                  </button>
+                )}
+
+                {onOpenVoiceRecorder && (
+                  <button
+                    id="record-vol2-reading-btn"
+                    onClick={() => {
+                      onOpenVoiceRecorder({
                         volume: 'vol2',
                         lessonId: lesson.id,
                         lessonNumber: lesson.lessonNumber,
                         lessonTitle: `${lesson.title} (${lesson.topicTitle})`,
-                        sectionTitle: `Đoạn ${idx + 1}`,
-                        targetText: paragraph
-                      }}
-                      onOpenRecorder={onOpenVoiceRecorder}
-                      size="sm"
-                      variant="emerald"
-                      label={`Thu âm đoạn ${idx + 1}`}
-                    />
-                  )}
-
-                  <button
-                    onClick={() => speechService.speak(paragraph)}
-                    className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-white hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-xl border border-emerald-200 transition-all shadow-xs cursor-pointer"
+                        sectionTitle: 'Toàn bộ bài đọc',
+                        targetText: `${lesson.reading.title}\n\n${lesson.reading.content.join('\n\n')}`,
+                        referenceAudioText: `${lesson.reading.title}. ${lesson.reading.content.join(' ')}`
+                      });
+                    }}
+                    className="flex items-center gap-1.5 bg-[#0d9488] hover:bg-[#0f766e] active:scale-95 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl shadow-xs transition-all cursor-pointer"
+                    title="Ghi âm và nộp bài đọc"
                   >
-                    <Volume2 className="w-3.5 h-3.5" />
-                    <span>Đọc đoạn {idx + 1}</span>
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>Luyện đọc</span>
                   </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Vocabulary helper */}
-          {lesson.reading.vocabulary && lesson.reading.vocabulary.length > 0 && (
-            <div className="mt-8 pt-6 border-t border-slate-100">
-              <div className="text-xs font-bold text-emerald-900 uppercase tracking-wider mb-3">
-                📚 Giải nghĩa từ ngữ mới:
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {lesson.reading.vocabulary.map((vocab, vIdx) => (
-                  <div
-                    key={vIdx}
-                    onClick={() => speechService.speak(vocab.word)}
-                    className="cursor-pointer p-3.5 rounded-2xl bg-emerald-50/40 hover:bg-emerald-100/60 border border-emerald-200 transition-colors"
-                  >
-                    <div className="font-bold text-emerald-950 text-base font-sgk-title flex items-center justify-between">
-                      <span>{vocab.word}</span>
-                      <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
-                    </div>
-                    <div className="text-xs text-slate-600 mt-1 leading-normal font-sgk">
-                      {vocab.meaning}
-                    </div>
-                  </div>
-                ))}
+                )}
               </div>
             </div>
-          )}
 
-          {/* Phonics focus if available */}
-          {lesson.reading.phonicsFocus && (
-            <div className="mt-6 p-4 rounded-2xl bg-blue-50/60 border border-blue-200 flex items-center gap-3">
-              <span className="text-xs font-bold text-blue-900">Vần mới cần chú ý:</span>
-              <div className="flex gap-2">
-                {lesson.reading.phonicsFocus.map((ph, pIdx) => (
-                  <button
-                    key={pIdx}
-                    onClick={() => speechService.speak(`Vần ${ph}`)}
-                    className="px-3 py-1 bg-white text-blue-900 font-bold text-xs rounded-xl border border-blue-300 shadow-xs hover:bg-blue-600 hover:text-white transition-colors cursor-pointer font-sgk"
-                  >
-                    {ph} 🔊
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ========================================================
-            3. TRẢ LỜI CÂU HỎI ĐỌC HIỂU
-           ======================================================== */}
-        {lesson.comprehensionQuestions && lesson.comprehensionQuestions.length > 0 && (
-          <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-emerald-100">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-              <HelpCircle className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-xl font-black text-slate-900 font-sgk-title">
-                Trả lời câu hỏi đọc hiểu văn bản
-              </h3>
-            </div>
-
-            <div className="space-y-4">
-              {lesson.comprehensionQuestions.map((q, qIdx) => {
-                const userSelected = selectedAnswers[q.id];
-                const isShowingAnswer = showAnswerFor[q.id];
-
+            {/* Paragraph Cards */}
+            <div className="space-y-3 pt-1">
+              {lesson.reading.content.map((paragraph, idx) => {
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(paragraph);
                 return (
-                  <div key={q.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-200">
-                    <div className="text-base sm:text-lg font-bold text-slate-900 mb-3 font-reading">
-                      Câu {qIdx + 1}: {q.question}
+                  <div
+                    key={idx}
+                    onClick={() => speechService.speak(paragraph)}
+                    className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 hover:border-teal-300 shadow-2xs hover:shadow-xs transition-all relative pl-6 flex items-center justify-between group cursor-pointer"
+                    title={hasTeacherAudio ? `Giọng đọc mẫu Cô giáo: ${paragraph}` : `Bấm để nghe đọc đoạn này`}
+                  >
+                    <div className="absolute left-2.5 top-3.5 bottom-3.5 w-1.5 bg-teal-500 rounded-full group-hover:w-2 transition-all" />
+                    
+                    <div className="flex-1 pr-2">
+                      <p className={`font-medium text-slate-800 font-serif leading-relaxed pl-2 whitespace-pre-line ${readingFontSizeClass}`}>
+                        {paragraph}
+                      </p>
+                      {hasTeacherAudio && (
+                        <span className="inline-block ml-2 text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
+                          🎙️ Giọng cô giáo
+                        </span>
+                      )}
                     </div>
 
-                    {/* If multiple choice options exist */}
-                    {q.options && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-                        {q.options.map((opt, oIdx) => (
-                          <button
-                            key={oIdx}
-                            onClick={() => handleSelectQuiz(q.id, oIdx, q.correctOption)}
-                            className={`p-3.5 rounded-xl text-left text-sm font-semibold transition-all border font-reading cursor-pointer ${
-                              userSelected === oIdx
-                                ? oIdx === q.correctOption
-                                  ? 'bg-emerald-100 border-emerald-500 text-emerald-950'
-                                  : 'bg-rose-100 border-rose-400 text-rose-950'
-                                : 'bg-white hover:bg-emerald-50 border-slate-200 text-slate-800'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span>{opt}</span>
-                              {userSelected === oIdx && oIdx === q.correctOption && (
-                                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Sample answer toggle */}
-                    {q.sampleAnswer && (
-                      <div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                         <button
-                          onClick={() => setShowAnswerFor(prev => ({ ...prev, [q.id]: !prev[q.id] }))}
-                          className="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline decoration-dashed cursor-pointer"
+                          onClick={(e) => handleTeacherRecordClick(e, paragraph, `Đoạn ${idx + 1}: ${paragraph.substring(0, 30)}...`)}
+                          className={`p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            hasTeacherAudio ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                          } ${isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                          title={`Thu âm giọng mẫu cho đoạn ${idx + 1}`}
                         >
-                          {isShowingAnswer ? 'Ẩn gợi ý trả lời' : '💡 Xem câu trả lời mẫu'}
+                          <Mic className="w-4 h-4" />
                         </button>
-                        {isShowingAnswer && (
-                          <div className="mt-2 p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-sm sm:text-base text-emerald-950 font-reading leading-relaxed">
-                            {q.sampleAnswer}
-                          </div>
-                        )}
+                      )}
+                      <div className="opacity-40 group-hover:opacity-100 transition-opacity text-teal-600">
+                        <Volume2 className="w-5 h-5" />
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}
             </div>
-          </div>
-        )}
 
-        {/* ========================================================
-            4. LUYỆN TẬP: CHÍNH TẢ & TẬP CHÉP
-           ======================================================== */}
-        {lesson.practice && (
-          <div className="bg-purple-50/50 rounded-3xl p-6 sm:p-7 shadow-sm border border-purple-200 space-y-6">
-            <div className="flex items-center justify-between pb-3 border-b border-purple-200">
-              <div className="flex items-center gap-2">
-                <PenTool className="w-5 h-5 text-purple-700" />
-                <h3 className="text-xl font-black text-purple-950 font-sgk-title">
-                  Luyện tập chính tả & Tập chép
-                </h3>
-              </div>
-
-              {lesson.practice.dictationText && (
-                <button
-                  id="open-dictation-board-btn"
-                  onClick={() => onOpenWritingPractice(lesson.practice!.dictationText!)}
-                  className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <span>Mở Vở Ô Ly Tập Chép</span>
-                  <span>✍️</span>
-                </button>
-              )}
-            </div>
-
-            {/* Dictation Text */}
-            {lesson.practice.dictationText && (
-              <div className="bg-white p-5 rounded-2xl border border-purple-200 shadow-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-purple-900 uppercase tracking-wider">
-                    📝 Đoạn văn / câu tập chép vào vở:
-                  </span>
-                  <button
-                    onClick={() => speechService.speak(lesson.practice!.dictationText!)}
-                    className="flex items-center gap-1 text-xs font-bold text-purple-700 hover:text-purple-900 cursor-pointer"
-                  >
-                    <Volume2 className="w-3.5 h-3.5" />
-                    Đọc đoạn chép
-                  </button>
+            {/* Vocabulary words */}
+            {lesson.reading.vocabulary && lesson.reading.vocabulary.length > 0 && (
+              <div className="pt-3 border-t border-teal-100">
+                <div className="text-xs font-bold text-teal-900 uppercase tracking-wider mb-2">
+                  Giải nghĩa từ:
                 </div>
-                <p className="text-xl sm:text-2xl text-slate-800 font-reading leading-relaxed bg-purple-50/40 p-4 rounded-xl border border-purple-100">
-                  "{lesson.practice.dictationText}"
-                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {lesson.reading.vocabulary.map((vocab, vIdx) => {
+                    const hasTeacherAudio = teacherAudioService.hasAudioForText(vocab.word);
+                    return (
+                      <div
+                        key={vIdx}
+                        onClick={() => speechService.speak(vocab.word)}
+                        className="p-3 rounded-xl bg-white border border-teal-100 hover:border-teal-300 transition-all cursor-pointer shadow-2xs flex items-center justify-between group"
+                      >
+                        <div>
+                          <div className="font-bold text-teal-900 text-sm font-serif flex items-center gap-1.5">
+                            <span>{vocab.word}</span>
+                            {hasTeacherAudio && (
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">GV</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-600 mt-0.5">{vocab.meaning}</div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
+                            <button
+                              onClick={(e) => handleTeacherRecordClick(e, vocab.word, `Từ vựng: ${vocab.word}`)}
+                              className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                hasTeacherAudio ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                              } ${isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                              title={`Thu âm giọng mẫu cho từ "${vocab.word}"`}
+                            >
+                              <Mic className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <Volume2 className="w-3.5 h-3.5 text-teal-600" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
+          </div>
 
-            {/* Spelling exercise */}
-            {lesson.practice.spellingExercise && (
-              <div className="bg-white p-5 rounded-2xl border border-purple-200 shadow-xs">
-                <div className="text-xs font-bold text-purple-900 uppercase tracking-wider mb-2">
-                  ✨ {lesson.practice.spellingExercise.prompt}
-                </div>
+          {/* 3. TRẢ LỜI CÂU HỎI ĐỌC HIỂU */}
+          {lesson.comprehensionQuestions && lesson.comprehensionQuestions.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2.5">
+                <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-sm font-serif shadow-2xs">
+                  2
+                </span>
+                <h2 className="text-base sm:text-lg font-bold text-blue-600 font-serif">
+                  Trả lời câu hỏi
+                </h2>
+              </div>
 
-                {lesson.practice.spellingExercise.pairs && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                    {lesson.practice.spellingExercise.pairs.map((pair, pIdx) => (
-                      <div key={pIdx} className="p-3.5 bg-purple-50/40 rounded-xl border border-purple-100 flex items-center justify-between">
-                        <span className="text-base font-bold text-slate-800 font-reading">
-                          {pair.textWithBlank}
-                        </span>
-                        <div className="flex gap-1.5">
-                          {pair.options.map((opt) => (
+              <div className="space-y-3">
+                {lesson.comprehensionQuestions.map((q, qIdx) => {
+                  const userSelected = selectedAnswers[q.id];
+                  const isShowingAnswer = showAnswerFor[q.id];
+
+                  return (
+                    <div key={q.id} className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                      <div className="text-sm sm:text-base font-bold text-slate-800 font-serif">
+                        Câu {qIdx + 1}: {q.question}
+                      </div>
+
+                      {q.options && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {q.options.map((opt, oIdx) => (
                             <button
-                              key={opt}
-                              onClick={() => {
-                                setSpellingSelections(prev => ({ ...prev, [pIdx]: opt }));
-                                if (opt === pair.answer) {
-                                  speechService.playSoundEffect('success');
-                                  onAddStar();
-                                } else {
-                                  speechService.playSoundEffect('pop');
-                                }
-                              }}
-                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer font-sgk ${
-                                spellingSelections[pIdx] === opt
-                                  ? opt === pair.answer
-                                    ? 'bg-emerald-500 text-white'
-                                    : 'bg-rose-500 text-white'
-                                  : 'bg-white text-purple-900 border border-purple-200 hover:bg-purple-100'
+                              key={oIdx}
+                              onClick={() => handleSelectQuiz(q.id, oIdx, q.correctOption)}
+                              className={`p-3 rounded-xl text-left text-xs sm:text-sm font-semibold transition-all border font-serif cursor-pointer ${
+                                userSelected === oIdx
+                                  ? oIdx === q.correctOption
+                                    ? 'bg-emerald-100 border-emerald-500 text-emerald-950 font-bold'
+                                    : 'bg-rose-100 border-rose-400 text-rose-950'
+                                  : 'bg-white hover:bg-teal-50 border-slate-200 text-slate-800'
                               }`}
                             >
-                              {opt}
+                              <div className="flex items-center justify-between">
+                                <span>{opt}</span>
+                                {userSelected === oIdx && oIdx === q.correctOption && (
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                )}
+                              </div>
                             </button>
                           ))}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      )}
+
+                      {q.sampleAnswer && (
+                        <div>
+                          <button
+                            onClick={() => setShowAnswerFor(prev => ({ ...prev, [q.id]: !prev[q.id] }))}
+                            className="text-xs font-bold text-teal-700 hover:text-teal-900 underline decoration-dashed cursor-pointer"
+                          >
+                            {isShowingAnswer ? 'Ẩn câu trả lời mẫu' : '💡 Xem câu trả lời mẫu'}
+                          </button>
+                          {isShowingAnswer && (
+                            <div className="mt-2 p-3 bg-teal-50 rounded-xl border border-teal-200 text-xs sm:text-sm text-teal-950 font-serif leading-relaxed">
+                              {q.sampleAnswer}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* ========================================================
-            LESSON COMPLETION & BADGE REWARD BANNER (VOL 2)
-           ======================================================== */}
-        <div className="bg-gradient-to-r from-emerald-100 via-teal-100 to-cyan-100 rounded-3xl p-5 sm:p-7 border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5 text-center sm:text-left">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-3xl shadow-sm shrink-0">
-              {isCompleted ? '🎖️' : '📖'}
             </div>
-            <div>
-              <h3 className="text-lg sm:text-xl font-black text-emerald-950 font-serif">
-                {isCompleted ? 'Bé đã hoàn thành xuất sắc bài đọc hiểu Tập 2 này!' : 'Bé đã đọc hiểu và trả lời xong các câu hỏi?'}
-              </h3>
-              <p className="text-xs sm:text-sm text-emerald-800 font-medium mt-0.5">
-                {isCompleted
-                  ? 'Thành tích đã được cộng vào Bảng Vàng Danh Hiệu của bé!'
-                  : 'Bấm nút để đánh dấu hoàn thành và nhận Ngôi Sao Thưởng nhé!'}
-              </p>
-            </div>
-          </div>
+          )}
 
-          <button
-            id="vol2-bottom-toggle-complete-btn"
-            onClick={handleToggleCompletion}
-            className={`px-5 py-3 rounded-2xl font-black text-sm sm:text-base shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-2 shrink-0 ${
-              isCompleted
-                ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white'
-            }`}
-          >
-            {isCompleted ? (
-              <>
-                <CheckCircle2 className="w-5 h-5 text-emerald-200" />
-                <span>Đã Hoàn Thành (Bấm để hủy)</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-5 h-5 text-yellow-200 fill-yellow-300 animate-spin" />
-                <span>Bé Đã Đọc Xong ⭐ Nhận Thưởng</span>
-              </>
-            )}
-          </button>
+          {/* 4. LUYỆN VIẾT CHÍNH TẢ */}
+          {lesson.practice && lesson.practice.dictationText && (
+            <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
+              <div className="flex items-center gap-3">
+                <PenTool className="w-4 h-4 text-purple-600" />
+                <span className="text-xs font-bold text-purple-900 uppercase">Tập chép:</span>
+                <span className="text-sm font-serif font-bold text-purple-950">
+                  "{lesson.practice.dictationText.slice(0, 40)}..."
+                </span>
+              </div>
+              <button
+                onClick={() => onOpenWritingPractice(lesson.practice!.dictationText!)}
+                className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <span>Mở Vở Ô Ly Tập Chép</span>
+                <span>✍️</span>
+              </button>
+            </div>
+          )}
+
         </div>
-
       </div>
 
-      {/* Footer Nav */}
-      <div className="flex items-center justify-between mt-8 pt-6 border-t border-emerald-200">
-        <button
-          onClick={onPreviousLesson}
-          disabled={!hasPrevious}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-sm transition-all ${
-            hasPrevious
-              ? 'bg-white hover:bg-emerald-50 text-emerald-950 border border-emerald-300 shadow-xs'
-              : 'opacity-40 cursor-not-allowed text-slate-400'
-          }`}
-        >
-          <ChevronLeft className="w-4 h-4" />
-          <span>Bài trước</span>
-        </button>
+      {/* Bottom Navigation */}
+      <div className="flex items-center justify-between gap-4 mt-6">
+        {hasPrevious && onPreviousLesson ? (
+          <button
+            onClick={onPreviousLesson}
+            className="flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm rounded-2xl border border-slate-200 shadow-2xs transition-all active:scale-95 cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4 text-slate-500" />
+            <span>Bài trước</span>
+          </button>
+        ) : <div />}
 
-        <span className="text-xs font-bold text-emerald-950">
-          {lesson.topicTitle} • Bài {lesson.lessonNumber}
-        </span>
-
-        <button
-          onClick={onNextLesson}
-          disabled={!hasNext}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-sm transition-all ${
-            hasNext
-              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-              : 'opacity-40 cursor-not-allowed text-slate-400'
-          }`}
-        >
-          <span>Bài tiếp theo</span>
-          <ChevronRight className="w-4 h-4" />
-        </button>
+        {hasNext && onNextLesson && (
+          <button
+            onClick={onNextLesson}
+            className="flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all active:scale-95 cursor-pointer ml-auto"
+          >
+            <span>Bài tiếp theo</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
     </div>

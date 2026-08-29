@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
+import { MobileNavBar } from './components/MobileNavBar';
 import { Volume1Grid } from './components/Volume1Grid';
 import { Volume1LessonView } from './components/Volume1LessonView';
 import { Volume2Grid } from './components/Volume2Grid';
@@ -7,19 +8,47 @@ import { Volume2LessonView } from './components/Volume2LessonView';
 import { AlphabetBoard } from './components/AlphabetBoard';
 import { WritingBoard } from './components/WritingBoard';
 import { IntroView } from './components/IntroView';
+import { TeacherPortalView } from './components/TeacherPortalView';
+import { ParentPortalView } from './components/ParentPortalView';
 import { TeacherManagementModal } from './components/TeacherManagementModal';
 import { TeacherLessonEditorModal } from './components/TeacherLessonEditorModal';
+import { TeacherAudioRecorderModal, TeacherAudioTarget } from './components/TeacherAudioRecorderModal';
+import { TeacherAudioStudioModal } from './components/TeacherAudioStudioModal';
 import { StudentVoiceRecorderModal } from './components/StudentVoiceRecorderModal';
 import { AchievementModal } from './components/AchievementModal';
 import { AchievementUnlockModal } from './components/AchievementUnlockModal';
-import { Volume1Lesson, Volume2Lesson, RecordingTargetInfo, AchievementBadge } from './types';
+import { UserProfileModal } from './components/UserProfileModal';
+import { GoogleWorkspaceModal } from './components/GoogleWorkspaceModal';
+import { TeacherLoginModal } from './components/TeacherLoginModal';
+import { Volume1Lesson, Volume2Lesson, RecordingTargetInfo, AchievementBadge, UserRole, AppUserProfile } from './types';
 import { lessonStorageService } from './services/lessonStorageService';
+import { teacherAudioService } from './services/teacherAudioService';
 import { achievementService } from './services/achievementService';
+import { userProfileService } from './services/userProfileService';
+import { teacherAuthService } from './services/teacherAuthService';
 import { speechService } from './services/speechService';
 import confetti from 'canvas-confetti';
-import { BookOpen, Sparkles, Home, ArrowLeft, Mic } from 'lucide-react';
+import { BookOpen, Sparkles, Home, ArrowLeft, Mic, Trophy } from 'lucide-react';
 
 export default function App() {
+  // Active User Profile & Multi-User State
+  const [activeUser, setActiveUser] = useState<AppUserProfile>(() => userProfileService.getActiveUser());
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isGoogleWorkspaceOpen, setIsGoogleWorkspaceOpen] = useState<boolean>(false);
+
+  // Teacher Authentication & Login Modal State
+  const [isTeacherLoginOpen, setIsTeacherLoginOpen] = useState<boolean>(false);
+  const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState<boolean>(() => teacherAuthService.isAuthenticated());
+
+  // Role State (Student, Teacher, Parent)
+  const [userRole, setUserRole] = useState<UserRole>(() => {
+    const active = userProfileService.getActiveUser();
+    if (active.role === 'teacher' && !teacherAuthService.isAuthenticated()) {
+      return 'student'; // fallback to student if not authenticated
+    }
+    return active.role || 'student';
+  });
+
   const [currentTab, setCurrentTab] = useState<'intro' | 'volume1' | 'volume2' | 'alphabet' | 'practice'>('volume1');
   const [selectedVol1Lesson, setSelectedVol1Lesson] = useState<Volume1Lesson | null>(null);
   const [selectedVol2Lesson, setSelectedVol2Lesson] = useState<Volume2Lesson | null>(null);
@@ -30,9 +59,9 @@ export default function App() {
     return saved ? parseInt(saved, 10) : 5;
   });
 
-  // Achievement Modals State
+  // Achievement & Badges Modal States
   const [isAchievementModalOpen, setIsAchievementModalOpen] = useState<boolean>(false);
-  const [unlockedBadgeQueue, setUnlockedBadgeQueue] = useState<AchievementBadge[]>([]);
+  const [unlockedBadgesToCelebrate, setUnlockedBadgesToCelebrate] = useState<AchievementBadge[]>([]);
 
   // Voice Recording Modal State
   const [isVoiceRecorderOpen, setIsVoiceRecorderOpen] = useState<boolean>(false);
@@ -46,12 +75,43 @@ export default function App() {
   const [editingVol2Lesson, setEditingVol2Lesson] = useState<Volume2Lesson | undefined>(undefined);
   const [customizedCount, setCustomizedCount] = useState<number>(() => lessonStorageService.getStats().totalCustomCount);
 
-  // Subscribe to storage & achievement changes to update badges and active lesson
+  // Teacher Audio Studio & Recorder State
+  const [isTeacherAudioStudioOpen, setIsTeacherAudioStudioOpen] = useState<boolean>(false);
+  const [teacherAudioTarget, setTeacherAudioTarget] = useState<TeacherAudioTarget | null>(null);
+  const [isTeacherAudioRecorderOpen, setIsTeacherAudioRecorderOpen] = useState<boolean>(false);
+  const [teacherAudioCount, setTeacherAudioCount] = useState<number>(() => teacherAudioService.getCount());
+
+  const handleSelectRole = (role: UserRole) => {
+    if (role === 'teacher') {
+      if (!teacherAuthService.isAuthenticated()) {
+        setIsTeacherLoginOpen(true);
+        return;
+      }
+    }
+    setUserRole(role);
+    localStorage.setItem('tv1_user_role', role);
+    speechService.playSoundEffect('pop');
+  };
+
+  const handleTeacherLogout = () => {
+    teacherAuthService.logout();
+    setIsTeacherAuthenticated(false);
+    setUserRole('student');
+    speechService.playSoundEffect('pop');
+  };
+
+  const handleTeacherLoginSuccess = (teacher: AppUserProfile) => {
+    setIsTeacherAuthenticated(true);
+    setActiveUser(teacher);
+    setUserRole('teacher');
+    localStorage.setItem('tv1_user_role', 'teacher');
+  };
+
+  // Subscribe to storage & achievement & teacher audio changes
   useEffect(() => {
-    const unsubLesson = lessonStorageService.subscribe(() => {
+    const unsubscribeLessons = lessonStorageService.subscribe(() => {
       setCustomizedCount(lessonStorageService.getStats().totalCustomCount);
       
-      // If currently viewing a lesson, refresh it with latest customized version
       if (selectedVol1Lesson) {
         const fresh = lessonStorageService.getVolume1Lesson(selectedVol1Lesson.id);
         if (fresh) setSelectedVol1Lesson(fresh);
@@ -62,44 +122,49 @@ export default function App() {
       }
     });
 
-    const unsubAchievement = achievementService.subscribe(() => {
-      // Force re-render if necessary for title & stats
+    const unsubscribeTeacherAudio = teacherAudioService.subscribe(() => {
+      setTeacherAudioCount(teacherAudioService.getCount());
+    });
+
+    const unsubscribeAchievements = achievementService.subscribe((state, newBadges) => {
+      if (newBadges.length > 0) {
+        setUnlockedBadgesToCelebrate(newBadges);
+        speechService.playSoundEffect('fanfare');
+      }
+      setStarsCount(state.starsCount);
+    });
+
+    const unsubscribeUserProfile = userProfileService.subscribe((current) => {
+      setActiveUser(current);
+      if (current.role) {
+        if (current.role === 'teacher' && !teacherAuthService.isAuthenticated()) {
+          setUserRole('student');
+        } else {
+          setUserRole(current.role);
+        }
+      }
+      if (current.role === 'student') {
+        setStarsCount(current.starsCount || 0);
+      }
+    });
+
+    const unsubscribeTeacherAuth = teacherAuthService.subscribe((session) => {
+      setIsTeacherAuthenticated(session !== null && session.isAuthenticated);
+      if (!session || !session.isAuthenticated) {
+        if (userRole === 'teacher') {
+          setUserRole('student');
+        }
+      }
     });
 
     return () => {
-      unsubLesson();
-      unsubAchievement();
+      unsubscribeLessons();
+      unsubscribeTeacherAudio();
+      unsubscribeAchievements();
+      unsubscribeUserProfile();
+      unsubscribeTeacherAuth();
     };
-  }, [selectedVol1Lesson?.id, selectedVol2Lesson?.id]);
-
-  const handleUnlockBadges = (newBadges: AchievementBadge[]) => {
-    if (newBadges && newBadges.length > 0) {
-      setUnlockedBadgeQueue(prev => [...prev, ...newBadges]);
-    }
-  };
-
-  const handleDismissUnlockModal = () => {
-    setUnlockedBadgeQueue(prev => prev.slice(1));
-  };
-
-  const handleJumpToLesson = (volume: 'vol1' | 'vol2', lessonId: number | string) => {
-    setIsAchievementModalOpen(false);
-    if (volume === 'vol1') {
-      const lesson = lessonStorageService.getVolume1Lesson(lessonId);
-      if (lesson) {
-        setCurrentTab('volume1');
-        setSelectedVol1Lesson(lesson);
-        setSelectedVol2Lesson(null);
-      }
-    } else {
-      const lesson = lessonStorageService.getVolume2Lesson(lessonId);
-      if (lesson) {
-        setCurrentTab('volume2');
-        setSelectedVol2Lesson(lesson);
-        setSelectedVol1Lesson(null);
-      }
-    }
-  };
+  }, [selectedVol1Lesson?.id, selectedVol2Lesson?.id, userRole]);
 
   const handleAddStar = () => {
     setStarsCount(prev => {
@@ -107,6 +172,12 @@ export default function App() {
       localStorage.setItem('tv1_stars', next.toString());
       return next;
     });
+
+    if (activeUser.role === 'student') {
+      userProfileService.updateUser(activeUser.id, {
+        starsCount: (activeUser.starsCount || 0) + 1
+      });
+    }
 
     // Trigger confetti
     confetti({
@@ -210,6 +281,12 @@ export default function App() {
     speechService.playSoundEffect('pop');
   };
 
+  const handleOpenTeacherRecorder = (target: TeacherAudioTarget) => {
+    setTeacherAudioTarget(target);
+    setIsTeacherAudioRecorderOpen(true);
+    speechService.playSoundEffect('pop');
+  };
+
   const handleOpenVoiceStudio = () => {
     if (selectedVol1Lesson) {
       setVoiceRecorderTarget({
@@ -251,125 +328,156 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#fffdfa] text-slate-800 flex flex-col font-sans selection:bg-amber-200">
       
-      {/* Global Navigation Header */}
+      {/* Global Navigation Header with Role Selector */}
       <Header
+        userRole={userRole}
+        onSelectRole={handleSelectRole}
         currentTab={currentTab}
         onSelectTab={handleTabChange}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         starsCount={starsCount}
         customizedCount={customizedCount}
+        teacherAudioCount={teacherAudioCount}
+        activeUser={activeUser}
+        isTeacherAuthenticated={isTeacherAuthenticated}
+        onTeacherLogout={handleTeacherLogout}
+        onOpenTeacherLogin={() => setIsTeacherLoginOpen(true)}
+        onOpenProfileModal={() => setIsProfileModalOpen(true)}
+        onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
         onOpenTeacherManagement={() => setIsTeacherMgmtOpen(true)}
+        onOpenTeacherAudioStudio={() => setIsTeacherAudioStudioOpen(true)}
         onOpenVoiceStudio={handleOpenVoiceStudio}
         onOpenAchievements={() => setIsAchievementModalOpen(true)}
       />
 
-      {/* Breadcrumb / Back Button when deep inside a lesson */}
-      {(selectedVol1Lesson || selectedVol2Lesson) && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 w-full">
-          <button
-            id="back-to-grid-btn"
-            onClick={() => {
-              setSelectedVol1Lesson(null);
-              setSelectedVol2Lesson(null);
-              speechService.playSoundEffect('pop');
+      {/* Main View Area based on User Role */}
+      <main className="flex-1 pb-20 md:pb-12">
+        {/* 1. TEACHER PORTAL */}
+        {userRole === 'teacher' && (
+          <TeacherPortalView
+            onSelectVol1Lesson={(lesson) => {
+              setUserRole('student');
+              setCurrentTab('volume1');
+              setSelectedVol1Lesson(lesson);
             }}
-            className="flex items-center gap-2 text-xs sm:text-sm font-bold text-amber-900 bg-amber-100/70 hover:bg-amber-200/90 px-3.5 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>
-              {selectedVol1Lesson ? '← Quay lại danh sách 83 bài Tập 1' : '← Quay lại 8 Chủ điểm Tập 2'}
-            </span>
-          </button>
-        </div>
-      )}
-
-      {/* Main View Area */}
-      <main className="flex-1 pb-12">
-        {currentTab === 'intro' && (
-          <IntroView
-            onOpenWritingPractice={handleOpenWritingPractice}
-            onAddStar={handleAddStar}
+            onSelectVol2Lesson={(lesson) => {
+              setUserRole('student');
+              setCurrentTab('volume2');
+              setSelectedVol2Lesson(lesson);
+            }}
+            onOpenVol1Editor={handleOpenEditVol1}
+            onOpenVol2Editor={handleOpenEditVol2}
+            onOpenTeacherRecorder={handleOpenTeacherRecorder}
+            onSwitchToStudentView={() => handleSelectRole('student')}
+            onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
+            onLogout={handleTeacherLogout}
+            onOpenTeacherLogin={() => setIsTeacherLoginOpen(true)}
           />
         )}
 
-        {currentTab === 'volume1' && (
-          selectedVol1Lesson ? (
-            <Volume1LessonView
-              lesson={selectedVol1Lesson}
-              onPreviousLesson={handleVol1Prev}
-              onNextLesson={handleVol1Next}
-              hasPrevious={vol1HasPrevious}
-              hasNext={vol1HasNext}
-              onOpenWritingPractice={handleOpenWritingPractice}
-              onAddStar={handleAddStar}
-              onEditLesson={() => handleOpenEditVol1(selectedVol1Lesson)}
-              onOpenVoiceRecorder={handleOpenVoiceRecorder}
-              onUnlockBadges={handleUnlockBadges}
-            />
-          ) : (
-            <Volume1Grid
-              onSelectLesson={(lesson) => setSelectedVol1Lesson(lesson)}
-              onEditLesson={handleOpenEditVol1}
-              searchQuery={searchQuery}
-            />
-          )
+        {/* 2. PARENT PORTAL */}
+        {userRole === 'parent' && (
+          <ParentPortalView
+            starsCount={starsCount}
+            onOpenAchievements={() => setIsAchievementModalOpen(true)}
+            onOpenVoiceStudio={handleOpenVoiceStudio}
+            onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
+            onSelectVolume1={() => {
+              setUserRole('student');
+              setCurrentTab('volume1');
+              setSelectedVol1Lesson(null);
+            }}
+            onSelectVolume2={() => {
+              setUserRole('student');
+              setCurrentTab('volume2');
+              setSelectedVol2Lesson(null);
+            }}
+          />
         )}
 
-        {currentTab === 'volume2' && (
-          selectedVol2Lesson ? (
-            <Volume2LessonView
-              lesson={selectedVol2Lesson}
-              onPreviousLesson={handleVol2Prev}
-              onNextLesson={handleVol2Next}
-              hasPrevious={vol2HasPrevious}
-              hasNext={vol2HasNext}
-              onOpenWritingPractice={handleOpenWritingPractice}
-              onAddStar={handleAddStar}
-              onEditLesson={() => handleOpenEditVol2(selectedVol2Lesson)}
-              onOpenVoiceRecorder={handleOpenVoiceRecorder}
-              onUnlockBadges={handleUnlockBadges}
-            />
-          ) : (
-            <Volume2Grid
-              onSelectLesson={(lesson) => setSelectedVol2Lesson(lesson)}
-              onEditLesson={handleOpenEditVol2}
-              searchQuery={searchQuery}
-            />
-          )
-        )}
+        {/* 3. STUDENT PORTAL (Interactive Lessons & Practice) */}
+        {userRole === 'student' && (
+          <>
+            {currentTab === 'intro' && (
+              <IntroView
+                onOpenWritingPractice={handleOpenWritingPractice}
+                onAddStar={handleAddStar}
+              />
+            )}
 
-        {currentTab === 'alphabet' && (
-          <AlphabetBoard />
-        )}
+            {currentTab === 'volume1' && (
+              selectedVol1Lesson ? (
+                <Volume1LessonView
+                  lesson={selectedVol1Lesson}
+                  onPreviousLesson={handleVol1Prev}
+                  onNextLesson={handleVol1Next}
+                  hasPrevious={vol1HasPrevious}
+                  hasNext={vol1HasNext}
+                  onOpenWritingPractice={handleOpenWritingPractice}
+                  onAddStar={handleAddStar}
+                  onEditLesson={() => handleOpenEditVol1(selectedVol1Lesson)}
+                  onOpenVoiceRecorder={handleOpenVoiceRecorder}
+                  onOpenTeacherRecorder={handleOpenTeacherRecorder}
+                  onUnlockBadges={(newBadges) => setUnlockedBadgesToCelebrate(newBadges)}
+                  onBackToList={() => {
+                    setSelectedVol1Lesson(null);
+                    speechService.playSoundEffect('pop');
+                  }}
+                />
+              ) : (
+                <Volume1Grid
+                  onSelectLesson={(lesson) => setSelectedVol1Lesson(lesson)}
+                  onEditLesson={handleOpenEditVol1}
+                  searchQuery={searchQuery}
+                />
+              )
+            )}
 
-        {currentTab === 'practice' && (
-          <div className="py-6 px-4">
-            <WritingBoard
-              initialSampleText={writingSampleText}
-              onSuccessReward={handleAddStar}
-              onUnlockBadges={handleUnlockBadges}
-            />
-          </div>
+            {currentTab === 'volume2' && (
+              selectedVol2Lesson ? (
+                <Volume2LessonView
+                  lesson={selectedVol2Lesson}
+                  onPreviousLesson={handleVol2Prev}
+                  onNextLesson={handleVol2Next}
+                  hasPrevious={vol2HasPrevious}
+                  hasNext={vol2HasNext}
+                  onOpenWritingPractice={handleOpenWritingPractice}
+                  onAddStar={handleAddStar}
+                  onEditLesson={() => handleOpenEditVol2(selectedVol2Lesson)}
+                  onOpenVoiceRecorder={handleOpenVoiceRecorder}
+                  onOpenTeacherRecorder={handleOpenTeacherRecorder}
+                  onBackToList={() => {
+                    setSelectedVol2Lesson(null);
+                    speechService.playSoundEffect('pop');
+                  }}
+                />
+              ) : (
+                <Volume2Grid
+                  onSelectLesson={(lesson) => setSelectedVol2Lesson(lesson)}
+                  onEditLesson={handleOpenEditVol2}
+                  searchQuery={searchQuery}
+                />
+              )
+            )}
+
+            {currentTab === 'alphabet' && (
+              <AlphabetBoard
+                onOpenTeacherRecorder={handleOpenTeacherRecorder}
+              />
+            )}
+
+            {currentTab === 'practice' && (
+              <div className="py-6 px-4">
+                <WritingBoard
+                  initialSampleText={writingSampleText}
+                  onSuccessReward={handleAddStar}
+                />
+              </div>
+            )}
+          </>
         )}
       </main>
-
-      {/* Academic Honors & Badges Dashboard Modal */}
-      <AchievementModal
-        isOpen={isAchievementModalOpen}
-        onClose={() => setIsAchievementModalOpen(false)}
-        onSelectLesson={handleJumpToLesson}
-      />
-
-      {/* Celebratory Badge Unlock Modal */}
-      <AchievementUnlockModal
-        badge={unlockedBadgeQueue[0] || null}
-        onClose={handleDismissUnlockModal}
-        onOpenAllAchievements={() => {
-          handleDismissUnlockModal();
-          setIsAchievementModalOpen(true);
-        }}
-      />
 
       {/* Teacher Global Management Modal */}
       <TeacherManagementModal
@@ -398,6 +506,21 @@ export default function App() {
         onSaveSuccess={(updated) => {
           handleEditorSaveSuccess(updated);
         }}
+        onOpenTeacherRecorder={handleOpenTeacherRecorder}
+      />
+
+      {/* Teacher Audio Studio Management Modal */}
+      <TeacherAudioStudioModal
+        isOpen={isTeacherAudioStudioOpen}
+        onClose={() => setIsTeacherAudioStudioOpen(false)}
+        onOpenRecorder={handleOpenTeacherRecorder}
+      />
+
+      {/* Teacher Audio Single Item Recorder Modal */}
+      <TeacherAudioRecorderModal
+        isOpen={isTeacherAudioRecorderOpen}
+        onClose={() => setIsTeacherAudioRecorderOpen(false)}
+        target={teacherAudioTarget}
       />
 
       {/* Student Voice Studio & Recorder Modal */}
@@ -406,11 +529,54 @@ export default function App() {
         onClose={() => setIsVoiceRecorderOpen(false)}
         targetInfo={voiceRecorderTarget}
         onAddStar={handleAddStar}
-        onUnlockBadges={handleUnlockBadges}
       />
 
+      {/* Multi-User Profile Switcher & Manager Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        onUserSwitched={(user) => {
+          if (user.role === 'teacher' && !teacherAuthService.isAuthenticated()) {
+            setIsProfileModalOpen(false);
+            setIsTeacherLoginOpen(true);
+            return;
+          }
+          setActiveUser(user);
+          setUserRole(user.role);
+          if (user.role === 'student') {
+            setStarsCount(user.starsCount || 0);
+          }
+        }}
+      />
+
+      {/* Teacher Authentication / PIN Login Modal */}
+      <TeacherLoginModal
+        isOpen={isTeacherLoginOpen}
+        onClose={() => setIsTeacherLoginOpen(false)}
+        onSuccess={handleTeacherLoginSuccess}
+      />
+
+      {/* Google Workspace Cloud Sync & Drive/Sheets/Classroom Modal */}
+      <GoogleWorkspaceModal
+        isOpen={isGoogleWorkspaceOpen}
+        onClose={() => setIsGoogleWorkspaceOpen(false)}
+      />
+
+      {/* Achievement Collection & Celebration Modals */}
+      <AchievementModal
+        isOpen={isAchievementModalOpen}
+        onClose={() => setIsAchievementModalOpen(false)}
+      />
+
+      {unlockedBadgesToCelebrate.length > 0 && (
+        <AchievementUnlockModal
+          badges={unlockedBadgesToCelebrate}
+          onClose={() => setUnlockedBadgesToCelebrate([])}
+        />
+      )}
+
       {/* Footer */}
-      <footer className="bg-white border-t border-amber-100 py-6 text-center text-xs text-amber-900/80">
+      <footer className="bg-white border-t border-amber-100 py-6 text-center text-xs text-amber-900/80 mb-14 md:mb-0">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="font-bold text-amber-950 font-serif">Tiếng Việt Lớp 1</span>
@@ -422,6 +588,19 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Mobile Floating Ergonomic Bottom Bar */}
+      <MobileNavBar
+        userRole={userRole}
+        onSelectRole={handleSelectRole}
+        currentTab={currentTab}
+        onSelectTab={handleTabChange}
+        onOpenAchievements={() => setIsAchievementModalOpen(true)}
+        onOpenVoiceStudio={handleOpenVoiceStudio}
+        starsCount={starsCount}
+        activeUser={activeUser}
+        onOpenProfileModal={() => setIsProfileModalOpen(true)}
+      />
 
     </div>
   );

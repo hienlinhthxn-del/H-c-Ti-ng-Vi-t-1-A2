@@ -1,9 +1,38 @@
-import React, { useState } from 'react';
-import { Volume2, Sparkles, Filter } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Volume2, Sparkles, Filter, Mic } from 'lucide-react';
 import { speechService } from '../services/speechService';
+import { teacherAudioService } from '../services/teacherAudioService';
+import { TeacherAudioTarget } from './TeacherAudioRecorderModal';
 
-export const AlphabetBoard: React.FC = () => {
+interface AlphabetBoardProps {
+  onOpenTeacherRecorder?: (target: TeacherAudioTarget) => void;
+}
+
+export const AlphabetBoard: React.FC<AlphabetBoardProps> = ({ onOpenTeacherRecorder }) => {
   const [activeCategory, setActiveCategory] = useState<'all' | 'single' | 'compound' | 'tones' | 'rhymes'>('all');
+  const [isTeacherVoiceEditMode, setIsTeacherVoiceEditMode] = useState<boolean>(false);
+  const [, setAudioVersion] = useState<number>(0);
+
+  useEffect(() => {
+    const unsub = teacherAudioService.subscribe(() => {
+      setAudioVersion(v => v + 1);
+    });
+    return unsub;
+  }, []);
+
+  const handleTeacherRecordClick = (e: React.MouseEvent, text: string, sectionTitle: string) => {
+    e.stopPropagation();
+    if (onOpenTeacherRecorder) {
+      onOpenTeacherRecorder({
+        targetText: text,
+        volume: 'vol1',
+        lessonId: 'alphabet-board',
+        lessonNumber: 0,
+        lessonTitle: 'Bảng Chữ Cái Tiếng Việt',
+        sectionTitle
+      });
+    }
+  };
 
   const singleLetters = [
     { letter: 'a', upper: 'A', name: 'a', example: 'quả na', icon: '🍐' },
@@ -90,28 +119,49 @@ export const AlphabetBoard: React.FC = () => {
             </p>
           </div>
 
-          {/* Filter tabs */}
-          <div className="flex flex-wrap gap-1.5 bg-amber-50 p-1.5 rounded-2xl border border-amber-200/80">
-            {[
-              { id: 'all', label: 'Tất cả' },
-              { id: 'single', label: '29 Chữ cái' },
-              { id: 'compound', label: '11 Âm ghép' },
-              { id: 'tones', label: '5 Dấu thanh' },
-              { id: 'rhymes', label: 'Vần phổ biến' }
-            ].map((tab) => (
+          {/* Filter tabs & Teacher Voice Mode */}
+          <div className="flex flex-wrap items-center gap-2">
+            {onOpenTeacherRecorder && (
               <button
-                key={tab.id}
-                id={`filter-alphabet-${tab.id}`}
-                onClick={() => setActiveCategory(tab.id as any)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  activeCategory === tab.id
-                    ? 'bg-amber-500 text-white shadow-xs'
-                    : 'text-amber-900 hover:bg-amber-100'
+                id="toggle-alphabet-teacher-voice-btn"
+                onClick={() => {
+                  setIsTeacherVoiceEditMode(!isTeacherVoiceEditMode);
+                  speechService.playSoundEffect('pop');
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer border ${
+                  isTeacherVoiceEditMode
+                    ? 'bg-amber-600 text-white border-amber-700 ring-2 ring-amber-300'
+                    : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900 border-amber-300'
                 }`}
+                title="Thu âm giọng đọc mẫu của cô giáo cho 29 chữ cái và âm ghép"
               >
-                {tab.label}
+                <Mic className="w-3.5 h-3.5" />
+                <span>{isTeacherVoiceEditMode ? 'Đang sửa giọng GV' : 'Sửa giọng mẫu GV'}</span>
               </button>
-            ))}
+            )}
+
+            <div className="flex flex-wrap gap-1.5 bg-amber-50 p-1.5 rounded-2xl border border-amber-200/80">
+              {[
+                { id: 'all', label: 'Tất cả' },
+                { id: 'single', label: '29 Chữ cái' },
+                { id: 'compound', label: '11 Âm ghép' },
+                { id: 'tones', label: '5 Dấu thanh' },
+                { id: 'rhymes', label: 'Vần phổ biến' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  id={`filter-alphabet-${tab.id}`}
+                  onClick={() => setActiveCategory(tab.id as any)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    activeCategory === tab.id
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'text-amber-900 hover:bg-amber-100'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -129,31 +179,46 @@ export const AlphabetBoard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {singleLetters.map((item) => (
-                <div
-                  key={item.letter}
-                  id={`single-letter-card-${item.letter}`}
-                  onClick={() => handlePlayLetter(`${item.letter}, ${item.example}`)}
-                  className="group cursor-pointer bg-gradient-to-b from-amber-50/50 to-orange-50/30 hover:to-orange-100/60 p-4 rounded-2xl border border-amber-200/70 hover:border-orange-400 hover:shadow-md transition-all text-center flex flex-col items-center justify-between"
-                >
-                  <span className="text-2xl mb-1 group-hover:scale-125 transition-transform">{item.icon}</span>
-                  <div className="flex items-baseline gap-1.5 my-1">
-                    <span className="text-3xl font-black text-amber-950 font-serif group-hover:text-orange-600">
-                      {item.letter}
-                    </span>
-                    <span className="text-xl font-bold text-amber-700 font-serif">
-                      {item.upper}
-                    </span>
+              {singleLetters.map((item) => {
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.letter);
+                return (
+                  <div
+                    key={item.letter}
+                    id={`single-letter-card-${item.letter}`}
+                    onClick={() => handlePlayLetter(`${item.letter}, ${item.example}`)}
+                    className="group cursor-pointer bg-gradient-to-b from-amber-50/50 to-orange-50/30 hover:to-orange-100/60 p-4 rounded-2xl border border-amber-200/70 hover:border-orange-400 hover:shadow-md transition-all text-center flex flex-col items-center justify-between relative"
+                  >
+                    {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
+                      <button
+                        onClick={(e) => handleTeacherRecordClick(e, `${item.letter}, ${item.example}`, `Chữ cái: ${item.letter.toUpperCase()} (${item.letter})`)}
+                        className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-xs transition-all active:scale-90 cursor-pointer ${
+                          isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        } ${hasTeacherAudio ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'}`}
+                        title={`Thu âm giọng đọc mẫu cô giáo cho chữ "${item.letter}"`}
+                      >
+                        <Mic className="w-3 h-3" />
+                      </button>
+                    )}
+
+                    <span className="text-2xl mb-1 group-hover:scale-125 transition-transform">{item.icon}</span>
+                    <div className="flex items-baseline gap-1.5 my-1">
+                      <span className="text-3xl font-black text-amber-950 font-serif group-hover:text-orange-600">
+                        {item.letter}
+                      </span>
+                      <span className="text-xl font-bold text-amber-700 font-serif">
+                        {item.upper}
+                      </span>
+                    </div>
+                    <div className="text-xs font-semibold text-slate-600 mt-1">
+                      {item.example}
+                    </div>
+                    <div className="mt-2 flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-100/70 px-2 py-0.5 rounded-full group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                      <Volume2 className="w-3 h-3" />
+                      <span>{hasTeacherAudio ? 'Giọng GV' : 'Đọc'}</span>
+                    </div>
                   </div>
-                  <div className="text-xs font-semibold text-slate-600 mt-1">
-                    {item.example}
-                  </div>
-                  <div className="mt-2 flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-100/70 px-2 py-0.5 rounded-full group-hover:bg-orange-500 group-hover:text-white transition-colors">
-                    <Volume2 className="w-3 h-3" />
-                    <span>Đọc</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -172,26 +237,41 @@ export const AlphabetBoard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {compoundSounds.map((item) => (
-                <div
-                  key={item.sound}
-                  id={`compound-sound-card-${item.sound}`}
-                  onClick={() => handlePlayLetter(`${item.name}, ${item.example}`)}
-                  className="group cursor-pointer bg-gradient-to-b from-emerald-50/50 to-teal-50/30 hover:to-emerald-100/60 p-4 rounded-2xl border border-emerald-200/70 hover:border-emerald-500 hover:shadow-md transition-all text-center flex flex-col items-center justify-between"
-                >
-                  <span className="text-2xl mb-1 group-hover:scale-125 transition-transform">{item.icon}</span>
-                  <div className="text-3xl font-black text-emerald-950 font-serif group-hover:text-emerald-600 my-1">
-                    {item.sound}
+              {compoundSounds.map((item) => {
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.name);
+                return (
+                  <div
+                    key={item.sound}
+                    id={`compound-sound-card-${item.sound}`}
+                    onClick={() => handlePlayLetter(`${item.name}, ${item.example}`)}
+                    className="group cursor-pointer bg-gradient-to-b from-emerald-50/50 to-teal-50/30 hover:to-emerald-100/60 p-4 rounded-2xl border border-emerald-200/70 hover:border-emerald-500 hover:shadow-md transition-all text-center flex flex-col items-center justify-between relative"
+                  >
+                    {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
+                      <button
+                        onClick={(e) => handleTeacherRecordClick(e, `${item.name}, ${item.example}`, `Âm ghép: ${item.sound}`)}
+                        className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-xs transition-all active:scale-90 cursor-pointer ${
+                          isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        } ${hasTeacherAudio ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'}`}
+                        title={`Thu âm giọng mẫu cho âm ghép "${item.sound}"`}
+                      >
+                        <Mic className="w-3 h-3" />
+                      </button>
+                    )}
+
+                    <span className="text-2xl mb-1 group-hover:scale-125 transition-transform">{item.icon}</span>
+                    <div className="text-3xl font-black text-emerald-950 font-serif group-hover:text-emerald-600 my-1">
+                      {item.sound}
+                    </div>
+                    <div className="text-xs font-semibold text-slate-600">
+                      {item.example}
+                    </div>
+                    <div className="mt-2 flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                      <Volume2 className="w-3 h-3" />
+                      <span>{hasTeacherAudio ? 'Giọng GV' : item.name}</span>
+                    </div>
                   </div>
-                  <div className="text-xs font-semibold text-slate-600">
-                    {item.example}
-                  </div>
-                  <div className="mt-2 flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                    <Volume2 className="w-3 h-3" />
-                    <span>{item.name}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

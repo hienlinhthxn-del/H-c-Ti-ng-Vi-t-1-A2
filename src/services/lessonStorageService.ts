@@ -95,6 +95,11 @@ class LessonStorageService {
     });
   }
 
+  // Get all Volume 2 Lessons as a flat array
+  getVolume2Lessons(): Volume2Lesson[] {
+    return this.getTopicGroups().flatMap(g => g.lessons);
+  }
+
   // Get Volume 2 Lesson by ID
   getVolume2Lesson(id: number): Volume2Lesson | undefined {
     const customMap = this.getCustomVol2Map();

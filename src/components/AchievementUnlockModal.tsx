@@ -1,134 +1,70 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { AchievementBadge } from '../types';
-import { speechService } from '../services/speechService';
+import { X, Sparkles, Award } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Sparkles, Trophy, Check, X, Award, Star } from 'lucide-react';
 
 interface AchievementUnlockModalProps {
-  badge: AchievementBadge | null;
+  badges: AchievementBadge[];
   onClose: () => void;
-  onOpenAllBadges?: () => void;
 }
 
-export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({
-  badge,
-  onClose,
-  onOpenAllBadges
-}) => {
-  useEffect(() => {
-    if (badge) {
-      // Trigger festive sound
-      speechService.playSoundEffect('fanfare');
-      
-      // Voice cheering
-      setTimeout(() => {
-        speechService.speak(`Hoan hô! Bé đã đạt danh hiệu mới: ${badge.title}!`);
-      }, 400);
+export const AchievementUnlockModal: React.FC<AchievementUnlockModalProps> = ({ badges, onClose }) => {
+  const currentBadge = badges && badges.length > 0 ? badges[0] : null;
 
-      // Trigger Confetti cannons
-      try {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-        setTimeout(() => {
-          confetti({
-            particleCount: 50,
-            angle: 60,
-            spread: 55,
-            origin: { x: 0 }
-          });
-          confetti({
-            particleCount: 50,
-            angle: 120,
-            spread: 55,
-            origin: { x: 1 }
-          });
-        }, 300);
-      } catch (e) {
-        console.error('Confetti error:', e);
-      }
+  React.useEffect(() => {
+    if (currentBadge) {
+      confetti({
+        particleCount: 90,
+        spread: 80,
+        origin: { y: 0.5 }
+      });
     }
-  }, [badge]);
+  }, [currentBadge]);
 
-  if (!badge) return null;
+  if (!badges || badges.length === 0 || !currentBadge) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border-4 border-amber-300 text-center overflow-hidden animate-scale-up">
-        
-        {/* Background glow & sparkles */}
-        <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-72 h-72 bg-gradient-to-br from-amber-300/40 via-yellow-200/30 to-transparent rounded-full blur-2xl pointer-events-none" />
-        
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer z-10"
-        >
-          <X className="w-5 h-5" />
-        </button>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-gradient-to-b from-amber-400 via-orange-400 to-rose-500 rounded-3xl p-1 shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
+        <div className="bg-white rounded-[22px] p-6 sm:p-8 text-center relative overflow-hidden">
+          
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
 
-        {/* Header Eyebrow */}
-        <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-gradient-to-r from-amber-100 to-yellow-200 border border-amber-300 text-amber-900 text-xs font-black uppercase tracking-wider mb-4 shadow-xs">
-          <Trophy className="w-4 h-4 text-amber-600 fill-amber-500" />
-          <span>Vinh Danh Danh Hiệu Mới!</span>
-        </div>
-
-        {/* Big Bouncy Badge Icon */}
-        <div className="relative my-4 flex justify-center">
-          <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl bg-gradient-to-br from-amber-400 via-orange-400 to-rose-500 p-1.5 shadow-xl rotate-3 hover:rotate-0 transition-transform flex items-center justify-center">
-            <div className="w-full h-full bg-white rounded-2xl flex flex-col items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-t from-amber-50 to-transparent opacity-80" />
-              <span className="text-5xl sm:text-6xl filter drop-shadow-md z-10 animate-bounce">
-                {badge.icon}
-              </span>
+          {/* Badge icon celebration */}
+          <div className="relative mx-auto w-24 h-24 mb-4">
+            <div className="absolute inset-0 rounded-full bg-amber-200 animate-ping opacity-40" />
+            <div className="relative w-24 h-24 rounded-3xl bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-5xl shadow-xl shadow-orange-500/30">
+              {currentBadge.icon}
             </div>
           </div>
-          
-          <div className="absolute -top-2 -right-2 bg-amber-400 text-amber-950 px-2.5 py-1 rounded-full font-black text-xs shadow-md border-2 border-white flex items-center gap-1 animate-pulse">
-            <Star className="w-3.5 h-3.5 fill-amber-950" />
-            <span>+{badge.rewardStars} Sao</span>
-          </div>
-        </div>
 
-        {/* Badge Title & Subtitle */}
-        <h2 className="text-2xl sm:text-3xl font-black text-amber-950 font-serif tracking-tight mt-2">
-          {badge.title}
-        </h2>
-        <div className="text-sm font-bold text-orange-600 mt-1">
-          {badge.subtitle}
-        </div>
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-black uppercase tracking-wider mb-2">
+            <Sparkles className="w-3.5 h-3.5 text-orange-600" />
+            Mở Khóa Huy Hiệu Mới!
+          </span>
 
-        {/* Description */}
-        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-serif mt-3 bg-amber-50/70 p-3.5 rounded-2xl border border-amber-200/70">
-          "{badge.description}"
-        </p>
+          <h3 className="text-2xl font-black font-serif text-slate-900 mb-2">
+            {currentBadge.title}
+          </h3>
 
-        {/* Actions */}
-        <div className="mt-6 flex flex-col sm:flex-row items-center gap-2.5">
-          {onOpenAllBadges && (
-            <button
-              onClick={() => {
-                onClose();
-                onOpenAllBadges();
-              }}
-              className="w-full py-3 px-4 bg-amber-100 hover:bg-amber-200 text-amber-950 rounded-2xl font-black text-sm transition-all border border-amber-300 shadow-xs cursor-pointer flex items-center justify-center gap-2"
-            >
-              <Award className="w-4 h-4 text-amber-700" />
-              <span>Xem Bảng Vàng Danh Hiệu</span>
-            </button>
-          )}
+          <p className="text-sm text-slate-600 mb-6 font-medium leading-relaxed">
+            {currentBadge.description}
+          </p>
 
           <button
             onClick={onClose}
-            className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white rounded-2xl font-black text-sm transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 active:scale-95 text-white font-black text-base shadow-lg shadow-orange-500/30 transition-all cursor-pointer"
           >
-            <Check className="w-4 h-4" />
-            <span>Tuyệt vời, Bé học tiếp!</span>
+            Tuyệt vời! Nhận Thưởng ⭐
           </button>
-        </div>
 
+        </div>
       </div>
     </div>
   );

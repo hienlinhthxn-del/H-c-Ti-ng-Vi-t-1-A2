@@ -149,7 +149,10 @@ class RecordingStorageService {
           mimeType: item.mimeType || 'audio/webm',
           durationSeconds: item.durationSeconds || 0,
           createdAt: item.createdAt || new Date().toISOString(),
-          feedback: item.feedback
+          feedback: item.feedback,
+          teacherComment: item.teacherComment,
+          teacherScore: item.teacherScore,
+          reviewedAt: item.reviewedAt
         };
       });
 
@@ -191,6 +194,49 @@ class RecordingStorageService {
     }
   }
 
+  // Update teacher review & comment
+  async updateTeacherReview(
+    id: string,
+    comment: string,
+    score: number = 5
+  ): Promise<boolean> {
+    const item = this.memoryRecordings.find(r => r.id === id);
+    if (item) {
+      item.teacherComment = comment;
+      item.teacherScore = score;
+      item.reviewedAt = new Date().toISOString();
+    }
+
+    try {
+      const db = await this.initDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const getReq = store.get(id);
+        getReq.onsuccess = () => {
+          const record = getReq.result;
+          if (record) {
+            record.teacherComment = comment;
+            record.teacherScore = score;
+            record.reviewedAt = new Date().toISOString();
+            const putReq = store.put(record);
+            putReq.onsuccess = () => resolve();
+            putReq.onerror = () => reject(putReq.error);
+          } else {
+            resolve();
+          }
+        };
+        getReq.onerror = () => reject(getReq.error);
+      });
+      this.notify();
+      return true;
+    } catch (err) {
+      console.warn('Failed to update teacher review in IndexedDB:', err);
+      this.notify();
+      return true;
+    }
+  }
+
   // Clear all recordings
   async clearAllRecordings(): Promise<boolean> {
     this.memoryRecordings = [];
@@ -217,7 +263,7 @@ class RecordingStorageService {
     targetText: string,
     durationSeconds: number
   ): { starsEarned: number; cheeringMessage: string; fluencyRating: 'excellent' | 'great' | 'good' } {
-    const wordCount = targetText.trim().split(/\s+/).length;
+    const wordCount = (targetText || '').trim().split(/\s+/).filter(Boolean).length || 1;
     
     const messages = [
       '🎉 Hoan hô bé! Giọng đọc rất to, rõ ràng và phát âm tròn vành rõ chữ!',

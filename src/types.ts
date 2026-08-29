@@ -1,4 +1,5 @@
 export type VolumeType = 'tap1' | 'tap2' | 'intro';
+export type UserRole = 'student' | 'teacher' | 'parent';
 
 export interface PhonicItem {
   letter: string;
@@ -154,6 +155,9 @@ export interface StudentRecording {
     cheeringMessage: string;
     fluencyRating: 'excellent' | 'great' | 'good';
   };
+  teacherComment?: string;
+  teacherScore?: number;
+  reviewedAt?: string;
 }
 
 export interface RecordingTargetInfo {
@@ -166,27 +170,175 @@ export interface RecordingTargetInfo {
   referenceAudioText?: string;
 }
 
+export interface TeacherAudioTarget {
+  text?: string;
+  targetText?: string;
+  displayTitle?: string;
+  sectionTitle?: string;
+  volume?: 'vol1' | 'vol2';
+  lessonId?: number;
+  lessonNumber?: number;
+  lessonTitle?: string;
+  section?: 'letter' | 'syllable' | 'word' | 'sentence' | 'passage' | 'quiz' | 'general';
+}
+
 export interface AchievementBadge {
   id: string;
   title: string;
-  subtitle: string;
   description: string;
   icon: string;
-  color: string;
-  category: 'total_reading' | 'vol1_lessons' | 'vol2_lessons' | 'practice' | 'voice_recording';
-  requirementType: 'lessons_completed' | 'vol1_lessons' | 'vol2_lessons' | 'practice_count' | 'recordings_count';
+  category: 'reading_count' | 'volume_completion' | 'recording_count' | 'streak';
   requiredCount: number;
-  rewardStars: number;
-  unlockedAt?: string;
+  unlockedAt?: string; // ISO string if unlocked
+  tier: 'bronze' | 'silver' | 'gold' | 'diamond';
 }
 
-export interface StudentTitleInfo {
-  title: string;
-  subtitle: string;
-  icon: string;
+export interface AcademicRank {
   level: number;
+  title: string;
+  minCompletedLessons: number;
+  badgeIcon: string;
   color: string;
-  nextBadge?: AchievementBadge;
-  unlockedCount: number;
-  totalBadgesCount: number;
+  description: string;
 }
+
+export interface AchievementState {
+  completedLessonKeys: string[]; // e.g. ["vol1_1", "vol1_2", "vol2_1"]
+  unlockedBadgeIds: string[];
+  totalRecordingsCount: number;
+  starsCount: number;
+}
+
+export type StudentStatus = 'excellent' | 'good' | 'average' | 'needs_support';
+
+export interface StudentCompletedLesson {
+  lessonKey: string; // "vol1_1" or "vol2_1"
+  volume: 'vol1' | 'vol2';
+  lessonNumber: number;
+  lessonTitle: string;
+  completedAt: string; // ISO string
+  scoreStars: number;
+  practiceType: 'reading' | 'writing' | 'recording';
+}
+
+export interface StudentProfile {
+  id: string;
+  studentCode: string; // e.g. "HS01"
+  name: string;
+  gender: 'male' | 'female';
+  classId: string;
+  avatar: string;
+  dob?: string;
+  completedLessons: StudentCompletedLesson[];
+  recordingsCount: number;
+  writingCount: number;
+  starsCount: number;
+  streakDays: number;
+  status: StudentStatus;
+  teacherNotes: string;
+  lastActiveAt: string;
+}
+
+export interface ClassRoom {
+  id: string;
+  name: string;
+  grade: string;
+  schoolYear: string;
+  homeroomTeacher: string;
+  totalStudents: number;
+  currentTargetLesson: number; // e.g. lesson number currently teaching (e.g. 45)
+}
+
+export interface ClassAnalyticsSummary {
+  totalStudents: number;
+  activeStudentsCount: number;
+  averageCompletionRate: number; // 0 - 100%
+  totalLessonsCompleted: number;
+  totalRecordingsSubmitted: number;
+  totalWritingSubmitted: number;
+  averageStars: number;
+  statusBreakdown: {
+    excellent: number;
+    good: number;
+    average: number;
+    needs_support: number;
+  };
+  mostCompletedLessons: {
+    lessonKey: string;
+    lessonTitle: string;
+    completedCount: number;
+    percentage: number;
+  }[];
+  leastCompletedLessons: {
+    lessonKey: string;
+    lessonTitle: string;
+    completedCount: number;
+    percentage: number;
+  }[];
+}
+
+export interface AppUserProfile {
+  id: string;
+  name: string;
+  role: UserRole;
+  avatar: string;
+  studentCode?: string;
+  classroom?: string;
+  gender?: 'male' | 'female';
+  pinCode?: string;
+  linkedStudentIds?: string[];
+  starsCount: number;
+  completedLessonKeys: string[];
+  unlockedBadgeIds: string[];
+  totalRecordingsCount: number;
+  createdAt: string;
+  lastActiveAt: string;
+}
+
+export interface GoogleAccountInfo {
+  email: string;
+  name: string;
+  picture?: string;
+  accessToken: string;
+  expiresAt: number;
+}
+
+export interface GoogleSheetsSyncStatus {
+  spreadsheetId?: string;
+  spreadsheetUrl?: string;
+  lastSyncedAt?: string;
+  totalRowsSynced?: number;
+  status: 'idle' | 'syncing' | 'synced' | 'error';
+  errorMessage?: string;
+}
+
+export interface GoogleDriveSyncStatus {
+  folderId?: string;
+  folderUrl?: string;
+  lastSyncedAt?: string;
+  totalFilesUploaded?: number;
+  status: 'idle' | 'syncing' | 'synced' | 'error';
+  errorMessage?: string;
+}
+
+export interface GoogleClassroomCourse {
+  id: string;
+  name: string;
+  section?: string;
+  descriptionHeading?: string;
+  room?: string;
+  alternateLink?: string;
+}
+
+export interface GoogleClassroomAssignment {
+  id: string;
+  courseId: string;
+  title: string;
+  description?: string;
+  state?: string;
+  alternateLink?: string;
+  maxPoints?: number;
+  dueDate?: { year: number; month: number; day: number };
+}
+
+

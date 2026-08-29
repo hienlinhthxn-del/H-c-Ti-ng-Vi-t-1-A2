@@ -2,33 +2,47 @@
 
 @layer base {
   html {
-    font-family: 'Nunito', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Be Vietnam Pro', 'Lexend', 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
   body {
-    font-family: 'Nunito', 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Be Vietnam Pro', 'Lexend', 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     color: #1e293b;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
   }
 }
 
-/* Textbook Typography - Sách Giáo Khoa Tiếng Việt 1 */
+/* Textbook Typography - Sách Giáo Khoa Tiếng Việt 1 Chuẩn GD&ĐT */
 .font-sgk {
-  font-family: 'Nunito', 'Be Vietnam Pro', -apple-system, sans-serif;
+  font-family: 'Be Vietnam Pro', 'Lexend', 'Nunito', -apple-system, sans-serif;
   letter-spacing: -0.01em;
 }
 
 .font-sgk-title {
-  font-family: 'Nunito', 'Be Vietnam Pro', sans-serif;
+  font-family: 'Be Vietnam Pro', 'Lexend', 'Nunito', sans-serif;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .font-reading {
-  font-family: 'Nunito', 'Be Vietnam Pro', sans-serif;
+  font-family: 'Be Vietnam Pro', 'Lexend', 'Nunito', sans-serif;
   line-height: 2.1;
   letter-spacing: 0.02em;
   word-spacing: 0.08em;
+}
+
+/* Authentic SGK Serif for Literary Reading Passages (Literata / Lora) */
+.font-serif {
+  font-family: 'Literata', 'Lora', 'Times New Roman', serif;
+}
+
+.font-sans {
+  font-family: 'Be Vietnam Pro', 'Lexend', 'Nunito', sans-serif;
 }
 
 .font-handwriting {
@@ -43,3 +57,46 @@
     linear-gradient(to right, rgba(59, 130, 246, 0.15) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(59, 130, 246, 0.15) 1px, transparent 1px);
 }
+
+/* Safe area padding utilities for mobile devices with notches / home indicators */
+.safe-area-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
+}
+
+.safe-area-top {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0.5rem));
+}
+
+/* Hide scrollbar utility for sleek horizontal tab lists on mobile & tablet */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom pleasant scrollbars for desktop & tablet */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Touch active feedback */
+@media (hover: none) and (pointer: coarse) {
+  button:active, a:active {
+    opacity: 0.88;
+    transform: scale(0.98);
+  }
+}
+

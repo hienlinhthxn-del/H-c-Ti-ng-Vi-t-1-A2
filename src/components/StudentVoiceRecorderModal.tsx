@@ -22,7 +22,9 @@ import {
   Radio,
   AlertCircle,
   HelpCircle,
-  Trophy
+  Trophy,
+  BookOpen,
+  Type
 } from 'lucide-react';
 
 interface StudentVoiceRecorderModalProps {
@@ -42,6 +44,8 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 }) => {
   const [activeTab, setActiveTab] = useState<'record' | 'history'>('record');
   const [recordings, setRecordings] = useState<StudentRecording[]>([]);
+  const [fontSizeMode, setFontSizeMode] = useState<'normal' | 'large' | 'huge'>('normal');
+  const [submittedSuccess, setSubmittedSuccess] = useState<boolean>(false);
   
   // Recording states
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -482,42 +486,92 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
           
           {activeTab === 'record' ? (
             <>
-              {/* Target Reading Card */}
+              {/* Target Reading Card - High contrast, customizable text size */}
               {targetInfo && (
-                <div className="bg-gradient-to-br from-amber-50 via-orange-50/40 to-yellow-50 rounded-3xl p-5 sm:p-6 border-2 border-amber-200 shadow-sm relative">
-                  <div className="flex items-center justify-between mb-3">
+                <div className={`rounded-3xl p-5 sm:p-6 border-2 transition-all relative ${
+                  isRecording
+                    ? 'bg-amber-50/90 border-orange-500 ring-4 ring-orange-400/30 shadow-lg'
+                    : 'bg-gradient-to-br from-amber-50 via-orange-50/40 to-yellow-50 border-amber-200 shadow-sm'
+                }`}>
+                  <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-black uppercase text-orange-800 bg-orange-100 px-3 py-1 rounded-full">
-                        📖 Bài đọc của bé
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        (Bé hãy đọc to, rõ ràng và ngắt nghỉ đúng nhịp nhé)
+                      <span className={`text-xs font-black uppercase px-3 py-1 rounded-full flex items-center gap-1.5 ${
+                        isRecording ? 'bg-orange-600 text-white animate-pulse' : 'bg-orange-100 text-orange-900'
+                      }`}>
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>Chữ cần đọc (Bé hãy nhìn vào đây):</span>
                       </span>
                     </div>
 
-                    {/* Teacher Reference Speech button */}
-                    <button
-                      id="listen-teacher-speech-btn"
-                      onClick={handleListenTeacherModel}
-                      disabled={isRecording}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        isTeacherSpeaking
-                          ? 'bg-rose-500 text-white animate-pulse'
-                          : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs'
-                      } ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      title="Nghe cô giáo đọc mẫu"
-                    >
-                      <Volume2 className="w-4 h-4 text-orange-500" />
-                      <span>{isTeacherSpeaking ? 'Đang đọc mẫu...' : 'Nghe cô đọc mẫu'}</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {/* Font size control */}
+                      <div className="flex items-center gap-1 bg-white/90 border border-amber-200 rounded-xl p-1 shadow-2xs">
+                        <Type className="w-3.5 h-3.5 text-amber-700 ml-1" />
+                        <button
+                          onClick={() => setFontSizeMode('normal')}
+                          className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            fontSizeMode === 'normal' ? 'bg-orange-500 text-white' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Chuẩn
+                        </button>
+                        <button
+                          onClick={() => setFontSizeMode('large')}
+                          className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            fontSizeMode === 'large' ? 'bg-orange-500 text-white' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Lớn (A+)
+                        </button>
+                        <button
+                          onClick={() => setFontSizeMode('huge')}
+                          className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            fontSizeMode === 'huge' ? 'bg-orange-500 text-white' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Rất lớn (A++)
+                        </button>
+                      </div>
+
+                      {/* Teacher Reference Speech button */}
+                      <button
+                        id="listen-teacher-speech-btn"
+                        onClick={handleListenTeacherModel}
+                        disabled={isRecording}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          isTeacherSpeaking
+                            ? 'bg-rose-500 text-white animate-pulse'
+                            : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs'
+                        } ${isRecording ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title="Nghe cô giáo đọc mẫu"
+                      >
+                        <Volume2 className="w-4 h-4 text-orange-500" />
+                        <span>{isTeacherSpeaking ? 'Đang đọc mẫu...' : 'Nghe cô đọc mẫu'}</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Target Text Box */}
-                  <div className="bg-white/90 backdrop-blur-xs rounded-2xl p-5 border border-amber-100 shadow-inner">
-                    <p className="text-xl sm:text-2xl font-serif text-slate-900 leading-relaxed sm:leading-loose text-center font-bold tracking-wide whitespace-pre-line">
+                  <div className="bg-white rounded-2xl p-5 sm:p-6 border border-amber-200 shadow-inner">
+                    <p className={`font-reading text-slate-900 text-center font-bold tracking-wide whitespace-pre-line ${
+                      fontSizeMode === 'huge'
+                        ? 'text-2xl sm:text-3xl md:text-4xl leading-[2.3]'
+                        : fontSizeMode === 'large'
+                        ? 'text-xl sm:text-2xl md:text-3xl leading-[2.2]'
+                        : 'text-lg sm:text-xl md:text-2xl leading-[2.0]'
+                    }`}>
                       {targetInfo.targetText}
                     </p>
                   </div>
+
+                  {isRecording && (
+                    <div className="mt-2.5 text-center">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-bold">
+                        <Sparkles className="w-3.5 h-3.5 text-orange-600" />
+                        Micro đang thu âm! Bé hãy cất giọng đọc to theo từng chữ ở trên nhé
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -537,13 +591,13 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                 
                 {/* 1. STATE: RECORDING ACTIVE */}
                 {isRecording ? (
-                  <div className="w-full space-y-5">
+                  <div className="w-full space-y-4">
                     
                     {/* Pulsing On-Air Indicator & Timer */}
                     <div className="flex items-center justify-center gap-3">
-                      <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-100 border border-rose-300 text-rose-700 text-xs font-black animate-pulse">
-                        <Radio className="w-4 h-4 text-rose-600" />
-                        <span>ĐANG GHI ÂM</span>
+                      <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-500 text-white text-xs font-black animate-pulse shadow-sm">
+                        <Radio className="w-4 h-4" />
+                        <span>ĐANG GHI ÂM GIỌNG ĐỌC CỦA BÉ</span>
                       </div>
                       
                       <div className="text-2xl sm:text-3xl font-black font-mono text-slate-800">
@@ -552,7 +606,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                     </div>
 
                     {/* Live Audio Visualizer Bars */}
-                    <div className="bg-slate-900 rounded-2xl p-4 sm:p-6 flex items-end justify-center gap-1.5 sm:gap-2 h-28 sm:h-32 shadow-inner">
+                    <div className="bg-slate-900 rounded-2xl p-4 sm:p-5 flex items-end justify-center gap-1.5 sm:gap-2 h-24 sm:h-28 shadow-inner">
                       {audioLevels.map((level, idx) => (
                         <div
                           key={idx}
@@ -570,10 +624,6 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                       ))}
                     </div>
 
-                    <p className="text-xs sm:text-sm text-slate-600 font-medium">
-                      🎤 Bé hãy nhìn vào bài đọc ở trên và đọc thật to, dõng dạc nhé!
-                    </p>
-
                     {/* Recording Action Buttons */}
                     <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                       <button
@@ -588,16 +638,16 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                       <button
                         id="finish-recording-btn"
                         onClick={stopRecording}
-                        className="px-6 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-sm sm:text-base flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-all cursor-pointer"
+                        className="px-7 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-95 text-white font-black text-sm sm:text-base flex items-center gap-2.5 shadow-lg shadow-emerald-500/30 transition-all cursor-pointer"
                       >
                         <Square className="w-5 h-5 fill-white" />
-                        <span>HOÀN THÀNH BÀI ĐỌC</span>
+                        <span>HOÀN THÀNH & NỘP BÀI ⭐</span>
                       </button>
                     </div>
 
                   </div>
                 ) : audioUrl ? (
-                  /* 2. STATE: RECORDED COMPLETED / REVIEW */
+                  /* 2. STATE: RECORDED COMPLETED / REVIEW & SUBMISSION */
                   <div className="w-full space-y-5">
                     
                     {/* Encouraging Feedback & Star Award Banner */}
@@ -609,14 +659,14 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-black uppercase bg-white/60 px-2.5 py-0.5 rounded-full">
-                              Khen thưởng bé
+                              Đã nộp bài cho thầy cô
                             </span>
                             <span className="text-xs font-bold text-amber-900">
                               +1 Ngôi sao chăm ngoan!
                             </span>
                           </div>
                           <p className="text-base sm:text-lg font-black font-serif mt-1">
-                            {currentRecordingSaved?.feedback?.cheeringMessage || 'Bé đã hoàn thành bài đọc rất xuất sắc!'}
+                            {currentRecordingSaved?.feedback?.cheeringMessage || 'Bé đã hoàn thành và nộp bài đọc rất xuất sắc!'}
                           </p>
                         </div>
                       </div>
@@ -625,7 +675,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                     {/* Audio Player Card */}
                     <div className="bg-orange-50/70 rounded-2xl p-4 sm:p-5 border border-orange-200 flex flex-col gap-3">
                       <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                        <span>Bản ghi âm giọng đọc của bé</span>
+                        <span>Bản ghi âm giọng đọc của bé vừa thu:</span>
                         <span className="font-mono text-orange-700 font-black">
                           {formatTime(playbackCurrentTime)} / {formatTime(playbackDuration || recordingSeconds)}
                         </span>
@@ -649,7 +699,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                       </div>
 
                       {/* Player controls */}
-                      <div className="flex items-center justify-between pt-2">
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                         <button
                           id="play-recorded-audio-btn"
                           onClick={togglePlayRecorded}
@@ -668,7 +718,21 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                           )}
                         </button>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            id="confirm-submit-teacher-btn"
+                            onClick={() => {
+                              setSubmittedSuccess(true);
+                              speechService.playSoundEffect('fanfare');
+                              speechService.speak('Bài đọc đã được lưu và nộp thành công cho giáo viên!');
+                              confetti({ particleCount: 60, spread: 60, origin: { y: 0.7 } });
+                            }}
+                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                            <span>{submittedSuccess ? 'Đã nộp bài cho cô giáo ✅' : 'Nộp bài cho cô giáo'}</span>
+                          </button>
+
                           {currentRecordingSaved && (
                             <button
                               id="download-recording-btn"
@@ -688,7 +752,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                             title="Ghi âm lại lần nữa"
                           >
                             <RotateCcw className="w-4 h-4 text-orange-500" />
-                            <span>Đọc lại lần nữa</span>
+                            <span>Đọc lại</span>
                           </button>
                         </div>
                       </div>
@@ -705,10 +769,10 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 
                     <div>
                       <h3 className="text-xl sm:text-2xl font-black font-serif text-slate-900">
-                        Sẵn sàng luyện đọc cùng cô!
+                        Sẵn sàng luyện đọc & nộp bài cùng cô!
                       </h3>
                       <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto mt-1">
-                        Bấm nút bên dưới, sau đó nhìn vào bài đọc và cất giọng thật to, rõ ràng từng tiếng nhé!
+                        Bấm nút bên dưới, sau đó nhìn vào bài đọc ở trên và cất giọng thật to, rõ ràng từng tiếng nhé!
                       </p>
                     </div>
 
