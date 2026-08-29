@@ -1,5 +1,6 @@
 import { AppUserProfile, UserRole } from '../types';
 import { achievementService } from './achievementService';
+import { classAnalyticsService } from './classAnalyticsService';
 
 const USERS_STORAGE_KEY = 'tiengviet1_multi_users_v2';
 const ACTIVE_USER_ID_KEY = 'tiengviet1_active_user_id_v2';
@@ -295,7 +296,16 @@ class UserProfileService {
   }
 
   // Update current active student progress
-  public recordLessonCompletion(lessonKey: string, isCompleted: boolean) {
+  public recordLessonCompletion(
+    lessonKey: string, 
+    isCompleted: boolean,
+    lessonMeta?: {
+      volume: 'vol1' | 'vol2';
+      lessonNumber: number;
+      lessonTitle: string;
+      practiceType?: 'reading' | 'writing' | 'recording';
+    }
+  ) {
     const active = this.getActiveUser();
     if (active.role !== 'student') return;
 
@@ -307,19 +317,80 @@ class UserProfileService {
     }
 
     active.completedLessonKeys = Array.from(completed);
-    active.starsCount = active.completedLessonKeys.length;
+    active.starsCount = Math.max(active.starsCount || 0, active.completedLessonKeys.length);
+    active.lastActiveAt = new Date().toISOString();
     this.saveUsers();
     this.notify();
+
+    // Sync to Class Analytics Service for real-time gradebook and stats
+    try {
+      const volume = lessonMeta?.volume || (lessonKey.startsWith('vol2_') ? 'vol2' : 'vol1');
+      const lessonNum = lessonMeta?.lessonNumber || parseInt(lessonKey.replace(/^[a-z0-9]+_/, ''), 10) || 1;
+      const lessonTitle = lessonMeta?.lessonTitle || `Bài ${lessonNum}`;
+      
+      classAnalyticsService.recordStudentLessonActivity(
+        { code: active.studentCode, id: active.id, name: active.name },
+        {
+          lessonKey,
+          volume,
+          lessonNumber: lessonNum,
+          lessonTitle,
+          isCompleted,
+          scoreStars: 5,
+          practiceType: lessonMeta?.practiceType || 'reading'
+        }
+      );
+    } catch (e) {
+      console.error('Failed to sync lesson completion to class analytics:', e);
+    }
   }
 
   // Record student recording activity
-  public recordRecordingAdded() {
+  public recordRecordingAdded(info?: {
+    lessonKey?: string;
+    volume?: 'vol1' | 'vol2';
+    lessonNumber?: number;
+    lessonTitle?: string;
+  }) {
     const active = this.getActiveUser();
     if (active.role !== 'student') return;
 
     active.totalRecordingsCount = (active.totalRecordingsCount || 0) + 1;
+    active.starsCount = (active.starsCount || 0) + 1;
+    active.lastActiveAt = new Date().toISOString();
     this.saveUsers();
     this.notify();
+
+    // Sync to Class Analytics
+    try {
+      classAnalyticsService.recordStudentVoiceSubmission(
+        { code: active.studentCode, id: active.id, name: active.name },
+        info || {}
+      );
+    } catch (e) {
+      console.error('Failed to sync recording to class analytics:', e);
+    }
+  }
+
+  // Record student writing activity
+  public recordWritingAdded(sampleText?: string) {
+    const active = this.getActiveUser();
+    if (active.role !== 'student') return;
+
+    active.starsCount = (active.starsCount || 0) + 1;
+    active.lastActiveAt = new Date().toISOString();
+    this.saveUsers();
+    this.notify();
+
+    // Sync to Class Analytics
+    try {
+      classAnalyticsService.recordStudentWritingSubmission(
+        { code: active.studentCode, id: active.id, name: active.name },
+        sampleText
+      );
+    } catch (e) {
+      console.error('Failed to sync writing to class analytics:', e);
+    }
   }
 
   // Export all users & data package for classroom multi-device transfer

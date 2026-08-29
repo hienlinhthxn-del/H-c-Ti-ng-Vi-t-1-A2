@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { AppUserProfile, UserRole } from '../types';
 import { userProfileService, AVATAR_OPTIONS } from '../services/userProfileService';
+import { classAnalyticsService } from '../services/classAnalyticsService';
 import { speechService } from '../services/speechService';
 
 interface UserProfileModalProps {
@@ -400,19 +401,33 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           </span>
                         </div>
 
-                        {user.role === 'student' && (
-                          <div className="flex items-center gap-2 mt-2 text-[11px] font-bold text-slate-600">
-                            <span className="text-amber-600">⭐ {user.starsCount || 0} sao</span>
-                            <span>•</span>
-                            <span className="text-emerald-700">📖 {user.completedLessonKeys?.length || 0} bài</span>
-                            {user.totalRecordingsCount > 0 && (
-                              <>
-                                <span>•</span>
-                                <span className="text-rose-600">🎙️ {user.totalRecordingsCount} bản thu</span>
-                              </>
-                            )}
-                          </div>
-                        )}
+                        {user.role === 'student' && (() => {
+                          const classStudent = classAnalyticsService.findStudent({ code: user.studentCode, id: user.id, name: user.name });
+                          const realStars = classStudent?.starsCount ?? user.starsCount ?? 0;
+                          const realLessons = classStudent?.completedLessons?.length ?? user.completedLessonKeys?.length ?? 0;
+                          const realRecs = classStudent?.recordingsCount ?? user.totalRecordingsCount ?? 0;
+                          const realWrites = classStudent?.writingCount ?? 0;
+
+                          return (
+                            <div className="flex items-center gap-2 mt-2 text-[11px] font-bold text-slate-600 flex-wrap">
+                              <span className="text-amber-600">⭐ {realStars} sao</span>
+                              <span>•</span>
+                              <span className="text-emerald-700">📖 {realLessons} bài</span>
+                              {realRecs > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-rose-600">🎙️ {realRecs} thu âm</span>
+                                </>
+                              )}
+                              {realWrites > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-sky-600">✍️ {realWrites} bài viết</span>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 

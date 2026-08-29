@@ -4,6 +4,7 @@ import { speechService } from '../services/speechService';
 import { lessonStorageService } from '../services/lessonStorageService';
 import { teacherAudioService } from '../services/teacherAudioService';
 import { achievementService } from '../services/achievementService';
+import { userProfileService } from '../services/userProfileService';
 import { TeacherAudioTarget } from './TeacherAudioRecorderModal';
 import {
   Volume2,
@@ -93,6 +94,14 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
     const nextState = !isCompleted;
     setIsCompleted(nextState);
     const { newlyCompleted, newBadges } = achievementService.setLessonCompleted('vol1', lesson.id, nextState);
+    
+    // Sync to user profile & class statistics in real time
+    userProfileService.recordLessonCompletion(`vol1_${lesson.id}`, nextState, {
+      volume: 'vol1',
+      lessonNumber: lesson.lessonNumber,
+      lessonTitle: `Bài ${lesson.lessonNumber}: ${lesson.title}`,
+      practiceType: 'reading'
+    });
 
     if (newlyCompleted) {
       speechService.playSoundEffect('fanfare');

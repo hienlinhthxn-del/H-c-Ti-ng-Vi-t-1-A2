@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { RotateCcw, Volume2, Sparkles, Undo, Download, CheckCircle2 } from 'lucide-react';
+import { RotateCcw, Volume2, Sparkles, Undo, Download, CheckCircle2, Award, Check } from 'lucide-react';
 import { speechService } from '../services/speechService';
+import { userProfileService } from '../services/userProfileService';
+import confetti from 'canvas-confetti';
 
 interface WritingBoardProps {
   initialSampleText?: string;
@@ -381,6 +383,28 @@ export const WritingBoard: React.FC<WritingBoardProps> = ({
           >
             <Download className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Lưu ảnh</span>
+          </button>
+
+          <button
+            id="submit-writing-practice-btn"
+            onClick={() => {
+              userProfileService.recordWritingAdded(sampleText);
+              speechService.playSoundEffect('fanfare');
+              speechService.speak('Hoan hô bé đã hoàn thành bài luyện viết!');
+              if (onSuccessReward) {
+                onSuccessReward();
+              }
+              confetti({
+                particleCount: 60,
+                spread: 65,
+                origin: { y: 0.6 }
+              });
+            }}
+            className="flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-transform active:scale-95 cursor-pointer"
+            title="Ghi nhận hoàn thành bài viết và cộng sao"
+          >
+            <Award className="w-3.5 h-3.5 text-amber-300" />
+            <span>Xong bài ⭐</span>
           </button>
         </div>
       </div>

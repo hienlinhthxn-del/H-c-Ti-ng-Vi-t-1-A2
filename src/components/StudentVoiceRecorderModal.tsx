@@ -3,6 +3,7 @@ import { RecordingTargetInfo, StudentRecording, AchievementBadge } from '../type
 import { speechService } from '../services/speechService';
 import { recordingStorageService } from '../services/recordingStorageService';
 import { achievementService } from '../services/achievementService';
+import { userProfileService } from '../services/userProfileService';
 import confetti from 'canvas-confetti';
 import {
   Mic,
@@ -246,6 +247,14 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
             particleCount: 70,
             spread: 70,
             origin: { y: 0.6 }
+          });
+
+          // Sync to student profile & Class Analytics
+          userProfileService.recordRecordingAdded({
+            lessonKey: targetInfo?.lessonId ? `${targetInfo.volume || 'vol1'}_${targetInfo.lessonId}` : undefined,
+            volume: targetInfo?.volume,
+            lessonNumber: targetInfo?.lessonNumber,
+            lessonTitle: targetInfo?.lessonTitle
           });
 
           // Track achievement & check for unlocked badges

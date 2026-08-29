@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Volume2Lesson, RecordingTargetInfo } from '../types';
+import { Volume2Lesson, RecordingTargetInfo, AchievementBadge } from '../types';
 import { speechService } from '../services/speechService';
 import { lessonStorageService } from '../services/lessonStorageService';
 import { teacherAudioService } from '../services/teacherAudioService';
+import { achievementService } from '../services/achievementService';
+import { userProfileService } from '../services/userProfileService';
 import { TeacherAudioTarget } from './TeacherAudioRecorderModal';
 import {
   Volume2,
@@ -16,7 +18,8 @@ import {
   Lightbulb,
   Edit3,
   Mic,
-  Type
+  Type,
+  Check
 } from 'lucide-react';
 
 interface Volume2LessonViewProps {
@@ -27,6 +30,7 @@ interface Volume2LessonViewProps {
   hasNext: boolean;
   onOpenWritingPractice: (text: string) => void;
   onAddStar: () => void;
+  onUnlockBadges?: (badges: AchievementBadge[]) => void;
   onEditLesson?: () => void;
   onOpenVoiceRecorder?: (target: RecordingTargetInfo) => void;
   onOpenTeacherRecorder?: (target: TeacherAudioTarget) => void;
@@ -41,6 +45,7 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
   hasNext,
   onOpenWritingPractice,
   onAddStar,
+  onUnlockBadges,
   onEditLesson,
   onOpenVoiceRecorder,
   onOpenTeacherRecorder,
@@ -52,6 +57,14 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
   const [showAnswerFor, setShowAnswerFor] = useState<{ [key: string]: boolean }>({});
   const [spellingSelections, setSpellingSelections] = useState<{ [key: number]: string }>({});
   const [, setAudioVersion] = useState<number>(0);
+  const [isCompleted, setIsCompleted] = useState<boolean>(() => achievementService.isLessonCompleted('vol2', lesson.id));
+
+  // Sync completion state when lesson changes
+  useEffect(() => {
+    setIsCompleted(achievementService.isLessonCompleted('vol2', lesson.id));
+    setSelectedAnswers({});
+    setShowAnswerFor({});
+  }, [lesson.id]);
 
   // Subscribe to teacher audio changes
   useEffect(() => {
@@ -62,6 +75,32 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
   }, []);
 
   const isCustomized = lessonStorageService.isVolume2Customized(lesson.id);
+
+  const handleToggleCompletion = () => {
+    const nextState = !isCompleted;
+    setIsCompleted(nextState);
+    const { newlyCompleted, newBadges } = achievementService.setLessonCompleted('vol2', lesson.id, nextState);
+    
+    // Sync to user profile & class statistics in real time
+    userProfileService.recordLessonCompletion(`vol2_${lesson.id}`, nextState, {
+      volume: 'vol2',
+      lessonNumber: lesson.lessonNumber,
+      lessonTitle: `Bài ${lesson.lessonNumber}: ${lesson.title}`,
+      practiceType: 'reading'
+    });
+
+    if (newlyCompleted) {
+      speechService.playSoundEffect('fanfare');
+      speechService.speak('Hoan hô bé đã hoàn thành bài tập đọc này!');
+      onAddStar();
+
+      if (newBadges.length > 0 && onUnlockBadges) {
+        onUnlockBadges(newBadges);
+      }
+    } else {
+      speechService.playSoundEffect('pop');
+    }
+  };
 
   const handleTeacherRecordClick = (e: React.MouseEvent, text: string, sectionTitle: string) => {
     e.stopPropagation();
@@ -200,6 +239,30 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
               <span>Sửa bài</span>
             </button>
           )}
+
+          {/* Mark completed button */}
+          <button
+            id="toggle-vol2-completed-btn"
+            onClick={handleToggleCompletion}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full font-bold text-xs sm:text-sm shadow-2xs transition-all active:scale-95 cursor-pointer border ${
+              isCompleted
+                ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-400'
+                : 'bg-white hover:bg-teal-50 text-slate-700 border-slate-200'
+            }`}
+            title={isCompleted ? 'Bé đã hoàn thành bài tập đọc này' : 'Bấm để đánh dấu đã đọc xong'}
+          >
+            {isCompleted ? (
+              <>
+                <CheckCircle2 className="w-4 h-4 text-emerald-100 fill-emerald-600" />
+                <span>Đã đọc xong ⭐</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-3.5 h-3.5 text-slate-500" />
+                <span>Đánh dấu xong</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 

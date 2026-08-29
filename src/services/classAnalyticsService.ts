@@ -288,6 +288,176 @@ class ClassAnalyticsService {
     this.saveStudents();
   }
 
+  // --- Student Find Helper ---
+  public findStudent(identifier: { code?: string; id?: string; name?: string }): StudentProfile | undefined {
+    if (identifier.id) {
+      const match = this.students.find(s => s.id === identifier.id);
+      if (match) return match;
+    }
+    if (identifier.code) {
+      const normalizedCode = identifier.code.toUpperCase().trim();
+      const match = this.students.find(s => s.studentCode?.toUpperCase().trim() === normalizedCode);
+      if (match) return match;
+    }
+    if (identifier.name) {
+      const normalizedName = identifier.name.toLowerCase().trim();
+      const match = this.students.find(s => s.name.toLowerCase().trim() === normalizedName);
+      if (match) return match;
+    }
+    return undefined;
+  }
+
+  // --- Recalculate status based on real progress ---
+  public computeStatusFromProgress(completedLessonsCount: number, targetCount: number = 35): StudentStatus {
+    const ratio = completedLessonsCount / targetCount;
+    if (ratio >= 0.8 || completedLessonsCount >= 30) return 'excellent';
+    if (ratio >= 0.55 || completedLessonsCount >= 20) return 'good';
+    if (ratio >= 0.28 || completedLessonsCount >= 10) return 'average';
+    return 'needs_support';
+  }
+
+  // --- Record Real Learning Activity when a student studies ---
+  public recordStudentLessonActivity(
+    identifier: { code?: string; id?: string; name?: string },
+    lessonData: {
+      lessonKey: string;
+      volume: 'vol1' | 'vol2';
+      lessonNumber: number;
+      lessonTitle: string;
+      isCompleted: boolean;
+      scoreStars?: number;
+      practiceType?: 'reading' | 'writing' | 'recording';
+    }
+  ) {
+    const student = this.findStudent(identifier);
+    if (!student) return;
+
+    const starsToAdd = lessonData.scoreStars !== undefined ? lessonData.scoreStars : 5;
+    const exists = student.completedLessons.find(cl => cl.lessonKey === lessonData.lessonKey);
+    let updatedList = [...student.completedLessons];
+    let newStars = student.starsCount;
+
+    if (lessonData.isCompleted) {
+      if (exists) {
+        updatedList = updatedList.map(cl => 
+          cl.lessonKey === lessonData.lessonKey 
+            ? { 
+                ...cl, 
+                scoreStars: starsToAdd, 
+                completedAt: new Date().toISOString(),
+                practiceType: lessonData.practiceType || cl.practiceType || 'reading' 
+              } 
+            : cl
+        );
+      } else {
+        updatedList.push({
+          lessonKey: lessonData.lessonKey,
+          volume: lessonData.volume,
+          lessonNumber: lessonData.lessonNumber,
+          lessonTitle: lessonData.lessonTitle,
+          completedAt: new Date().toISOString(),
+          scoreStars: starsToAdd,
+          practiceType: lessonData.practiceType || 'reading'
+        });
+        newStars += starsToAdd;
+      }
+    } else {
+      if (exists) {
+        updatedList = updatedList.filter(cl => cl.lessonKey !== lessonData.lessonKey);
+        newStars = Math.max(0, newStars - starsToAdd);
+      }
+    }
+
+    const newStatus = this.computeStatusFromProgress(updatedList.length);
+
+    this.students = this.students.map(s => {
+      if (s.id !== student.id) return s;
+      return {
+        ...s,
+        completedLessons: updatedList,
+        starsCount: newStars,
+        status: newStatus,
+        lastActiveAt: new Date().toISOString()
+      };
+    });
+
+    this.saveStudents();
+  }
+
+  // --- Record Voice Submission in real time ---
+  public recordStudentVoiceSubmission(
+    identifier: { code?: string; id?: string; name?: string },
+    info: {
+      lessonKey?: string;
+      volume?: 'vol1' | 'vol2';
+      lessonNumber?: number;
+      lessonTitle?: string;
+    }
+  ) {
+    const student = this.findStudent(identifier);
+    if (!student) return;
+
+    this.students = this.students.map(s => {
+      if (s.id !== student.id) return s;
+      
+      const newRecCount = s.recordingsCount + 1;
+      let updatedLessons = [...s.completedLessons];
+      
+      if (info.lessonKey) {
+        const hasLesson = updatedLessons.find(cl => cl.lessonKey === info.lessonKey);
+        if (hasLesson) {
+          updatedLessons = updatedLessons.map(cl => 
+            cl.lessonKey === info.lessonKey 
+              ? { ...cl, practiceType: 'recording', completedAt: new Date().toISOString() }
+              : cl
+          );
+        } else if (info.volume && info.lessonNumber && info.lessonTitle) {
+          updatedLessons.push({
+            lessonKey: info.lessonKey,
+            volume: info.volume,
+            lessonNumber: info.lessonNumber,
+            lessonTitle: info.lessonTitle,
+            completedAt: new Date().toISOString(),
+            scoreStars: 5,
+            practiceType: 'recording'
+          });
+        }
+      }
+
+      return {
+        ...s,
+        recordingsCount: newRecCount,
+        completedLessons: updatedLessons,
+        starsCount: s.starsCount + 3,
+        status: this.computeStatusFromProgress(updatedLessons.length),
+        lastActiveAt: new Date().toISOString()
+      };
+    });
+
+    this.saveStudents();
+  }
+
+  // --- Record Writing Practice in real time ---
+  public recordStudentWritingSubmission(
+    identifier: { code?: string; id?: string; name?: string },
+    sampleText?: string
+  ) {
+    const student = this.findStudent(identifier);
+    if (!student) return;
+
+    this.students = this.students.map(s => {
+      if (s.id !== student.id) return s;
+      return {
+        ...s,
+        writingCount: s.writingCount + 1,
+        starsCount: s.starsCount + 3,
+        lastActiveAt: new Date().toISOString()
+      };
+    });
+
+    this.saveStudents();
+  }
+
   // --- Mark Lesson Completed for a Student ---
   public markLessonCompletedForStudent(
     studentId: string, 
