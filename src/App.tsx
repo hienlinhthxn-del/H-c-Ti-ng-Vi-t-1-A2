@@ -443,7 +443,7 @@ export default function App() {
                     <span className="bg-purple-600 text-white px-2 py-0.5 rounded-md font-bold text-[11px]">
                       👩‍🏫 Quyền Giáo Viên
                     </span>
-                    <span>Đang mở giao diện học sinh (Bạn có thể bấm <strong>"Sửa bài"</strong> hoặc <strong>"Sửa giọng GV"</strong> ở từng bài học).</span>
+                    <span>Đang xem trước giao diện của Học sinh. (Để sửa bài, vui lòng quay lại Cổng Giáo Viên).</span>
                   </div>
                   <button
                     onClick={() => handleSelectRole('teacher')}
@@ -471,7 +471,6 @@ export default function App() {
                     hasNext={vol1HasNext}
                     onOpenWritingPractice={handleOpenWritingPractice}
                     onAddStar={handleAddStar}
-                    onEditLesson={isTeacherAuthenticated ? () => handleOpenEditVol1(selectedVol1Lesson) : undefined}
                     onOpenVoiceRecorder={handleOpenVoiceRecorder}
                     onOpenTeacherRecorder={isTeacherAuthenticated ? handleOpenTeacherRecorder : undefined}
                     onUnlockBadges={(newBadges) => setUnlockedBadgesToCelebrate(newBadges)}
@@ -483,7 +482,6 @@ export default function App() {
                 ) : (
                   <Volume1Grid
                     onSelectLesson={(lesson) => setSelectedVol1Lesson(lesson)}
-                    onEditLesson={isTeacherAuthenticated ? handleOpenEditVol1 : undefined}
                     searchQuery={searchQuery}
                   />
                 )
@@ -499,7 +497,6 @@ export default function App() {
                     hasNext={vol2HasNext}
                     onOpenWritingPractice={handleOpenWritingPractice}
                     onAddStar={handleAddStar}
-                    onEditLesson={isTeacherAuthenticated ? () => handleOpenEditVol2(selectedVol2Lesson) : undefined}
                     onOpenVoiceRecorder={handleOpenVoiceRecorder}
                     onOpenTeacherRecorder={isTeacherAuthenticated ? handleOpenTeacherRecorder : undefined}
                     onBackToList={() => {
@@ -510,7 +507,6 @@ export default function App() {
                 ) : (
                   <Volume2Grid
                     onSelectLesson={(lesson) => setSelectedVol2Lesson(lesson)}
-                    onEditLesson={isTeacherAuthenticated ? handleOpenEditVol2 : undefined}
                     searchQuery={searchQuery}
                   />
                 )
