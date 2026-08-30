@@ -1,4 +1,4 @@
-// Speech Synthesis & Sound Effect Engine for Grade 1 Vietnamese
+﻿// Speech Synthesis & Sound Effect Engine for Grade 1 Vietnamese
 import { teacherAudioService, TeacherAudioItem } from './teacherAudioService';
 
 class SoundService {
@@ -245,19 +245,19 @@ class SpeechService {
   }
 
   // Check if custom teacher audio exists for given text
-  hasTeacherVoice(text?: string): boolean {
+  hasTeacherVoice(text?: string, context?: string): boolean {
     if (!text || typeof text !== 'string') return false;
-    return teacherAudioService.hasAudioForText(text);
+    return teacherAudioService.hasAudioForText(text, context);
   }
 
   // Get custom teacher audio item
-  getTeacherVoice(text?: string): TeacherAudioItem | undefined {
+  getTeacherVoice(text?: string, context?: string): TeacherAudioItem | undefined {
     if (!text || typeof text !== 'string') return undefined;
-    return teacherAudioService.getAudioByText(text);
+    return teacherAudioService.getAudioByText(text, context);
   }
 
   // Speak text with priority for teacher's recorded sample audio
-  speak(text: string, onEnd?: () => void, rateOverride?: number) {
+  speak(text: string, onEnd?: () => void, rateOverride?: number, context?: string) {
     this.stop();
     soundEffects.playPop();
 
@@ -273,9 +273,9 @@ class SpeechService {
     }
 
     // 1. Check if Teacher has recorded authentic reference audio and preferTeacherVoice is active
-    if (teacherAudioService.isPreferTeacherVoice() && teacherAudioService.hasAudioForText(cleanText)) {
+    if (teacherAudioService.isPreferTeacherVoice() && teacherAudioService.hasAudioForText(cleanText, context)) {
       this.isSpeaking = true;
-      const audio = teacherAudioService.playAudio(cleanText, () => {
+      const audio = teacherAudioService.playAudio(cleanText, context, () => {
         this.isSpeaking = false;
         if (onEnd) onEnd();
       });
@@ -359,7 +359,7 @@ class SpeechService {
     window.speechSynthesis.speak(utterance);
   }
 
-  // Spell out a syllable step by step: e.g. "b", "a", "ba", "huyền", "bà"
+  // Spell out a syllable step by step: e.g. "b", "a", "ba", "huyá»n", "bÃ "
   async spellOut(steps?: string[], fullResult?: string, onDone?: () => void) {
     if (!steps || steps.length === 0) {
       if (fullResult) {

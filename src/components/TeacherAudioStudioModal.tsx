@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   X, Mic, Volume2, Play, Pause, Trash2, Download, Upload, 
   RotateCcw, Sparkles, CheckCircle2, Bot, User, Search, 
@@ -371,7 +371,7 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {currentVol1Lesson.part1_Letters.letters.map((letter, idx) => {
-                      const hasAudio = teacherAudioService.hasAudioForText(letter);
+                      const hasAudio = teacherAudioService.hasAudioForText(letter, 'letter');
                       return (
                         <div
                           key={idx}
@@ -447,7 +447,7 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     {currentVol1Lesson.part2_SyllablesAndWords.words.map((item, idx) => {
-                      const hasAudio = teacherAudioService.hasAudioForText(item.word);
+                      const hasAudio = teacherAudioService.hasAudioForText(item.word, 'word');
                       return (
                         <div
                           key={idx}
@@ -526,7 +526,7 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                       {currentVol1Lesson.part3_SentenceAndPractice.readingPassage}
                     </p>
                     <div className="flex items-center gap-2 shrink-0">
-                      {teacherAudioService.hasAudioForText(currentVol1Lesson.part3_SentenceAndPractice.readingPassage) && (
+                      {teacherAudioService.hasAudioForText(currentVol1Lesson.part3_SentenceAndPractice.readingPassage, 'passage') && (
                         <button
                           onClick={() => {
                             const text = currentVol1Lesson.part3_SentenceAndPractice.readingPassage;
@@ -555,7 +555,7 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                         className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all shrink-0 cursor-pointer"
                       >
                         <Mic className="w-3.5 h-3.5" />
-                        <span>{teacherAudioService.hasAudioForText(currentVol1Lesson.part3_SentenceAndPractice.readingPassage) ? 'Thu lại đoạn văn 🎙️' : 'Thu âm đoạn văn 🎙️'}</span>
+                        <span>{teacherAudioService.hasAudioForText(currentVol1Lesson.part3_SentenceAndPractice.readingPassage, 'passage') ? 'Thu lại đoạn văn 🎙️' : 'Thu âm đoạn văn 🎙️'}</span>
                       </button>
                     </div>
                   </div>

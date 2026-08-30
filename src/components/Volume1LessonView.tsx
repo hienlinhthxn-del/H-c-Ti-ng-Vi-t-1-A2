@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Volume1Lesson, RecordingTargetInfo, AchievementBadge } from '../types';
 import { speechService } from '../services/speechService';
 import { lessonStorageService } from '../services/lessonStorageService';
@@ -76,7 +76,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
 
   const isCustomized = lessonStorageService.isVolume1Customized(lesson.id);
 
-  const handleTeacherRecordClick = (e: React.MouseEvent, text: string, sectionTitle: string) => {
+  const handleTeacherRecordClick = (e: React.MouseEvent, text: string, sectionTitle: string, section?: 'letter' | 'syllable' | 'word' | 'sentence' | 'passage' | 'quiz' | 'general') => {
     e.stopPropagation();
     if (onOpenTeacherRecorder) {
       onOpenTeacherRecorder({
@@ -374,12 +374,12 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
             {/* Letter Cards Grid */}
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1">
               {lesson.part1_Letters.letters.map((letter, idx) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(letter);
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(letter, 'letter');
                 return (
                   <div key={idx} className="relative group/card">
                     <button
                       id={`letter-card-${idx}`}
-                      onClick={() => speechService.speak(letter)}
+                      onClick={() => speechService.speak(letter, undefined, undefined, 'letter')}
                       className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white border border-slate-200/90 hover:border-orange-400 shadow-xs hover:shadow flex items-center justify-center text-[#c2410c] hover:text-orange-600 hover:scale-105 transition-all cursor-pointer font-sgk font-black tracking-normal relative ${letterFontSizeClass}`}
                       title={hasTeacherAudio ? `Giọng đọc mẫu Cô giáo: ${letter}` : `Bấm để nghe phát âm: ${letter}`}
                     >
@@ -394,7 +394,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                     {/* Teacher Quick Record Button */}
                     {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                       <button
-                        onClick={(e) => handleTeacherRecordClick(e, letter, `Âm / Vần: ${letter}`)}
+                        onClick={(e) => handleTeacherRecordClick(e, letter, `Âm / Vần: ${letter}`, 'letter')}
                         className={`absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-md transition-all active:scale-90 cursor-pointer ${
                           isTeacherVoiceEditMode ? 'opacity-100 scale-100' : 'opacity-0 group-hover/card:opacity-100 scale-90 group-hover/card:scale-100'
                         } ${hasTeacherAudio ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'}`}
@@ -416,7 +416,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {lesson.part2_SyllablesAndWords.models.map((model, idx) => {
-                    const hasTeacherAudio = teacherAudioService.hasAudioForText(model.result);
+                    const hasTeacherAudio = teacherAudioService.hasAudioForText(model.result, 'syllable');
                     return (
                       <div
                         key={idx}
@@ -478,11 +478,11 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {lesson.part2_SyllablesAndWords.readingSyllables.map((syl, i) => {
-                    const hasTeacherAudio = teacherAudioService.hasAudioForText(syl);
+                    const hasTeacherAudio = teacherAudioService.hasAudioForText(syl, 'syllable');
                     return (
                       <div key={i} className="relative group/syl">
                         <button
-                          onClick={() => speechService.speak(syl)}
+                          onClick={() => speechService.speak(syl, undefined, undefined, 'syllable')}
                           className="px-3.5 py-1.5 bg-slate-50 hover:bg-amber-100/80 hover:text-amber-950 text-slate-800 font-bold rounded-xl border border-slate-200/80 transition-all shadow-2xs font-sgk cursor-pointer active:scale-95 text-base sm:text-lg flex items-center gap-1.5"
                         >
                           <span>{syl}</span>
@@ -492,7 +492,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                         </button>
                         {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                           <button
-                            onClick={(e) => handleTeacherRecordClick(e, syl, `Tiếng: ${syl}`)}
+                            onClick={(e) => handleTeacherRecordClick(e, syl, `Tiếng: ${syl}`, 'syllable')}
                             className={`absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-white shadow-xs transition-all active:scale-90 cursor-pointer ${
                               isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover/syl:opacity-100'
                             } ${hasTeacherAudio ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'}`}
@@ -560,12 +560,12 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
             {/* Words Row with Subtle Bottom Highlight */}
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1">
               {lesson.part2_SyllablesAndWords.words.map((item, idx) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.word);
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.word, 'word');
                 return (
                   <div key={idx} className="relative group/word">
                     <button
                       id={`word-item-${idx}`}
-                      onClick={() => speechService.speak(item.word)}
+                      onClick={() => speechService.speak(item.word, undefined, undefined, 'word')}
                       className={`px-5 py-2.5 sm:px-6 sm:py-3 rounded-xl bg-slate-50/70 hover:bg-blue-50/90 border-b-2 border-blue-200 hover:border-blue-500 text-blue-700 font-bold transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer font-sgk flex items-center gap-2 ${wordFontSizeClass}`}
                       title={item.meaning ? `${item.word}: ${item.meaning}` : `Bấm để nghe: ${item.word}`}
                     >
@@ -612,7 +612,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   id="speak-passage-btn"
-                  onClick={() => speechService.speak(lesson.part3_SentenceAndPractice.readingPassage)}
+                  onClick={() => speechService.speak(lesson.part3_SentenceAndPractice.readingPassage, undefined, undefined, 'passage')}
                   className="w-9 h-9 rounded-xl border border-slate-200/80 bg-white hover:bg-emerald-50 text-emerald-600 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
                   title="Nghe đọc toàn bộ đoạn văn"
                 >
@@ -621,7 +621,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
 
                 {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                   <button
-                    onClick={(e) => handleTeacherRecordClick(e, lesson.part3_SentenceAndPractice.readingPassage, 'Toàn bộ đoạn văn')}
+                    onClick={(e) => handleTeacherRecordClick(e, lesson.part3_SentenceAndPractice.readingPassage, 'Toàn bộ đoạn văn', 'passage')}
                     className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl shadow-xs transition-all cursor-pointer"
                     title="Thu âm giọng đọc mẫu cả đoạn văn cho học sinh"
                   >
@@ -656,12 +656,12 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
             {/* Reading Sentences Cards with Green Left Accent Bar */}
             <div className="space-y-3 pt-1">
               {passageSentences.map((sentence, sIdx) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(sentence);
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(sentence, 'sentence');
                 return (
                   <div
                     key={sIdx}
                     id={`sentence-card-${sIdx}`}
-                    onClick={() => speechService.speak(sentence)}
+                    onClick={() => speechService.speak(sentence, undefined, undefined, 'sentence')}
                     className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all relative pl-6 flex items-center justify-between group cursor-pointer"
                     title={hasTeacherAudio ? `Giọng đọc mẫu Cô giáo: ${sentence}` : `Bấm để nghe đọc câu: ${sentence}`}
                   >
@@ -682,7 +682,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                     <div className="flex items-center gap-2 shrink-0">
                       {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                         <button
-                          onClick={(e) => handleTeacherRecordClick(e, sentence, `Câu ${sIdx + 1}: ${sentence.substring(0, 30)}...`)}
+                          onClick={(e) => handleTeacherRecordClick(e, sentence, `Câu ${sIdx + 1}: ${sentence.substring(0, 30)}...`, 'sentence')}
                           className={`p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                             hasTeacherAudio ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
                           } ${isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}

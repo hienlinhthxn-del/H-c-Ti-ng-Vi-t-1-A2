@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Volume2Lesson, RecordingTargetInfo, AchievementBadge } from '../types';
 import { speechService } from '../services/speechService';
 import { lessonStorageService } from '../services/lessonStorageService';
@@ -102,7 +102,7 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
     }
   };
 
-  const handleTeacherRecordClick = (e: React.MouseEvent, text: string, sectionTitle: string) => {
+  const handleTeacherRecordClick = (e: React.MouseEvent, text: string, sectionTitle: string, section?: 'letter' | 'syllable' | 'word' | 'sentence' | 'passage' | 'quiz' | 'general') => {
     e.stopPropagation();
     if (onOpenTeacherRecorder) {
       onOpenTeacherRecorder({
@@ -336,7 +336,7 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
 
                 {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                   <button
-                    onClick={(e) => handleTeacherRecordClick(e, `${lesson.reading.title}. ${lesson.reading.content.join(' ')}`, 'Toàn bộ bài đọc')}
+                    onClick={(e) => handleTeacherRecordClick(e, `${lesson.reading.title}. ${lesson.reading.content.join(' ')}`, 'Toàn bộ bài đọc', 'passage')}
                     className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl shadow-xs transition-all cursor-pointer"
                     title="Thu âm giọng đọc mẫu cô giáo cho cả bài đọc"
                   >
@@ -372,11 +372,11 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
             {/* Paragraph Cards */}
             <div className="space-y-3 pt-1">
               {lesson.reading.content.map((paragraph, idx) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(paragraph);
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(paragraph, 'passage');
                 return (
                   <div
                     key={idx}
-                    onClick={() => speechService.speak(paragraph)}
+                    onClick={() => speechService.speak(paragraph, undefined, undefined, 'passage')}
                     className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 hover:border-teal-300 shadow-2xs hover:shadow-xs transition-all relative pl-6 flex items-center justify-between group cursor-pointer"
                     title={hasTeacherAudio ? `Giọng đọc mẫu Cô giáo: ${paragraph}` : `Bấm để nghe đọc đoạn này`}
                   >
@@ -396,7 +396,7 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
                     <div className="flex items-center gap-2 shrink-0">
                       {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                         <button
-                          onClick={(e) => handleTeacherRecordClick(e, paragraph, `Đoạn ${idx + 1}: ${paragraph.substring(0, 30)}...`)}
+                          onClick={(e) => handleTeacherRecordClick(e, paragraph, `Đoạn ${idx + 1}: ${paragraph.substring(0, 30)}...`, 'passage')}
                           className={`p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                             hasTeacherAudio ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
                           } ${isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
@@ -422,11 +422,11 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {lesson.reading.vocabulary.map((vocab, vIdx) => {
-                    const hasTeacherAudio = teacherAudioService.hasAudioForText(vocab.word);
+                    const hasTeacherAudio = teacherAudioService.hasAudioForText(vocab.word, 'word');
                     return (
                       <div
                         key={vIdx}
-                        onClick={() => speechService.speak(vocab.word)}
+                        onClick={() => speechService.speak(vocab.word, undefined, undefined, 'word')}
                         className="p-3 rounded-xl bg-white border border-teal-100 hover:border-teal-300 transition-all cursor-pointer shadow-2xs flex items-center justify-between group"
                       >
                         <div>
@@ -441,7 +441,7 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
                         <div className="flex items-center gap-1.5">
                           {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                             <button
-                              onClick={(e) => handleTeacherRecordClick(e, vocab.word, `Từ vựng: ${vocab.word}`)}
+                              onClick={(e) => handleTeacherRecordClick(e, vocab.word, `Từ vựng: ${vocab.word}`, 'word')}
                               className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                 hasTeacherAudio ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
                               } ${isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}

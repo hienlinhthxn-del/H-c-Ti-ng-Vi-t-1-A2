@@ -150,13 +150,18 @@ class TeacherAudioService {
   }
 
   // Normalize text for reliable matching
-  public normalizeKey(text: any): string {
+  public normalizeKey(text: any, context?: string): string {
     if (!text || typeof text !== 'string') return '';
-    return text
+    let key = text
       .trim()
       .toLowerCase()
       .replace(/[\s\t\n]+/g, ' ')
       .replace(/[.,/#!$%^&*;:{}=\-_`~()?"'–—]/g, '');
+    
+    if (context) {
+      key = `${context}:::${key}`;
+    }
+    return key;
   }
 
   // Subscribe to updates
@@ -192,7 +197,7 @@ class TeacherAudioService {
 
   // Save or update an audio item
   public saveAudio(item: Omit<TeacherAudioItem, 'id' | 'key' | 'createdAt'> & { id?: string; createdAt?: string }): TeacherAudioItem {
-    const key = this.normalizeKey(item.text);
+    const key = this.normalizeKey(item.text, item.section);
     const id = item.id || `audio_${key}_${Date.now()}`;
     const fullItem: TeacherAudioItem = {
       ...item,
@@ -209,26 +214,43 @@ class TeacherAudioService {
   }
 
   // Find custom audio by text
-  public getAudioByText(text?: string): TeacherAudioItem | undefined {
-    const key = this.normalizeKey(text);
-    if (!key) return undefined;
-    return this.memoryMap[key];
+  public getAudioByText(text?: string, context?: string): TeacherAudioItem | undefined {
+    if (!text) return undefined;
+    if (context) {
+      const specificKey = this.normalizeKey(text, context);
+      if (this.memoryMap[specificKey]) return this.memoryMap[specificKey];
+    }
+    const genericKey = this.normalizeKey(text);
+    return this.memoryMap[genericKey];
   }
 
   // Check if custom audio exists for text
-  public hasAudioForText(text?: string): boolean {
-    const key = this.normalizeKey(text);
-    if (!key) return false;
-    return Boolean(this.memoryMap[key] && this.memoryMap[key].audioBase64);
+  public hasAudioForText(text?: string, context?: string): boolean {
+    if (!text) return false;
+    if (context) {
+      const specificKey = this.normalizeKey(text, context);
+      if (this.memoryMap[specificKey] && this.memoryMap[specificKey].audioBase64) return true;
+    }
+    const genericKey = this.normalizeKey(text);
+    return Boolean(this.memoryMap[genericKey] && this.memoryMap[genericKey].audioBase64);
   }
 
   // Delete audio for text
-  public deleteAudioByText(text?: string): void {
-    const key = this.normalizeKey(text);
-    if (!key) return;
-    if (this.memoryMap[key]) {
-      delete this.memoryMap[key];
-      this.deleteFromDB(key);
+  public deleteAudioByText(text?: string, context?: string): void {
+    if (!text) return;
+    if (context) {
+      const specificKey = this.normalizeKey(text, context);
+      if (this.memoryMap[specificKey]) {
+        delete this.memoryMap[specificKey];
+        this.deleteFromDB(specificKey);
+        this.notify();
+        return;
+      }
+    }
+    const genericKey = this.normalizeKey(text);
+    if (this.memoryMap[genericKey]) {
+      delete this.memoryMap[genericKey];
+      this.deleteFromDB(genericKey);
       this.notify();
     }
   }
@@ -262,8 +284,17 @@ class TeacherAudioService {
   }
 
   // Play custom audio for text
-  public playAudio(text: string, onEnd?: () => void): HTMLAudioElement | null {
-    const item = this.getAudioByText(text);
+  public playAudio(text: string, context?: string, onEnd?: () => void): HTMLAudioElement | null {
+    let item = undefined;
+    if (context) {
+      const specificKey = this.normalizeKey(text, context);
+      item = this.memoryMap[specificKey];
+    }
+    if (!item) {
+      const genericKey = this.normalizeKey(text);
+      item = this.memoryMap[genericKey];
+    }
+    
     if (!item || !item.audioBase64) return null;
 
     this.stopCurrentAudio();

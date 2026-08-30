@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Volume2, Sparkles, Filter, Mic } from 'lucide-react';
 import { speechService } from '../services/speechService';
 import { teacherAudioService } from '../services/teacherAudioService';
@@ -180,7 +180,7 @@ export const AlphabetBoard: React.FC<AlphabetBoardProps> = ({ onOpenTeacherRecor
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {singleLetters.map((item) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.letter);
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.letter, 'letter');
                 return (
                   <div
                     key={item.letter}
@@ -238,7 +238,7 @@ export const AlphabetBoard: React.FC<AlphabetBoardProps> = ({ onOpenTeacherRecor
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {compoundSounds.map((item) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.name);
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.name, 'letter');
                 return (
                   <div
                     key={item.sound}
