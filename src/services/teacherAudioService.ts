@@ -13,12 +13,141 @@ export interface TeacherAudioItem {
   notes?: string;
 }
 
-const STORAGE_KEY = 'tv1_teacher_custom_audios';
+const DB_NAME = 'tieng_viet_1_teacher_audio_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'teacher_audios';
 const PREFER_TEACHER_VOICE_KEY = 'tv1_prefer_teacher_voice';
 
 class TeacherAudioService {
   private listeners: (() => void)[] = [];
   private currentAudioElement: HTMLAudioElement | null = null;
+  private memoryMap: Record<string, TeacherAudioItem> = {};
+  private dbPromise: Promise<IDBDatabase> | null = null;
+  private isInitialized = false;
+
+  constructor() {
+    if (typeof window !== 'undefined' && 'indexedDB' in window) {
+      this.initDB().then(() => {
+        this.loadAllFromDB();
+      });
+    }
+  }
+
+  private initDB(): Promise<IDBDatabase> {
+    if (this.dbPromise) return this.dbPromise;
+
+    this.dbPromise = new Promise((resolve, reject) => {
+      if (typeof window === 'undefined' || !('indexedDB' in window)) {
+        reject(new Error('IndexedDB is not available'));
+        return;
+      }
+
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'key' });
+        }
+      };
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    return this.dbPromise;
+  }
+
+  private async loadAllFromDB() {
+    try {
+      const db = await this.initDB();
+      const items = await new Promise<TeacherAudioItem[]>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+
+      const newMap: Record<string, TeacherAudioItem> = {};
+      items.forEach(item => {
+        newMap[item.key] = item;
+      });
+
+      // Migrate from localStorage if this is the first time using IndexedDB
+      try {
+        const oldData = localStorage.getItem('tv1_teacher_custom_audios');
+        if (oldData) {
+          const oldMap = JSON.parse(oldData);
+          let migrated = false;
+          for (const key in oldMap) {
+            if (!newMap[key]) {
+              newMap[key] = oldMap[key];
+              this.saveToDB(oldMap[key]); // Save migrated item asynchronously
+              migrated = true;
+            }
+          }
+          if (migrated) {
+            localStorage.removeItem('tv1_teacher_custom_audios'); // Cleanup
+          }
+        }
+      } catch (e) {
+        console.warn('Error migrating old localStorage audio', e);
+      }
+
+      this.memoryMap = newMap;
+      this.isInitialized = true;
+      this.notify();
+    } catch (e) {
+      console.error('Failed to load teacher audios from IndexedDB', e);
+      this.isInitialized = true; // allow app to continue
+    }
+  }
+
+  private async saveToDB(item: TeacherAudioItem) {
+    try {
+      const db = await this.initDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.put(item);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.error('Failed to save teacher audio to IndexedDB', e);
+    }
+  }
+
+  private async deleteFromDB(key: string) {
+    try {
+      const db = await this.initDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.delete(key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.error('Failed to delete teacher audio from IndexedDB', e);
+    }
+  }
+
+  private async clearDB() {
+    try {
+      const db = await this.initDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.clear();
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      console.error('Failed to clear teacher audio from IndexedDB', e);
+    }
+  }
 
   // Normalize text for reliable matching
   public normalizeKey(text: any): string {
@@ -61,28 +190,6 @@ class TeacherAudioService {
     this.notify();
   }
 
-  // Get all saved teacher audios map
-  private getAudiosMap(): Record<string, TeacherAudioItem> {
-    if (typeof window === 'undefined') return {};
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      return data ? JSON.parse(data) : {};
-    } catch (e) {
-      console.error('Failed to parse teacher audios from localStorage:', e);
-      return {};
-    }
-  }
-
-  private saveAudiosMap(map: Record<string, TeacherAudioItem>): void {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-      this.notify();
-    } catch (e) {
-      console.error('Failed to save teacher audios to localStorage:', e);
-    }
-  }
-
   // Save or update an audio item
   public saveAudio(item: Omit<TeacherAudioItem, 'id' | 'key' | 'createdAt'> & { id?: string; createdAt?: string }): TeacherAudioItem {
     const key = this.normalizeKey(item.text);
@@ -95,9 +202,9 @@ class TeacherAudioService {
       teacherName: item.teacherName || 'Cô giáo'
     };
 
-    const map = this.getAudiosMap();
-    map[key] = fullItem;
-    this.saveAudiosMap(map);
+    this.memoryMap[key] = fullItem;
+    this.saveToDB(fullItem);
+    this.notify();
     return fullItem;
   }
 
@@ -105,56 +212,53 @@ class TeacherAudioService {
   public getAudioByText(text?: string): TeacherAudioItem | undefined {
     const key = this.normalizeKey(text);
     if (!key) return undefined;
-    const map = this.getAudiosMap();
-    return map[key];
+    return this.memoryMap[key];
   }
 
   // Check if custom audio exists for text
   public hasAudioForText(text?: string): boolean {
     const key = this.normalizeKey(text);
     if (!key) return false;
-    const map = this.getAudiosMap();
-    return Boolean(map[key] && map[key].audioBase64);
+    return Boolean(this.memoryMap[key] && this.memoryMap[key].audioBase64);
   }
 
   // Delete audio for text
   public deleteAudioByText(text?: string): void {
     const key = this.normalizeKey(text);
     if (!key) return;
-    const map = this.getAudiosMap();
-    if (map[key]) {
-      delete map[key];
-      this.saveAudiosMap(map);
+    if (this.memoryMap[key]) {
+      delete this.memoryMap[key];
+      this.deleteFromDB(key);
+      this.notify();
     }
   }
 
   // Delete audio by ID
   public deleteAudioById(id: string): void {
-    const map = this.getAudiosMap();
     let foundKey: string | null = null;
-    for (const [k, item] of Object.entries(map)) {
+    for (const [k, item] of Object.entries(this.memoryMap)) {
       if (item.id === id) {
         foundKey = k;
         break;
       }
     }
     if (foundKey) {
-      delete map[foundKey];
-      this.saveAudiosMap(map);
+      delete this.memoryMap[foundKey];
+      this.deleteFromDB(foundKey);
+      this.notify();
     }
   }
 
   // Get all audio items as array
   public getAllAudios(): TeacherAudioItem[] {
-    const map = this.getAudiosMap();
-    return Object.values(map).sort(
+    return Object.values(this.memoryMap).sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   }
 
   // Get count of custom recordings
   public getCount(): number {
-    return Object.keys(this.getAudiosMap()).length;
+    return Object.keys(this.memoryMap).length;
   }
 
   // Play custom audio for text
@@ -207,13 +311,12 @@ class TeacherAudioService {
 
   // Export all teacher recordings to JSON backup
   public exportToJson(): string {
-    const map = this.getAudiosMap();
     const payload = {
       version: '1.0',
       type: 'TiengViet1_TeacherCustomAudio',
       exportDate: new Date().toISOString(),
-      totalAudios: Object.keys(map).length,
-      audios: map
+      totalAudios: Object.keys(this.memoryMap).length,
+      audios: this.memoryMap
     };
     return JSON.stringify(payload, null, 2);
   }
@@ -226,12 +329,15 @@ class TeacherAudioService {
         return { success: false, count: 0, message: 'Tệp không chứa dữ liệu âm thanh đọc mẫu hợp lệ.' };
       }
 
-      const currentMap = this.getAudiosMap();
       const newAudios = parsed.audios as Record<string, TeacherAudioItem>;
       const count = Object.keys(newAudios).length;
-      const merged = { ...currentMap, ...newAudios };
+      
+      for (const [key, item] of Object.entries(newAudios)) {
+        this.memoryMap[key] = item;
+        this.saveToDB(item);
+      }
 
-      this.saveAudiosMap(merged);
+      this.notify();
       return {
         success: true,
         count,
@@ -245,8 +351,8 @@ class TeacherAudioService {
 
   // Clear all recordings
   public clearAll(): void {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem(STORAGE_KEY);
+    this.memoryMap = {};
+    this.clearDB();
     this.notify();
   }
 }
