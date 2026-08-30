@@ -20,6 +20,7 @@ import { AchievementUnlockModal } from './components/AchievementUnlockModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleWorkspaceModal } from './components/GoogleWorkspaceModal';
 import { TeacherLoginModal } from './components/TeacherLoginModal';
+import { StudentLoginModal } from './components/StudentLoginModal';
 import { Volume1Lesson, Volume2Lesson, RecordingTargetInfo, AchievementBadge, UserRole, AppUserProfile } from './types';
 import { lessonStorageService } from './services/lessonStorageService';
 import { teacherAudioService } from './services/teacherAudioService';
@@ -42,7 +43,8 @@ export default function App() {
   const [isGoogleWorkspaceOpen, setIsGoogleWorkspaceOpen] = useState<boolean>(false);
 
   // Teacher Authentication & Login Modal State
-  const [isTeacherLoginOpen, setIsTeacherLoginOpen] = useState<boolean>(false);
+  const [isTeacherLoginOpen, setIsTeacherLoginOpen] = useState(false);
+  const [isStudentLoginOpen, setIsStudentLoginOpen] = useState(false);
   const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState<boolean>(() => teacherAuthService.isAuthenticated());
 
   // Role State (Student, Teacher, Parent)
@@ -92,11 +94,12 @@ export default function App() {
       return;
     } else if (role === 'parent') {
       navigate('/parent');
+      setUserRole(role);
+      localStorage.setItem('tv1_user_role', role);
     } else {
-      navigate('/student');
+      setIsStudentLoginOpen(true);
+      return;
     }
-    setUserRole(role);
-    localStorage.setItem('tv1_user_role', role);
     speechService.playSoundEffect('pop');
   };
 
@@ -114,6 +117,14 @@ export default function App() {
     setUserRole('teacher');
     localStorage.setItem('tv1_user_role', 'teacher');
     navigate('/teacher');
+  };
+
+  const handleStudentLoginSuccess = (student: AppUserProfile) => {
+    setIsStudentLoginOpen(false);
+    setActiveUser(student);
+    setUserRole('student');
+    localStorage.setItem('tv1_user_role', 'student');
+    navigate('/student');
   };
 
   useEffect(() => {
@@ -352,6 +363,11 @@ export default function App() {
           isOpen={isTeacherLoginOpen}
           onClose={() => setIsTeacherLoginOpen(false)}
           onSuccess={handleTeacherLoginSuccess}
+        />
+        <StudentLoginModal
+          isOpen={isStudentLoginOpen}
+          onClose={() => setIsStudentLoginOpen(false)}
+          onLoginSuccess={handleStudentLoginSuccess}
         />
       </>
     );
@@ -613,6 +629,11 @@ export default function App() {
         isOpen={isTeacherLoginOpen}
         onClose={() => setIsTeacherLoginOpen(false)}
         onSuccess={handleTeacherLoginSuccess}
+      />
+      <StudentLoginModal
+        isOpen={isStudentLoginOpen}
+        onClose={() => setIsStudentLoginOpen(false)}
+        onLoginSuccess={handleStudentLoginSuccess}
       />
 
       {/* Google Workspace Cloud Sync & Drive/Sheets/Classroom Modal */}
