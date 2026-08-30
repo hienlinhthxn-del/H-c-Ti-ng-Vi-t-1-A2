@@ -371,7 +371,7 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {currentVol1Lesson.part1_Letters.letters.map((letter, idx) => {
-                      const hasAudio = teacherAudioService.hasAudioForText(letter, 'letter');
+                      const hasAudio = teacherAudioService.hasAudioForText(letter, 'letter', currentVol1Lesson.id);
                       return (
                         <div
                           key={idx}
@@ -407,7 +407,7 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                                 <button
                                   onClick={() => {
                                     if (window.confirm(`Xóa giọng mẫu của "${letter}" khi chưa ưng ý và chuyển về phát âm AI?`)) {
-                                      teacherAudioService.deleteAudioByText(letter);
+                                      teacherAudioService.deleteAudioByText(letter, 'letter', currentVol1Lesson.id);
                                       speechService.playSoundEffect('pop');
                                       setStatusMessage({ text: `Đã xóa giọng mẫu của "${letter}"`, isError: false });
                                       setTimeout(() => setStatusMessage(null), 2500);
@@ -447,7 +447,7 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     {currentVol1Lesson.part2_SyllablesAndWords.words.map((item, idx) => {
-                      const hasAudio = teacherAudioService.hasAudioForText(item.word, 'word');
+                      const hasAudio = teacherAudioService.hasAudioForText(item.word, 'word', currentVol1Lesson.id);
                       return (
                         <div
                           key={idx}
@@ -483,7 +483,7 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                                 <button
                                   onClick={() => {
                                     if (window.confirm(`Xóa giọng mẫu của từ "${item.word}" khi chưa ưng ý?`)) {
-                                      teacherAudioService.deleteAudioByText(item.word);
+                                      teacherAudioService.deleteAudioByText(item.word, 'word', currentVol1Lesson.id);
                                       speechService.playSoundEffect('pop');
                                       setStatusMessage({ text: `Đã xóa giọng mẫu của "${item.word}"`, isError: false });
                                       setTimeout(() => setStatusMessage(null), 2500);
@@ -526,12 +526,12 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                       {currentVol1Lesson.part3_SentenceAndPractice.readingPassage}
                     </p>
                     <div className="flex items-center gap-2 shrink-0">
-                      {teacherAudioService.hasAudioForText(currentVol1Lesson.part3_SentenceAndPractice.readingPassage, 'passage') && (
+                      {teacherAudioService.hasAudioForText(currentVol1Lesson.part3_SentenceAndPractice.readingPassage, 'passage', currentVol1Lesson.id) && (
                         <button
                           onClick={() => {
                             const text = currentVol1Lesson.part3_SentenceAndPractice.readingPassage;
                             if (window.confirm('Xóa giọng đọc mẫu đoạn văn này khi chưa ưng ý?')) {
-                              teacherAudioService.deleteAudioByText(text);
+                              teacherAudioService.deleteAudioByText(text, 'passage', currentVol1Lesson.id);
                               speechService.playSoundEffect('pop');
                               setStatusMessage({ text: 'Đã xóa giọng mẫu của đoạn văn', isError: false });
                               setTimeout(() => setStatusMessage(null), 2500);
@@ -555,7 +555,7 @@ export const TeacherAudioStudioModal: React.FC<TeacherAudioStudioModalProps> = (
                         className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all shrink-0 cursor-pointer"
                       >
                         <Mic className="w-3.5 h-3.5" />
-                        <span>{teacherAudioService.hasAudioForText(currentVol1Lesson.part3_SentenceAndPractice.readingPassage, 'passage') ? 'Thu lại đoạn văn 🎙️' : 'Thu âm đoạn văn 🎙️'}</span>
+                        <span>{teacherAudioService.hasAudioForText(currentVol1Lesson.part3_SentenceAndPractice.readingPassage, 'passage', currentVol1Lesson.id) ? 'Thu lại đoạn văn 🎙️' : 'Thu âm đoạn văn 🎙️'}</span>
                       </button>
                     </div>
                   </div>

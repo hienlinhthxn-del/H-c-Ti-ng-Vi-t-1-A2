@@ -180,7 +180,7 @@ export const AlphabetBoard: React.FC<AlphabetBoardProps> = ({ onOpenTeacherRecor
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {singleLetters.map((item) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.letter, 'letter');
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.letter, 'letter', 'alphabet-board');
                 return (
                   <div
                     key={item.letter}
@@ -238,7 +238,7 @@ export const AlphabetBoard: React.FC<AlphabetBoardProps> = ({ onOpenTeacherRecor
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {compoundSounds.map((item) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.name, 'letter');
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.name, 'letter', 'alphabet-board');
                 return (
                   <div
                     key={item.sound}

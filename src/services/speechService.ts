@@ -245,19 +245,19 @@ class SpeechService {
   }
 
   // Check if custom teacher audio exists for given text
-  hasTeacherVoice(text?: string, context?: string): boolean {
+  hasTeacherVoice(text?: string, context?: string, lessonId?: string | number): boolean {
     if (!text || typeof text !== 'string') return false;
-    return teacherAudioService.hasAudioForText(text, context);
+    return teacherAudioService.hasAudioForText(text, context, lessonId);
   }
 
   // Get custom teacher audio item
-  getTeacherVoice(text?: string, context?: string): TeacherAudioItem | undefined {
+  getTeacherVoice(text?: string, context?: string, lessonId?: string | number): TeacherAudioItem | undefined {
     if (!text || typeof text !== 'string') return undefined;
-    return teacherAudioService.getAudioByText(text, context);
+    return teacherAudioService.getAudioByText(text, context, lessonId);
   }
 
   // Speak text with priority for teacher's recorded sample audio
-  speak(text: string, onEnd?: () => void, rateOverride?: number, context?: string) {
+  speak(text: string, onEnd?: () => void, rateOverride?: number, context?: string, lessonId?: string | number) {
     this.stop();
     soundEffects.playPop();
 
@@ -273,9 +273,9 @@ class SpeechService {
     }
 
     // 1. Check if Teacher has recorded authentic reference audio and preferTeacherVoice is active
-    if (teacherAudioService.isPreferTeacherVoice() && teacherAudioService.hasAudioForText(cleanText, context)) {
+    if (teacherAudioService.isPreferTeacherVoice() && teacherAudioService.hasAudioForText(cleanText, context, lessonId)) {
       this.isSpeaking = true;
-      const audio = teacherAudioService.playAudio(cleanText, context, () => {
+      const audio = teacherAudioService.playAudio(cleanText, context, lessonId, () => {
         this.isSpeaking = false;
         if (onEnd) onEnd();
       });
@@ -360,10 +360,10 @@ class SpeechService {
   }
 
   // Spell out a syllable step by step: e.g. "b", "a", "ba", "huyá»n", "bÃ "
-  async spellOut(steps?: string[], fullResult?: string, onDone?: () => void) {
+  async spellOut(steps?: string[], fullResult?: string, onDone?: () => void, lessonId?: string | number) {
     if (!steps || steps.length === 0) {
       if (fullResult) {
-        this.speak(fullResult, onDone, undefined, 'syllable');
+        this.speak(fullResult, onDone, undefined, 'syllable', lessonId);
       } else if (onDone) {
         onDone();
       }

@@ -71,6 +71,13 @@ class TeacherAudioService {
 
       const newMap: Record<string, TeacherAudioItem> = {};
       items.forEach(item => {
+        const expectedKey = this.normalizeKey(item.text, item.section, item.lessonId);
+        if (item.key !== expectedKey) {
+          const oldKey = item.key;
+          item.key = expectedKey;
+          this.saveToDB(item);
+          this.deleteFromDB(oldKey);
+        }
         newMap[item.key] = item;
       });
 
@@ -150,7 +157,7 @@ class TeacherAudioService {
   }
 
   // Normalize text for reliable matching
-  public normalizeKey(text: any, context?: string): string {
+  public normalizeKey(text: any, context?: string, lessonId?: string | number): string {
     if (!text || typeof text !== 'string') return '';
     let key = text
       .trim()
@@ -160,6 +167,9 @@ class TeacherAudioService {
     
     if (context) {
       key = `${context}:::${key}`;
+    }
+    if (lessonId !== undefined) {
+      key = `${lessonId}:::${key}`;
     }
     return key;
   }
@@ -197,7 +207,7 @@ class TeacherAudioService {
 
   // Save or update an audio item
   public saveAudio(item: Omit<TeacherAudioItem, 'id' | 'key' | 'createdAt'> & { id?: string; createdAt?: string }): TeacherAudioItem {
-    const key = this.normalizeKey(item.text, item.section);
+    const key = this.normalizeKey(item.text, item.section, item.lessonId);
     const id = item.id || `audio_${key}_${Date.now()}`;
     const fullItem: TeacherAudioItem = {
       ...item,
@@ -214,8 +224,12 @@ class TeacherAudioService {
   }
 
   // Find custom audio by text
-  public getAudioByText(text?: string, context?: string): TeacherAudioItem | undefined {
+  public getAudioByText(text?: string, context?: string, lessonId?: string | number): TeacherAudioItem | undefined {
     if (!text) return undefined;
+    if (context && lessonId !== undefined) {
+      const strictKey = this.normalizeKey(text, context, lessonId);
+      if (this.memoryMap[strictKey]) return this.memoryMap[strictKey];
+    }
     if (context) {
       const specificKey = this.normalizeKey(text, context);
       if (this.memoryMap[specificKey]) return this.memoryMap[specificKey];
@@ -225,8 +239,12 @@ class TeacherAudioService {
   }
 
   // Check if custom audio exists for text
-  public hasAudioForText(text?: string, context?: string): boolean {
+  public hasAudioForText(text?: string, context?: string, lessonId?: string | number): boolean {
     if (!text) return false;
+    if (context && lessonId !== undefined) {
+      const strictKey = this.normalizeKey(text, context, lessonId);
+      if (this.memoryMap[strictKey] && this.memoryMap[strictKey].audioBase64) return true;
+    }
     if (context) {
       const specificKey = this.normalizeKey(text, context);
       if (this.memoryMap[specificKey] && this.memoryMap[specificKey].audioBase64) return true;
@@ -236,8 +254,17 @@ class TeacherAudioService {
   }
 
   // Delete audio for text
-  public deleteAudioByText(text?: string, context?: string): void {
+  public deleteAudioByText(text?: string, context?: string, lessonId?: string | number): void {
     if (!text) return;
+    if (context && lessonId !== undefined) {
+      const strictKey = this.normalizeKey(text, context, lessonId);
+      if (this.memoryMap[strictKey]) {
+        delete this.memoryMap[strictKey];
+        this.deleteFromDB(strictKey);
+        this.notify();
+        return;
+      }
+    }
     if (context) {
       const specificKey = this.normalizeKey(text, context);
       if (this.memoryMap[specificKey]) {
@@ -284,9 +311,13 @@ class TeacherAudioService {
   }
 
   // Play custom audio for text
-  public playAudio(text: string, context?: string, onEnd?: () => void): HTMLAudioElement | null {
+  public playAudio(text: string, context?: string, lessonId?: string | number, onEnd?: () => void): HTMLAudioElement | null {
     let item = undefined;
-    if (context) {
+    if (context && lessonId !== undefined) {
+      const strictKey = this.normalizeKey(text, context, lessonId);
+      item = this.memoryMap[strictKey];
+    }
+    if (!item && context) {
       const specificKey = this.normalizeKey(text, context);
       item = this.memoryMap[specificKey];
     }

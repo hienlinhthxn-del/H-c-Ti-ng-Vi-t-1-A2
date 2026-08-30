@@ -116,7 +116,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
     }
   };
 
-  const handleSpellingModel = (steps: string[] | undefined, fullResult: string, idx: number) => {
+  const handleSpellingModel = (steps: string[] | undefined, fullResult: string, idx: number, lessonId: string) => {
     setSpellingActiveIdx(idx);
     speechService.spellOut(steps, fullResult, () => {
       speechService.playSoundEffect('sparkle');
@@ -374,12 +374,12 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
             {/* Letter Cards Grid */}
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1">
               {lesson.part1_Letters.letters.map((letter, idx) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(letter, 'letter');
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(letter, 'letter', lesson.id);
                 return (
                   <div key={idx} className="relative group/card">
                     <button
                       id={`letter-card-${idx}`}
-                      onClick={() => speechService.speak(letter, undefined, undefined, 'letter')}
+                      onClick={() => speechService.speak(letter, undefined, undefined, 'letter', lesson.id)}
                       className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white border border-slate-200/90 hover:border-orange-400 shadow-xs hover:shadow flex items-center justify-center text-[#c2410c] hover:text-orange-600 hover:scale-105 transition-all cursor-pointer font-sgk font-black tracking-normal relative ${letterFontSizeClass}`}
                       title={hasTeacherAudio ? `Giọng đọc mẫu Cô giáo: ${letter}` : `Bấm để nghe phát âm: ${letter}`}
                     >
@@ -416,11 +416,11 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {lesson.part2_SyllablesAndWords.models.map((model, idx) => {
-                    const hasTeacherAudio = teacherAudioService.hasAudioForText(model.result, 'syllable');
+                    const hasTeacherAudio = teacherAudioService.hasAudioForText(model.result, 'syllable', lesson.id);
                     return (
                       <div
                         key={idx}
-                        onClick={() => handleSpellingModel(model.spellingSteps, model.result, idx)}
+                        onClick={() => handleSpellingModel(model.spellingSteps, model.result, idx, lesson.id)}
                         className={`cursor-pointer p-3 rounded-xl border transition-all flex items-center justify-between group relative ${
                           spellingActiveIdx === idx
                             ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-300'
@@ -478,11 +478,11 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {lesson.part2_SyllablesAndWords.readingSyllables.map((syl, i) => {
-                    const hasTeacherAudio = teacherAudioService.hasAudioForText(syl, 'syllable');
+                    const hasTeacherAudio = teacherAudioService.hasAudioForText(syl, 'syllable', lesson.id);
                     return (
                       <div key={i} className="relative group/syl">
                         <button
-                          onClick={() => speechService.speak(syl, undefined, undefined, 'syllable')}
+                          onClick={() => speechService.speak(syl, undefined, undefined, 'syllable', lesson.id)}
                           className="px-3.5 py-1.5 bg-slate-50 hover:bg-amber-100/80 hover:text-amber-950 text-slate-800 font-bold rounded-xl border border-slate-200/80 transition-all shadow-2xs font-sgk cursor-pointer active:scale-95 text-base sm:text-lg flex items-center gap-1.5"
                         >
                           <span>{syl}</span>
@@ -560,12 +560,12 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
             {/* Words Row with Subtle Bottom Highlight */}
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1">
               {lesson.part2_SyllablesAndWords.words.map((item, idx) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.word, 'word');
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(item.word, 'word', lesson.id);
                 return (
                   <div key={idx} className="relative group/word">
                     <button
                       id={`word-item-${idx}`}
-                      onClick={() => speechService.speak(item.word, undefined, undefined, 'word')}
+                      onClick={() => speechService.speak(item.word, undefined, undefined, 'word', lesson.id)}
                       className={`px-5 py-2.5 sm:px-6 sm:py-3 rounded-xl bg-slate-50/70 hover:bg-blue-50/90 border-b-2 border-blue-200 hover:border-blue-500 text-blue-700 font-bold transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer font-sgk flex items-center gap-2 ${wordFontSizeClass}`}
                       title={item.meaning ? `${item.word}: ${item.meaning}` : `Bấm để nghe: ${item.word}`}
                     >
@@ -612,7 +612,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   id="speak-passage-btn"
-                  onClick={() => speechService.speak(lesson.part3_SentenceAndPractice.readingPassage, undefined, undefined, 'passage')}
+                  onClick={() => speechService.speak(lesson.part3_SentenceAndPractice.readingPassage, undefined, undefined, 'passage', lesson.id)}
                   className="w-9 h-9 rounded-xl border border-slate-200/80 bg-white hover:bg-emerald-50 text-emerald-600 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
                   title="Nghe đọc toàn bộ đoạn văn"
                 >
@@ -656,12 +656,12 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
             {/* Reading Sentences Cards with Green Left Accent Bar */}
             <div className="space-y-3 pt-1">
               {passageSentences.map((sentence, sIdx) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(sentence, 'sentence');
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(sentence, 'sentence', lesson.id);
                 return (
                   <div
                     key={sIdx}
                     id={`sentence-card-${sIdx}`}
-                    onClick={() => speechService.speak(sentence, undefined, undefined, 'sentence')}
+                    onClick={() => speechService.speak(sentence, undefined, undefined, 'sentence', lesson.id)}
                     className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 hover:border-emerald-300 shadow-2xs hover:shadow-xs transition-all relative pl-6 flex items-center justify-between group cursor-pointer"
                     title={hasTeacherAudio ? `Giọng đọc mẫu Cô giáo: ${sentence}` : `Bấm để nghe đọc câu: ${sentence}`}
                   >

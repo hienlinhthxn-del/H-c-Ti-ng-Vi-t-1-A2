@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Mic, Square, Play, Pause, RotateCcw, Save, Trash2, 
   Volume2, CheckCircle2, AlertCircle, Sparkles, User, HelpCircle, Bot
@@ -259,7 +259,7 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
   const handleDeleteSavedAudio = () => {
     if (!effectiveText) return;
     if (window.confirm(`Thầy Cô có chắc muốn xoá giọng đọc mẫu của "${effectiveText}" khi chưa ưng ý và chuyển về phát âm chuẩn AI mặc định?`)) {
-      teacherAudioService.deleteAudioByText(effectiveText);
+      teacherAudioService.deleteAudioByText(effectiveText, target.section, target.lessonId);
       speechService.playSoundEffect('pop');
       if (isPlayingSavedTeacher) {
         teacherAudioService.stopCurrentAudio();

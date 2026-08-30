@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   Volume1Lesson, 
   Volume2Lesson, 
@@ -170,21 +170,22 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   });
 
   // Audio actions
-  const handlePlayAudio = (text: string) => {
-    if (playingAudioKey === text) {
+  const handlePlayAudio = (id: string) => {
+    if (playingAudioKey === id) {
       teacherAudioService.stopCurrentAudio();
       setPlayingAudioKey(null);
       return;
     }
-    setPlayingAudioKey(text);
-    teacherAudioService.playAudio(text, () => {
+    setPlayingAudioKey(id);
+    const audioItem = teacherAudioService.getAllAudios().find(a => a.id === id);
+    if (audioItem) teacherAudioService.playAudio(audioItem.text, audioItem.section, audioItem.lessonId, () => {
       setPlayingAudioKey(null);
     });
   };
 
-  const handleDeleteAudio = (text: string) => {
+  const handleDeleteAudio = (id: string, text: string) => {
     if (window.confirm(`Xoá giọng đọc mẫu của từ "${text}"?`)) {
-      teacherAudioService.deleteAudioByText(text);
+      teacherAudioService.deleteAudioById(id);
       showToast('Đã xoá bản thu âm');
     }
   };
@@ -792,7 +793,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                       <div className="flex items-center gap-2">
                         <button
                           id={`play-teacher-audio-${audio.id}`}
-                          onClick={() => handlePlayAudio(audio.text)}
+                          onClick={() => handlePlayAudio(audio.id)}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                             isPlaying 
                               ? 'bg-rose-500 text-white animate-pulse' 
@@ -819,7 +820,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
                       <button
                         id={`delete-teacher-audio-${audio.id}`}
-                        onClick={() => handleDeleteAudio(audio.text)}
+                        onClick={() => handleDeleteAudio(audio.id, audio.text)}
                         className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                         title="Xoá giọng đọc mẫu này"
                       >

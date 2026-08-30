@@ -372,11 +372,11 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
             {/* Paragraph Cards */}
             <div className="space-y-3 pt-1">
               {lesson.reading.content.map((paragraph, idx) => {
-                const hasTeacherAudio = teacherAudioService.hasAudioForText(paragraph, 'passage');
+                const hasTeacherAudio = teacherAudioService.hasAudioForText(paragraph, 'passage', lesson.id);
                 return (
                   <div
                     key={idx}
-                    onClick={() => speechService.speak(paragraph, undefined, undefined, 'passage')}
+                    onClick={() => speechService.speak(paragraph, undefined, undefined, 'passage', lesson.id)}
                     className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 hover:border-teal-300 shadow-2xs hover:shadow-xs transition-all relative pl-6 flex items-center justify-between group cursor-pointer"
                     title={hasTeacherAudio ? `Giọng đọc mẫu Cô giáo: ${paragraph}` : `Bấm để nghe đọc đoạn này`}
                   >
@@ -422,11 +422,11 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {lesson.reading.vocabulary.map((vocab, vIdx) => {
-                    const hasTeacherAudio = teacherAudioService.hasAudioForText(vocab.word, 'word');
+                    const hasTeacherAudio = teacherAudioService.hasAudioForText(vocab.word, 'word', lesson.id);
                     return (
                       <div
                         key={vIdx}
-                        onClick={() => speechService.speak(vocab.word, undefined, undefined, 'word')}
+                        onClick={() => speechService.speak(vocab.word, undefined, undefined, 'word', lesson.id)}
                         className="p-3 rounded-xl bg-white border border-teal-100 hover:border-teal-300 transition-all cursor-pointer shadow-2xs flex items-center justify-between group"
                       >
                         <div>
