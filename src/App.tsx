@@ -88,11 +88,8 @@ export default function App() {
 
   const handleSelectRole = (role: UserRole) => {
     if (role === 'teacher') {
-      if (!teacherAuthService.isAuthenticated()) {
-        setIsTeacherLoginOpen(true);
-        return;
-      }
-      navigate('/teacher');
+      setIsTeacherLoginOpen(true);
+      return;
     } else if (role === 'parent') {
       navigate('/parent');
     } else {
