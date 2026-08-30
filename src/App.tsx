@@ -422,27 +422,58 @@ export default function App() {
         <Routes>
           {/* 1. TEACHER PORTAL */}
           <Route path="/teacher/*" element={
-            <TeacherPortalView
-              onSelectVol1Lesson={(lesson) => {
-                navigate('/student');
-                setUserRole('student');
-                setCurrentTab('volume1');
-                setSelectedVol1Lesson(lesson);
-              }}
-              onSelectVol2Lesson={(lesson) => {
-                navigate('/student');
-                setUserRole('student');
-                setCurrentTab('volume2');
-                setSelectedVol2Lesson(lesson);
-              }}
-              onOpenVol1Editor={handleOpenEditVol1}
-              onOpenVol2Editor={handleOpenEditVol2}
-              onOpenTeacherRecorder={handleOpenTeacherRecorder}
-              onSwitchToStudentView={() => handleSelectRole('student')}
-              onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
-              onLogout={handleTeacherLogout}
-              onOpenTeacherLogin={() => setIsTeacherLoginOpen(true)}
-            />
+            selectedVol1Lesson ? (
+              <Volume1LessonView
+                lesson={selectedVol1Lesson}
+                onPreviousLesson={handleVol1Prev}
+                onNextLesson={handleVol1Next}
+                hasPrevious={vol1HasPrevious}
+                hasNext={vol1HasNext}
+                onOpenWritingPractice={handleOpenWritingPractice}
+                onAddStar={handleAddStar}
+                onEditLesson={() => handleOpenEditVol1(selectedVol1Lesson)}
+                onOpenVoiceRecorder={handleOpenVoiceRecorder}
+                onOpenTeacherRecorder={handleOpenTeacherRecorder}
+                onUnlockBadges={(newBadges) => setUnlockedBadgesToCelebrate(newBadges)}
+                onBackToList={() => {
+                  setSelectedVol1Lesson(null);
+                  speechService.playSoundEffect('pop');
+                }}
+              />
+            ) : selectedVol2Lesson ? (
+              <Volume2LessonView
+                lesson={selectedVol2Lesson}
+                onPreviousLesson={handleVol2Prev}
+                onNextLesson={handleVol2Next}
+                hasPrevious={vol2HasPrevious}
+                hasNext={vol2HasNext}
+                onOpenWritingPractice={handleOpenWritingPractice}
+                onAddStar={handleAddStar}
+                onEditLesson={() => handleOpenEditVol2(selectedVol2Lesson)}
+                onOpenVoiceRecorder={handleOpenVoiceRecorder}
+                onOpenTeacherRecorder={handleOpenTeacherRecorder}
+                onBackToList={() => {
+                  setSelectedVol2Lesson(null);
+                  speechService.playSoundEffect('pop');
+                }}
+              />
+            ) : (
+              <TeacherPortalView
+                onSelectVol1Lesson={(lesson) => {
+                  setSelectedVol1Lesson(lesson);
+                }}
+                onSelectVol2Lesson={(lesson) => {
+                  setSelectedVol2Lesson(lesson);
+                }}
+                onOpenVol1Editor={handleOpenEditVol1}
+                onOpenVol2Editor={handleOpenEditVol2}
+                onOpenTeacherRecorder={handleOpenTeacherRecorder}
+                onSwitchToStudentView={() => handleSelectRole('student')}
+                onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
+                onLogout={handleTeacherLogout}
+                onOpenTeacherLogin={() => setIsTeacherLoginOpen(true)}
+              />
+            )
           } />
 
           {/* 2. PARENT PORTAL */}
