@@ -28,9 +28,14 @@ import { userProfileService } from './services/userProfileService';
 import { teacherAuthService } from './services/teacherAuthService';
 import { speechService } from './services/speechService';
 import confetti from 'canvas-confetti';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { LandingPage } from './pages/LandingPage';
 import { BookOpen, Sparkles, Home, ArrowLeft, Mic, Trophy } from 'lucide-react';
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // Active User Profile & Multi-User State
   const [activeUser, setActiveUser] = useState<AppUserProfile>(() => userProfileService.getActiveUser());
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
@@ -87,6 +92,11 @@ export default function App() {
         setIsTeacherLoginOpen(true);
         return;
       }
+      navigate('/teacher');
+    } else if (role === 'parent') {
+      navigate('/parent');
+    } else {
+      navigate('/student');
     }
     setUserRole(role);
     localStorage.setItem('tv1_user_role', role);
@@ -97,6 +107,7 @@ export default function App() {
     teacherAuthService.logout();
     setIsTeacherAuthenticated(false);
     setUserRole('student');
+    navigate('/');
     speechService.playSoundEffect('pop');
   };
 
@@ -105,7 +116,18 @@ export default function App() {
     setActiveUser(teacher);
     setUserRole('teacher');
     localStorage.setItem('tv1_user_role', 'teacher');
+    navigate('/teacher');
   };
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/teacher')) {
+       setUserRole('teacher');
+    } else if (location.pathname.startsWith('/parent')) {
+       setUserRole('parent');
+    } else if (location.pathname.startsWith('/student')) {
+       setUserRole('student');
+    }
+  }, [location.pathname]);
 
   // Subscribe to storage & achievement & teacher audio changes
   useEffect(() => {
@@ -325,6 +347,10 @@ export default function App() {
     speechService.playSoundEffect('pop');
   };
 
+  if (location.pathname === '/') {
+    return <LandingPage />;
+  }
+
   return (
     <div className="min-h-screen bg-[#fffdfa] text-slate-800 flex flex-col font-sans selection:bg-amber-200">
       
@@ -353,148 +379,157 @@ export default function App() {
 
       {/* Main View Area based on User Role */}
       <main className="flex-1 pb-20 md:pb-12">
-        {/* 1. TEACHER PORTAL */}
-        {userRole === 'teacher' && (
-          <TeacherPortalView
-            onSelectVol1Lesson={(lesson) => {
-              setUserRole('student');
-              setCurrentTab('volume1');
-              setSelectedVol1Lesson(lesson);
-            }}
-            onSelectVol2Lesson={(lesson) => {
-              setUserRole('student');
-              setCurrentTab('volume2');
-              setSelectedVol2Lesson(lesson);
-            }}
-            onOpenVol1Editor={handleOpenEditVol1}
-            onOpenVol2Editor={handleOpenEditVol2}
-            onOpenTeacherRecorder={handleOpenTeacherRecorder}
-            onSwitchToStudentView={() => handleSelectRole('student')}
-            onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
-            onLogout={handleTeacherLogout}
-            onOpenTeacherLogin={() => setIsTeacherLoginOpen(true)}
-          />
-        )}
+        <Routes>
+          {/* 1. TEACHER PORTAL */}
+          <Route path="/teacher/*" element={
+            <TeacherPortalView
+              onSelectVol1Lesson={(lesson) => {
+                navigate('/student');
+                setUserRole('student');
+                setCurrentTab('volume1');
+                setSelectedVol1Lesson(lesson);
+              }}
+              onSelectVol2Lesson={(lesson) => {
+                navigate('/student');
+                setUserRole('student');
+                setCurrentTab('volume2');
+                setSelectedVol2Lesson(lesson);
+              }}
+              onOpenVol1Editor={handleOpenEditVol1}
+              onOpenVol2Editor={handleOpenEditVol2}
+              onOpenTeacherRecorder={handleOpenTeacherRecorder}
+              onSwitchToStudentView={() => handleSelectRole('student')}
+              onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
+              onLogout={handleTeacherLogout}
+              onOpenTeacherLogin={() => setIsTeacherLoginOpen(true)}
+            />
+          } />
 
-        {/* 2. PARENT PORTAL */}
-        {userRole === 'parent' && (
-          <ParentPortalView
-            starsCount={starsCount}
-            onOpenAchievements={() => setIsAchievementModalOpen(true)}
-            onOpenVoiceStudio={handleOpenVoiceStudio}
-            onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
-            onSelectVolume1={() => {
-              setUserRole('student');
-              setCurrentTab('volume1');
-              setSelectedVol1Lesson(null);
-            }}
-            onSelectVolume2={() => {
-              setUserRole('student');
-              setCurrentTab('volume2');
-              setSelectedVol2Lesson(null);
-            }}
-          />
-        )}
+          {/* 2. PARENT PORTAL */}
+          <Route path="/parent/*" element={
+            <ParentPortalView
+              starsCount={starsCount}
+              onOpenAchievements={() => setIsAchievementModalOpen(true)}
+              onOpenVoiceStudio={handleOpenVoiceStudio}
+              onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
+              onSelectVolume1={() => {
+                navigate('/student');
+                setUserRole('student');
+                setCurrentTab('volume1');
+                setSelectedVol1Lesson(null);
+              }}
+              onSelectVolume2={() => {
+                navigate('/student');
+                setUserRole('student');
+                setCurrentTab('volume2');
+                setSelectedVol2Lesson(null);
+              }}
+            />
+          } />
 
-        {/* 3. STUDENT PORTAL (Interactive Lessons & Practice) */}
-        {userRole === 'student' && (
-          <>
-            {/* Teacher banner indicator if teacher is previewing in student role */}
-            {isTeacherAuthenticated && (
-              <div className="bg-purple-50 border-b border-purple-200/80 px-4 py-2 text-xs text-purple-900 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="bg-purple-600 text-white px-2 py-0.5 rounded-md font-bold text-[11px]">
-                    👩‍🏫 Quyền Giáo Viên
-                  </span>
-                  <span>Đang mở giao diện học sinh (Bạn có thể bấm <strong>"Sửa bài"</strong> hoặc <strong>"Sửa giọng GV"</strong> ở từng bài học).</span>
+          {/* 3. STUDENT PORTAL (Interactive Lessons & Practice) */}
+          <Route path="/student/*" element={
+            <>
+              {/* Teacher banner indicator if teacher is previewing in student role */}
+              {isTeacherAuthenticated && (
+                <div className="bg-purple-50 border-b border-purple-200/80 px-4 py-2 text-xs text-purple-900 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-purple-600 text-white px-2 py-0.5 rounded-md font-bold text-[11px]">
+                      👩‍🏫 Quyền Giáo Viên
+                    </span>
+                    <span>Đang mở giao diện học sinh (Bạn có thể bấm <strong>"Sửa bài"</strong> hoặc <strong>"Sửa giọng GV"</strong> ở từng bài học).</span>
+                  </div>
+                  <button
+                    onClick={() => handleSelectRole('teacher')}
+                    className="font-bold text-purple-700 hover:text-purple-900 underline ml-2 cursor-pointer whitespace-nowrap"
+                  >
+                    Về Cổng Giáo Viên →
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleSelectRole('teacher')}
-                  className="font-bold text-purple-700 hover:text-purple-900 underline ml-2 cursor-pointer whitespace-nowrap"
-                >
-                  Về Cổng Giáo Viên →
-                </button>
-              </div>
-            )}
+              )}
 
-            {currentTab === 'intro' && (
-              <IntroView
-                onOpenWritingPractice={handleOpenWritingPractice}
-                onAddStar={handleAddStar}
-              />
-            )}
-
-            {currentTab === 'volume1' && (
-              selectedVol1Lesson ? (
-                <Volume1LessonView
-                  lesson={selectedVol1Lesson}
-                  onPreviousLesson={handleVol1Prev}
-                  onNextLesson={handleVol1Next}
-                  hasPrevious={vol1HasPrevious}
-                  hasNext={vol1HasNext}
+              {currentTab === 'intro' && (
+                <IntroView
                   onOpenWritingPractice={handleOpenWritingPractice}
                   onAddStar={handleAddStar}
-                  onEditLesson={isTeacherAuthenticated ? () => handleOpenEditVol1(selectedVol1Lesson) : undefined}
-                  onOpenVoiceRecorder={handleOpenVoiceRecorder}
+                />
+              )}
+
+              {currentTab === 'volume1' && (
+                selectedVol1Lesson ? (
+                  <Volume1LessonView
+                    lesson={selectedVol1Lesson}
+                    onPreviousLesson={handleVol1Prev}
+                    onNextLesson={handleVol1Next}
+                    hasPrevious={vol1HasPrevious}
+                    hasNext={vol1HasNext}
+                    onOpenWritingPractice={handleOpenWritingPractice}
+                    onAddStar={handleAddStar}
+                    onEditLesson={isTeacherAuthenticated ? () => handleOpenEditVol1(selectedVol1Lesson) : undefined}
+                    onOpenVoiceRecorder={handleOpenVoiceRecorder}
+                    onOpenTeacherRecorder={isTeacherAuthenticated ? handleOpenTeacherRecorder : undefined}
+                    onUnlockBadges={(newBadges) => setUnlockedBadgesToCelebrate(newBadges)}
+                    onBackToList={() => {
+                      setSelectedVol1Lesson(null);
+                      speechService.playSoundEffect('pop');
+                    }}
+                  />
+                ) : (
+                  <Volume1Grid
+                    onSelectLesson={(lesson) => setSelectedVol1Lesson(lesson)}
+                    onEditLesson={isTeacherAuthenticated ? handleOpenEditVol1 : undefined}
+                    searchQuery={searchQuery}
+                  />
+                )
+              )}
+
+              {currentTab === 'volume2' && (
+                selectedVol2Lesson ? (
+                  <Volume2LessonView
+                    lesson={selectedVol2Lesson}
+                    onPreviousLesson={handleVol2Prev}
+                    onNextLesson={handleVol2Next}
+                    hasPrevious={vol2HasPrevious}
+                    hasNext={vol2HasNext}
+                    onOpenWritingPractice={handleOpenWritingPractice}
+                    onAddStar={handleAddStar}
+                    onEditLesson={isTeacherAuthenticated ? () => handleOpenEditVol2(selectedVol2Lesson) : undefined}
+                    onOpenVoiceRecorder={handleOpenVoiceRecorder}
+                    onOpenTeacherRecorder={isTeacherAuthenticated ? handleOpenTeacherRecorder : undefined}
+                    onBackToList={() => {
+                      setSelectedVol2Lesson(null);
+                      speechService.playSoundEffect('pop');
+                    }}
+                  />
+                ) : (
+                  <Volume2Grid
+                    onSelectLesson={(lesson) => setSelectedVol2Lesson(lesson)}
+                    onEditLesson={isTeacherAuthenticated ? handleOpenEditVol2 : undefined}
+                    searchQuery={searchQuery}
+                  />
+                )
+              )}
+
+              {currentTab === 'alphabet' && (
+                <AlphabetBoard
                   onOpenTeacherRecorder={isTeacherAuthenticated ? handleOpenTeacherRecorder : undefined}
-                  onUnlockBadges={(newBadges) => setUnlockedBadgesToCelebrate(newBadges)}
-                  onBackToList={() => {
-                    setSelectedVol1Lesson(null);
-                    speechService.playSoundEffect('pop');
-                  }}
                 />
-              ) : (
-                <Volume1Grid
-                  onSelectLesson={(lesson) => setSelectedVol1Lesson(lesson)}
-                  onEditLesson={isTeacherAuthenticated ? handleOpenEditVol1 : undefined}
-                  searchQuery={searchQuery}
-                />
-              )
-            )}
+              )}
 
-            {currentTab === 'volume2' && (
-              selectedVol2Lesson ? (
-                <Volume2LessonView
-                  lesson={selectedVol2Lesson}
-                  onPreviousLesson={handleVol2Prev}
-                  onNextLesson={handleVol2Next}
-                  hasPrevious={vol2HasPrevious}
-                  hasNext={vol2HasNext}
-                  onOpenWritingPractice={handleOpenWritingPractice}
-                  onAddStar={handleAddStar}
-                  onEditLesson={isTeacherAuthenticated ? () => handleOpenEditVol2(selectedVol2Lesson) : undefined}
-                  onOpenVoiceRecorder={handleOpenVoiceRecorder}
-                  onOpenTeacherRecorder={isTeacherAuthenticated ? handleOpenTeacherRecorder : undefined}
-                  onBackToList={() => {
-                    setSelectedVol2Lesson(null);
-                    speechService.playSoundEffect('pop');
-                  }}
-                />
-              ) : (
-                <Volume2Grid
-                  onSelectLesson={(lesson) => setSelectedVol2Lesson(lesson)}
-                  onEditLesson={isTeacherAuthenticated ? handleOpenEditVol2 : undefined}
-                  searchQuery={searchQuery}
-                />
-              )
-            )}
+              {currentTab === 'practice' && (
+                <div className="py-6 px-4">
+                  <WritingBoard
+                    initialSampleText={writingSampleText}
+                    onSuccessReward={handleAddStar}
+                  />
+                </div>
+              )}
+            </>
+          } />
 
-            {currentTab === 'alphabet' && (
-              <AlphabetBoard
-                onOpenTeacherRecorder={isTeacherAuthenticated ? handleOpenTeacherRecorder : undefined}
-              />
-            )}
-
-            {currentTab === 'practice' && (
-              <div className="py-6 px-4">
-                <WritingBoard
-                  initialSampleText={writingSampleText}
-                  onSuccessReward={handleAddStar}
-                />
-              </div>
-            )}
-          </>
-        )}
+          {/* Catch-all fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
       {/* Teacher Global Management Modal */}
