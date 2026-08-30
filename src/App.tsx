@@ -348,7 +348,16 @@ export default function App() {
   };
 
   if (location.pathname === '/') {
-    return <LandingPage onSelectRole={handleSelectRole} />;
+    return (
+      <>
+        <LandingPage onSelectRole={handleSelectRole} />
+        <TeacherLoginModal
+          isOpen={isTeacherLoginOpen}
+          onClose={() => setIsTeacherLoginOpen(false)}
+          onSuccess={handleTeacherLoginSuccess}
+        />
+      </>
+    );
   }
 
   return (
