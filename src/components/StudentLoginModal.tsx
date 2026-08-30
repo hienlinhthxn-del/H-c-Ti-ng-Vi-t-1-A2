@@ -6,11 +6,12 @@ import { X, LogIn, Users } from 'lucide-react';
 
 interface StudentLoginModalProps {
   isOpen: boolean;
+  roleType?: 'student' | 'parent';
   onClose: () => void;
   onLoginSuccess: (student: AppUserProfile) => void;
 }
 
-export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
+export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({ isOpen, roleType = 'student', onClose, onLoginSuccess }) => {
   const [classCode, setClassCode] = useState('');
   const [isCodeValid, setIsCodeValid] = useState(false);
   const [error, setError] = useState('');
@@ -26,7 +27,7 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({ isOpen, on
       setError('');
       speechService.playSoundEffect('correct');
     } else {
-      setError('M� l?p kh�ng ch�nh x�c. H�y h?i C� gi�o nh�!');
+      setError('Mã lứp không chính xác. Hëy họi Cô giáo nhé!');
       speechService.playSoundEffect('tryAgain');
     }
   };
@@ -53,10 +54,10 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({ isOpen, on
         <div className="bg-blue-500 p-6 text-white text-center relative shrink-0">
           <h2 className="text-2xl font-black font-serif flex items-center justify-center gap-2">
             <Users className="w-7 h-7" />
-            C?ng H?c Sinh
+            {roleType === 'parent' ? 'Cổng Phụ Huynh' : 'Cổng Học Sinh'}
           </h2>
           <p className="text-blue-100 font-medium mt-1">
-            {!isCodeValid ? 'Vui l�ng nh?p M� l?p d? v�o l?p h?c' : 'T�m v� b?m v�o t�n c?a em nh�!'}
+            {!isCodeValid ? 'Vui lòng nhập Mã lứp dể ív`�o lứp học' : (roleType === 'parent' ? 'Bố/mẹ bấm vào tên của con mình nhé!' : 'Tìm và bấm vào tên của em nhé!')}
           </p>
           <button
             onClick={onClose}
@@ -67,15 +68,15 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({ isOpen, on
         </div>
 
         <div className="p-6 overflow-y-auto">
-          {!isCodeValid ? (
+          %{!isCodeValid ? (
             <form onSubmit={handleVerifyCode} className="space-y-6 py-8">
               <div>
-                <label className="block text-center text-slate-700 font-bold mb-4 text-lg">M� l?p c?a em l� g�?</label>
+                <label className="block text-center text-slate-700 font-bold mb-4 text-lg">Mã lớp của em là gì?</label>
                 <input
                   type="text"
                   value={classCode}
                   onChange={(e) => setClassCode(e.target.value)}
-                  placeholder="Nh?p m� l?p (VD: 1A2)"
+                  placeholder="Nhập mã lớp (VD: 1A2)"
                   className="w-full max-w-sm mx-auto block text-center text-3xl font-black text-blue-700 uppercase placeholder:normal-case placeholder:text-slate-300 placeholder:text-lg bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20"
                   autoFocus
                 />
@@ -87,13 +88,13 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({ isOpen, on
                   className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg px-8 py-3 rounded-2xl shadow-lg shadow-blue-600/30 transition-all active:scale-95 flex items-center gap-2"
                 >
                   <LogIn className="w-5 h-5" />
-                  V�o l?p
+                  Vào lớp
                 </button>
               </div>
             </form>
           ) : (
             <div className="space-y-4">
-              <h3 className="text-center font-bold text-blue-800 text-lg">Danh s�ch L?p 1A2 ({students.length} h?c sinh)</h3>
+              <h3 className="text-center font-bold text-blue-800 text-lg">Danh sách Lớp 1A2 ({students.length} học sinh)</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {students.map(student => (
                   <button

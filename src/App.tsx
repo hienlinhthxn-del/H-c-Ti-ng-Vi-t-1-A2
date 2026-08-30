@@ -45,6 +45,7 @@ export default function App() {
   // Teacher Authentication & Login Modal State
   const [isTeacherLoginOpen, setIsTeacherLoginOpen] = useState(false);
   const [isStudentLoginOpen, setIsStudentLoginOpen] = useState(false);
+  const [isParentLoginOpen, setIsParentLoginOpen] = useState(false);
   const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState<boolean>(() => teacherAuthService.isAuthenticated());
 
   // Role State (Student, Teacher, Parent)
@@ -93,14 +94,24 @@ export default function App() {
       setIsTeacherLoginOpen(true);
       return;
     } else if (role === 'parent') {
-      navigate('/parent');
-      setUserRole(role);
-      localStorage.setItem('tv1_user_role', role);
+      setIsParentLoginOpen(true);
+      return;
     } else {
       setIsStudentLoginOpen(true);
       return;
     }
     speechService.playSoundEffect('pop');
+  };
+
+  const handleParentLoginSuccess = (student: AppUserProfile) => {
+    setIsParentLoginOpen(false);
+    // When parent logs in by selecting their child, we switch the active user to that student
+    // so the ParentPortal shows that student's progress!
+    userProfileService.switchUser(student.id);
+    setActiveUser(student);
+    setUserRole('parent');
+    localStorage.setItem('tv1_user_role', 'parent');
+    navigate('/parent');
   };
 
   const handleTeacherLogout = () => {
@@ -366,8 +377,15 @@ export default function App() {
         />
         <StudentLoginModal
           isOpen={isStudentLoginOpen}
+          roleType="student"
           onClose={() => setIsStudentLoginOpen(false)}
           onLoginSuccess={handleStudentLoginSuccess}
+        />
+        <StudentLoginModal
+          isOpen={isParentLoginOpen}
+          roleType="parent"
+          onClose={() => setIsParentLoginOpen(false)}
+          onLoginSuccess={handleParentLoginSuccess}
         />
       </>
     );
@@ -632,8 +650,15 @@ export default function App() {
       />
       <StudentLoginModal
         isOpen={isStudentLoginOpen}
+        roleType="student"
         onClose={() => setIsStudentLoginOpen(false)}
         onLoginSuccess={handleStudentLoginSuccess}
+      />
+      <StudentLoginModal
+        isOpen={isParentLoginOpen}
+        roleType="parent"
+        onClose={() => setIsParentLoginOpen(false)}
+        onLoginSuccess={handleParentLoginSuccess}
       />
 
       {/* Google Workspace Cloud Sync & Drive/Sheets/Classroom Modal */}
