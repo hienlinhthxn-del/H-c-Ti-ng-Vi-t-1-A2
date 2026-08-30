@@ -363,7 +363,7 @@ class SpeechService {
   async spellOut(steps?: string[], fullResult?: string, onDone?: () => void) {
     if (!steps || steps.length === 0) {
       if (fullResult) {
-        this.speak(fullResult, onDone);
+        this.speak(fullResult, onDone, undefined, 'syllable');
       } else if (onDone) {
         onDone();
       }
@@ -375,7 +375,7 @@ class SpeechService {
       await new Promise<void>((resolve) => {
         this.speak(step, () => {
           setTimeout(resolve, 300);
-        }, 0.75);
+        }, 0.75, 'letter');
       });
     }
 
@@ -385,7 +385,7 @@ class SpeechService {
           this.speak(fullResult, () => {
             resolve();
             if (onDone) onDone();
-          }, 0.8);
+          }, 0.8, 'syllable');
         }, 300);
       });
     } else if (onDone) {
