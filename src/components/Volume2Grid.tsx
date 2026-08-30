@@ -182,8 +182,8 @@ export const Volume2Grid: React.FC<Volume2GridProps> = ({ onSelectLesson, onEdit
 
                 <div className="mt-4 pt-3 border-t border-emerald-100 flex items-center justify-between text-xs font-bold text-emerald-700">
                   <span className="flex items-center gap-1">
-                    <span>{isCompleted ? 'Đọc lại & Xem câu hỏi' : 'Khám phá bài đọc & Câu hỏi'}</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    <span>{isCompleted ? 'Học lại' : 'Học bài'}</span>
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </span>
 
                   {onEditLesson && (

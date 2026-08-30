@@ -399,6 +399,24 @@ export default function App() {
         {/* 3. STUDENT PORTAL (Interactive Lessons & Practice) */}
         {userRole === 'student' && (
           <>
+            {/* Teacher banner indicator if teacher is previewing in student role */}
+            {isTeacherAuthenticated && (
+              <div className="bg-purple-50 border-b border-purple-200/80 px-4 py-2 text-xs text-purple-900 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="bg-purple-600 text-white px-2 py-0.5 rounded-md font-bold text-[11px]">
+                    👩‍🏫 Quyền Giáo Viên
+                  </span>
+                  <span>Đang mở giao diện học sinh (Bạn có thể bấm <strong>"Sửa bài"</strong> hoặc <strong>"Sửa giọng GV"</strong> ở từng bài học).</span>
+                </div>
+                <button
+                  onClick={() => handleSelectRole('teacher')}
+                  className="font-bold text-purple-700 hover:text-purple-900 underline ml-2 cursor-pointer whitespace-nowrap"
+                >
+                  Về Cổng Giáo Viên →
+                </button>
+              </div>
+            )}
+
             {currentTab === 'intro' && (
               <IntroView
                 onOpenWritingPractice={handleOpenWritingPractice}
@@ -416,9 +434,9 @@ export default function App() {
                   hasNext={vol1HasNext}
                   onOpenWritingPractice={handleOpenWritingPractice}
                   onAddStar={handleAddStar}
-                  onEditLesson={() => handleOpenEditVol1(selectedVol1Lesson)}
+                  onEditLesson={isTeacherAuthenticated ? () => handleOpenEditVol1(selectedVol1Lesson) : undefined}
                   onOpenVoiceRecorder={handleOpenVoiceRecorder}
-                  onOpenTeacherRecorder={handleOpenTeacherRecorder}
+                  onOpenTeacherRecorder={isTeacherAuthenticated ? handleOpenTeacherRecorder : undefined}
                   onUnlockBadges={(newBadges) => setUnlockedBadgesToCelebrate(newBadges)}
                   onBackToList={() => {
                     setSelectedVol1Lesson(null);
@@ -428,7 +446,7 @@ export default function App() {
               ) : (
                 <Volume1Grid
                   onSelectLesson={(lesson) => setSelectedVol1Lesson(lesson)}
-                  onEditLesson={handleOpenEditVol1}
+                  onEditLesson={isTeacherAuthenticated ? handleOpenEditVol1 : undefined}
                   searchQuery={searchQuery}
                 />
               )
@@ -444,9 +462,9 @@ export default function App() {
                   hasNext={vol2HasNext}
                   onOpenWritingPractice={handleOpenWritingPractice}
                   onAddStar={handleAddStar}
-                  onEditLesson={() => handleOpenEditVol2(selectedVol2Lesson)}
+                  onEditLesson={isTeacherAuthenticated ? () => handleOpenEditVol2(selectedVol2Lesson) : undefined}
                   onOpenVoiceRecorder={handleOpenVoiceRecorder}
-                  onOpenTeacherRecorder={handleOpenTeacherRecorder}
+                  onOpenTeacherRecorder={isTeacherAuthenticated ? handleOpenTeacherRecorder : undefined}
                   onBackToList={() => {
                     setSelectedVol2Lesson(null);
                     speechService.playSoundEffect('pop');
@@ -455,7 +473,7 @@ export default function App() {
               ) : (
                 <Volume2Grid
                   onSelectLesson={(lesson) => setSelectedVol2Lesson(lesson)}
-                  onEditLesson={handleOpenEditVol2}
+                  onEditLesson={isTeacherAuthenticated ? handleOpenEditVol2 : undefined}
                   searchQuery={searchQuery}
                 />
               )
@@ -463,7 +481,7 @@ export default function App() {
 
             {currentTab === 'alphabet' && (
               <AlphabetBoard
-                onOpenTeacherRecorder={handleOpenTeacherRecorder}
+                onOpenTeacherRecorder={isTeacherAuthenticated ? handleOpenTeacherRecorder : undefined}
               />
             )}
 
