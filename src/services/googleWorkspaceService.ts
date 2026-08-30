@@ -1,6 +1,6 @@
 import { GoogleAccountInfo, GoogleSheetsSyncStatus, GoogleDriveSyncStatus, GoogleClassroomCourse, GoogleClassroomAssignment, AppUserProfile, StudentRecording } from '../types';
 
-const OAUTH_CLIENT_ID = '336846112123-d3bpulaagi5gfifn622cfgl76ksedo10.apps.googleusercontent.com';
+const OAUTH_CLIENT_ID = '343701045130-g7ue5ftn96vs1m52daa7747if66g0dti.apps.googleusercontent.com';
 const SCOPES = [
   'openid',
   'email',
