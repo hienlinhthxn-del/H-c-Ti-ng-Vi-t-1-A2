@@ -199,6 +199,11 @@ class AchievementService {
     }
   }
 
+  public reloadState() {
+    this.state = this.loadState();
+    this.notify([]);
+  }
+
   public getState(): AchievementState {
     return { ...this.state };
   }

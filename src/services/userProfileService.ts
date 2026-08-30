@@ -206,6 +206,8 @@ class UserProfileService {
           starsCount: target.starsCount || (target.completedLessonKeys ? target.completedLessonKeys.length : 0)
         };
         localStorage.setItem('tiengviet1_achievements_v1', JSON.stringify(achievementState));
+        // Force achievement service to reload from memory so UI updates immediately
+        setTimeout(() => achievementService.reloadState(), 0);
       } catch (e) {
         console.error('Failed to sync achievement state on user switch:', e);
       }
