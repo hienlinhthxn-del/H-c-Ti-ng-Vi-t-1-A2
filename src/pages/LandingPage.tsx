@@ -1,17 +1,12 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { BookOpen, Users, GraduationCap } from 'lucide-react';
-import { speechService } from '../services/speechService';
+import { BookOpen } from 'lucide-react';
+import { UserRole } from '../types';
 
-export const LandingPage: React.FC = () => {
-  const navigate = useNavigate();
+interface LandingPageProps {
+  onSelectRole: (role: UserRole) => void;
+}
 
-  const handleSelectRole = (path: string, roleName: string) => {
-    speechService.playSoundEffect('pop');
-    localStorage.setItem('tv1_user_role', roleName);
-    navigate(path);
-  };
-
+export const LandingPage: React.FC<LandingPageProps> = ({ onSelectRole }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex flex-col items-center justify-center p-4">
       <div className="text-center mb-10 animate-fade-in-up">
@@ -27,7 +22,7 @@ export const LandingPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl w-full">
         {/* Student */}
         <button
-          onClick={() => handleSelectRole('/student', 'student')}
+          onClick={() => onSelectRole('student')}
           className="flex flex-col items-center p-8 bg-white rounded-3xl shadow-lg border-2 border-orange-100 hover:border-orange-400 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer group"
         >
           <div className="w-20 h-20 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -39,7 +34,7 @@ export const LandingPage: React.FC = () => {
 
         {/* Teacher */}
         <button
-          onClick={() => handleSelectRole('/teacher', 'teacher')}
+          onClick={() => onSelectRole('teacher')}
           className="flex flex-col items-center p-8 bg-white rounded-3xl shadow-lg border-2 border-amber-100 hover:border-amber-400 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer group"
         >
           <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -51,7 +46,7 @@ export const LandingPage: React.FC = () => {
 
         {/* Parent */}
         <button
-          onClick={() => handleSelectRole('/parent', 'parent')}
+          onClick={() => onSelectRole('parent')}
           className="flex flex-col items-center p-8 bg-white rounded-3xl shadow-lg border-2 border-emerald-100 hover:border-emerald-400 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer group"
         >
           <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">

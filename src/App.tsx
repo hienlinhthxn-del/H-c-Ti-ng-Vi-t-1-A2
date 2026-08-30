@@ -348,7 +348,7 @@ export default function App() {
   };
 
   if (location.pathname === '/') {
-    return <LandingPage />;
+    return <LandingPage onSelectRole={handleSelectRole} />;
   }
 
   return (
