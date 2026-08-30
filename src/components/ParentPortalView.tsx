@@ -232,37 +232,25 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
         </div>
       </div>
 
-      {/* Child Profile Switcher bar for Multi-child families */}
+      {/* Child Profile Display */}
       {allStudents.length > 0 && (
         <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
           <div className="flex items-center gap-2 text-xs font-black text-emerald-950">
-            <span>🧒 Hồ sơ các bé đang theo dõi:</span>
+            <span>🧒 Đang xem hồ sơ của bé:</span>
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            {allStudents.map(student => {
-              const isSelected = student.id === selectedStudentId;
+          <div className="flex items-center gap-2">
+            {allStudents.filter(s => s.id === selectedStudentId).map(student => {
               return (
-                <button
+                <div
                   key={student.id}
-                  onClick={() => {
-                    setSelectedStudentId(student.id);
-                    userProfileService.setActiveUser(student.id);
-                    speechService.playSoundEffect('pop');
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-emerald-700 text-white shadow-xs'
-                      : 'bg-white text-emerald-900 hover:bg-emerald-100 border border-emerald-200'
-                  }`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-700 text-white shadow-xs"
                 >
                   <span>{student.avatar}</span>
                   <span>{student.name}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    isSelected ? 'bg-emerald-800 text-amber-300' : 'bg-emerald-100 text-emerald-800'
-                  }`}>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-emerald-800 text-amber-300">
                     ⭐ {student.starsCount || 0}
                   </span>
-                </button>
+                </div>
               );
             })}
           </div>
