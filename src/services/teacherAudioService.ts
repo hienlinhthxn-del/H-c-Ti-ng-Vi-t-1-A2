@@ -1,4 +1,4 @@
-import { db } from './firebaseConfig';
+﻿import { db } from './firebaseConfig';
 import { collection, doc, setDoc, getDocs, deleteDoc, onSnapshot, query } from 'firebase/firestore';
 
 export interface TeacherAudioItem {
@@ -162,6 +162,10 @@ class TeacherAudioService {
     }
   }
 
+  public getCount(): number {
+    return Object.keys(this.memoryMap).length;
+  }
+
   public getAllAudios(): TeacherAudioItem[] {
     return Object.values(this.memoryMap).sort((a, b) => {
       const dateA = new Date(a.createdAt).getTime();
@@ -172,6 +176,33 @@ class TeacherAudioService {
       if (isNaN(dateB)) return -1;
       return dateB - dateA;
     });
+  }
+
+    public exportToJson(): string {
+    return JSON.stringify(Object.values(this.memoryMap));
+  }
+
+  public importFromJson(jsonStr: string): { success: boolean, count: number } {
+    try {
+      const items = JSON.parse(jsonStr) as TeacherAudioItem[];
+      let count = 0;
+      items.forEach(item => {
+        if (item.text && item.audioBase64) {
+          this.saveAudio(item);
+          count++;
+        }
+      });
+      return { success: true, count };
+    } catch (e) {
+      console.error('Import failed', e);
+      return { success: false, count: 0 };
+    }
+  }
+
+  public async clearAll(): Promise<void> {
+    for (const item of Object.values(this.memoryMap)) {
+      await this.deleteAudioById(item.id);
+    }
   }
 
   public playAudio(text: string, context?: string, lessonId?: string | number, onEnd?: () => void): HTMLAudioElement | null {
