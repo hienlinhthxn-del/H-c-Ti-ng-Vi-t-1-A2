@@ -1,4 +1,4 @@
-import { Volume1Lesson } from '../types';
+﻿import { Volume1Lesson } from '../types';
 
 export const LESSONS_PART_3: Volume1Lesson[] = [
   {
@@ -59,7 +59,7 @@ export const LESSONS_PART_3: Volume1Lesson[] = [
     part2_SyllablesAndWords: {
       title: 'Đọc âm vần, tiếng, từ ngữ',
       models: [
-        { initial: 'b', vowel: 'iêc', tone: 'sắc', result: 'biếc', spellingSteps: ['bê', 'iêc', 'biêc', 'sắc', 'biếc'] }
+        { initial: 'b', vowel: 'iêc', tone: 'sắc', result: 'biếc', spellingSteps: ['bờ', 'iêc', 'biêc', 'sắc', 'biếc'] }
       ],
       readingSyllables: ['thiếc', 'tiệc', 'xiếc', 'điện', 'kiến', 'thiện', 'diệp', 'thiếp', 'tiệp'],
       words: [
@@ -102,7 +102,7 @@ export const LESSONS_PART_3: Volume1Lesson[] = [
     part2_SyllablesAndWords: {
       title: 'Đọc âm vần, tiếng, từ ngữ',
       models: [
-        { initial: 'b', vowel: 'iêng', result: 'biêng', spellingSteps: ['bê', 'iêng', 'biêng'] }
+        { initial: 'b', vowel: 'iêng', result: 'biêng', spellingSteps: ['bờ', 'iêng', 'biêng'] }
       ],
       readingSyllables: ['kiễng', 'liệng', 'riềng', 'diềm', 'kiểm', 'xiêm', 'yên', 'yến'],
       words: [
@@ -145,7 +145,7 @@ export const LESSONS_PART_3: Volume1Lesson[] = [
     part2_SyllablesAndWords: {
       title: 'Đọc âm vần, tiếng, từ ngữ',
       models: [
-        { initial: 'b', vowel: 'iêt', tone: 'sắc', result: 'biết', spellingSteps: ['bê', 'iêt', 'biêt', 'sắc', 'biết'] }
+        { initial: 'b', vowel: 'iêt', tone: 'sắc', result: 'biết', spellingSteps: ['bờ', 'iêt', 'biêt', 'sắc', 'biết'] }
       ],
       readingSyllables: ['chiết', 'viết', 'việt', 'chiều', 'diễu', 'kiểu', 'yêu', 'yếu', 'yểu'],
       words: [
@@ -280,7 +280,7 @@ export const LESSONS_PART_3: Volume1Lesson[] = [
     part2_SyllablesAndWords: {
       title: 'Đọc âm vần, tiếng, từ ngữ',
       models: [
-        { initial: 'b', vowel: 'uôc', tone: 'nặng', result: 'buộc', spellingSteps: ['bê', 'uôc', 'buôc', 'nặng', 'buộc'] }
+        { initial: 'b', vowel: 'uôc', tone: 'nặng', result: 'buộc', spellingSteps: ['bờ', 'uôc', 'buôc', 'nặng', 'buộc'] }
       ],
       readingSyllables: ['cuốc', 'luộc', 'ruốc', 'thuộc', 'buốt', 'muốt', 'ruột', 'tuột'],
       words: [
@@ -501,7 +501,7 @@ export const LESSONS_PART_3: Volume1Lesson[] = [
     part2_SyllablesAndWords: {
       title: 'Đọc âm vần, tiếng, từ ngữ',
       models: [
-        { initial: 'b', vowel: 'ưom', tone: 'sắc', result: 'bướm', spellingSteps: ['bê', 'ưom', 'bươm', 'sắc', 'bướm'] }
+        { initial: 'b', vowel: 'ưom', tone: 'sắc', result: 'bướm', spellingSteps: ['bờ', 'ưom', 'bươm', 'sắc', 'bướm'] }
       ],
       readingSyllables: ['chườm', 'đượm', 'gươm', 'ướm', 'lượm', 'mướp', 'nượp', 'ướp'],
       words: [

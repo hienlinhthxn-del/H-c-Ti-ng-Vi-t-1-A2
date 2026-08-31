@@ -1,4 +1,4 @@
-import { Volume1Lesson } from '../types';
+﻿import { Volume1Lesson } from '../types';
 
 export const LESSONS_PART_2: Volume1Lesson[] = [
   {
@@ -16,7 +16,7 @@ export const LESSONS_PART_2: Volume1Lesson[] = [
     part2_SyllablesAndWords: {
       title: 'Đọc âm vần, tiếng, từ ngữ',
       models: [
-        { initial: 'b', vowel: 'an', tone: 'nặng', result: 'bạn', spellingSteps: ['bê', 'an', 'ban', 'nặng', 'bạn'] }
+        { initial: 'b', vowel: 'an', tone: 'nặng', result: 'bạn', spellingSteps: ['bờ', 'an', 'ban', 'nặng', 'bạn'] }
       ],
       readingSyllables: ['bản', 'nhãn', 'gắn', 'lặn', 'bận', 'gần'],
       words: [

@@ -1,4 +1,4 @@
-import { Volume1Lesson } from '../types';
+﻿import { Volume1Lesson } from '../types';
 
 export const LESSONS_PART_1: Volume1Lesson[] = [
   {
@@ -63,8 +63,8 @@ export const LESSONS_PART_1: Volume1Lesson[] = [
     part2_SyllablesAndWords: {
       title: 'Đọc âm, tiếng, từ ngữ',
       models: [
-        { initial: 'b', vowel: 'a', result: 'ba', spellingSteps: ['bê', 'a', 'ba'] },
-        { initial: 'b', vowel: 'a', tone: 'huyền', result: 'bà', spellingSteps: ['bê', 'a', 'ba', 'huyền', 'bà'] }
+        { initial: 'b', vowel: 'a', result: 'ba', spellingSteps: ['bờ', 'a', 'ba'] },
+        { initial: 'b', vowel: 'a', tone: 'huyền', result: 'bà', spellingSteps: ['bờ', 'a', 'ba', 'huyền', 'bà'] }
       ],
       readingSyllables: ['ba', 'bà'],
       words: [
@@ -153,8 +153,8 @@ export const LESSONS_PART_1: Volume1Lesson[] = [
     part2_SyllablesAndWords: {
       title: 'Đọc âm, tiếng, từ ngữ',
       models: [
-        { initial: 'b', vowel: 'e', tone: 'sắc', result: 'bé', spellingSteps: ['bê', 'e', 'be', 'sắc', 'bé'] },
-        { initial: 'b', vowel: 'ê', tone: 'sắc', result: 'bế', spellingSteps: ['bê', 'ê', 'bê', 'sắc', 'bế'] }
+        { initial: 'b', vowel: 'e', tone: 'sắc', result: 'bé', spellingSteps: ['bờ', 'e', 'be', 'sắc', 'bé'] },
+        { initial: 'b', vowel: 'ê', tone: 'sắc', result: 'bế', spellingSteps: ['bờ', 'ê', 'bờ', 'sắc', 'bế'] }
       ],
       readingSyllables: ['bè', 'bé', 'bế'],
       words: [
@@ -249,7 +249,7 @@ export const LESSONS_PART_1: Volume1Lesson[] = [
     part2_SyllablesAndWords: {
       title: 'Đọc âm, tiếng, từ ngữ',
       models: [
-        { initial: 'b', vowel: 'o', tone: 'huyền', result: 'bò', spellingSteps: ['bê', 'o', 'bo', 'huyền', 'bò'] },
+        { initial: 'b', vowel: 'o', tone: 'huyền', result: 'bò', spellingSteps: ['bờ', 'o', 'bo', 'huyền', 'bò'] },
         { initial: 'c', vowel: 'o', tone: 'hỏi', result: 'cỏ', spellingSteps: ['cờ', 'o', 'co', 'hỏi', 'cỏ'] }
       ],
       readingSyllables: ['bò', 'bó', 'bỏ', 'cò', 'có', 'cỏ'],
@@ -293,8 +293,8 @@ export const LESSONS_PART_1: Volume1Lesson[] = [
     part2_SyllablesAndWords: {
       title: 'Đọc âm, tiếng, từ ngữ',
       models: [
-        { initial: 'b', vowel: 'ô', tone: 'sắc', result: 'bố', spellingSteps: ['bê', 'ô', 'bô', 'sắc', 'bố'] },
-        { initial: 'b', vowel: 'ô', tone: 'nặng', result: 'bộ', spellingSteps: ['bê', 'ô', 'bô', 'nặng', 'bộ'] }
+        { initial: 'b', vowel: 'ô', tone: 'sắc', result: 'bố', spellingSteps: ['bờ', 'ô', 'bô', 'sắc', 'bố'] },
+        { initial: 'b', vowel: 'ô', tone: 'nặng', result: 'bộ', spellingSteps: ['bờ', 'ô', 'bô', 'nặng', 'bộ'] }
       ],
       readingSyllables: ['bố', 'bổ', 'bộ', 'cô', 'cổ', 'cộ'],
       words: [
@@ -381,7 +381,7 @@ export const LESSONS_PART_1: Volume1Lesson[] = [
     part2_SyllablesAndWords: {
       title: 'Đọc âm, tiếng, từ ngữ',
       models: [
-        { initial: 'b', vowel: 'ơ', tone: 'huyền', result: 'bờ', spellingSteps: ['bê', 'ơ', 'bơ', 'huyền', 'bờ'] },
+        { initial: 'b', vowel: 'ơ', tone: 'huyền', result: 'bờ', spellingSteps: ['bờ', 'ơ', 'bơ', 'huyền', 'bờ'] },
         { initial: 'd', vowel: 'ơ', tone: 'ngã', result: 'dỡ', spellingSteps: ['dờ', 'ơ', 'dơ', 'ngã', 'dỡ'] }
       ],
       readingSyllables: ['bờ', 'bở', 'cờ', 'cỡ', 'dỡ', 'đỡ'],
