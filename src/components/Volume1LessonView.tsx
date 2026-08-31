@@ -453,7 +453,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                         <div className="flex items-center gap-1.5">
                           {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                             <button
-                              onClick={(e) => handleTeacherRecordClick(e, model.result, `Mô hình: ${model.result}`)}
+                              onClick={(e) => handleTeacherRecordClick(e, model.result, `Mô hình: ${model.result}`, 'syllable')}
                               className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                 hasTeacherAudio ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
                               } ${isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
@@ -580,7 +580,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                     </button>
                     {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                       <button
-                        onClick={(e) => handleTeacherRecordClick(e, item.word, `Từ ngữ: ${item.word}`)}
+                        onClick={(e) => handleTeacherRecordClick(e, item.word, `Từ ngữ: ${item.word}`, 'word')}
                         className={`absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-xs transition-all active:scale-90 cursor-pointer ${
                           isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover/word:opacity-100'
                         } ${hasTeacherAudio ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'}`}
