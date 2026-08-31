@@ -765,7 +765,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAudios.map(audio => {
-                const isPlaying = playingAudioKey === audio.text;
+                const isPlaying = playingAudioKey === audio.id;
                 return (
                   <div key={audio.id} className="bg-white rounded-3xl p-5 border border-amber-100 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
                     <div className="space-y-2">
@@ -774,7 +774,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                           {audio.section || 'Mục đọc'}
                         </span>
                         <span className="text-[10px] text-slate-400">
-                          {new Date(audio.updatedAt).toLocaleDateString('vi-VN')}
+                          {new Date(audio.createdAt).toLocaleDateString('vi-VN')}
                         </span>
                       </div>
 
