@@ -178,7 +178,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
     }
     setPlayingAudioKey(id);
     const audioItem = teacherAudioService.getAllAudios().find(a => a.id === id);
-    if (audioItem) teacherAudioService.playAudio(audioItem.text, audioItem.section, audioItem.lessonId, () => {
+    if (audioItem) teacherAudioService.playAudioById(id, () => {
       setPlayingAudioKey(null);
     });
   };

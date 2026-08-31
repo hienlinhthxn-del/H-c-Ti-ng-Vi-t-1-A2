@@ -125,12 +125,44 @@ class TeacherAudioService {
       const specificKey = this.normalizeKey(text, context);
       if (this.memoryMap[specificKey] && this.memoryMap[specificKey].audioBase64) return this.memoryMap[specificKey];
     }
+    if (lessonId !== undefined) {
+      const lessonOnlyKey = this.normalizeKey(text, undefined, lessonId);
+      if (this.memoryMap[lessonOnlyKey] && this.memoryMap[lessonOnlyKey].audioBase64) return this.memoryMap[lessonOnlyKey];
+    }
     const genericKey = this.normalizeKey(text);
     return Boolean(this.memoryMap[genericKey] && this.memoryMap[genericKey].audioBase64) ? this.memoryMap[genericKey] : undefined;
   }
 
   public hasAudioForText(text?: string, context?: string, lessonId?: string | number): boolean {
     return !!this.getAudioByText(text, context, lessonId);
+  }
+
+  public playAudioById(id: string, onEnd?: () => void): HTMLAudioElement | null {
+    const item = Object.values(this.memoryMap).find(a => a.id === id);
+    if (!item || !item.audioBase64) return null;
+
+    this.stopCurrentAudio();
+    try {
+      const audio = new Audio(item.audioBase64);
+      this.currentAudioElement = audio;
+      audio.onended = () => {
+        this.currentAudioElement = null;
+        if (onEnd) onEnd();
+      };
+      audio.onerror = () => {
+        console.error('Failed to play custom audio for id', id);
+        this.currentAudioElement = null;
+        if (onEnd) onEnd();
+      };
+      audio.play().catch(e => {
+        console.error('Audio play blocked:', e);
+        if (onEnd) onEnd();
+      });
+      return audio;
+    } catch (e) {
+      console.error('Error playing audio', e);
+      return null;
+    }
   }
 
   public async deleteAudioById(id: string): Promise<void> {
@@ -206,6 +238,7 @@ class TeacherAudioService {
   }
 
   public playAudio(text: string, context?: string, lessonId?: string | number, onEnd?: () => void): HTMLAudioElement | null {
+    // Note: this is kept for backwards compatibility
     const item = this.getAudioByText(text, context, lessonId);
     if (!item || !item.audioBase64) return null;
 

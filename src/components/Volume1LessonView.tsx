@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Volume1Lesson, RecordingTargetInfo, AchievementBadge } from '../types';
 import { speechService } from '../services/speechService';
 import { lessonStorageService } from '../services/lessonStorageService';
@@ -85,7 +85,8 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
         lessonId: lesson.id,
         lessonNumber: lesson.lessonNumber,
         lessonTitle: `Bài ${lesson.lessonNumber}: ${lesson.title}`,
-        sectionTitle
+        sectionTitle,
+        section
       });
     }
   };
