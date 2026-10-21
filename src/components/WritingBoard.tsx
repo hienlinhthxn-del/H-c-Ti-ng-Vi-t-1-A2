@@ -32,6 +32,9 @@ export const WritingBoard: React.FC<WritingBoardProps> = ({
     { title: 'Âm ghép ch th ph', text: 'ch gh gi kh nh ng' },
     { title: 'Từ ngữ: ba bà bố mẹ', text: 'ba bà bố mẹ bé' },
     { title: 'Từ ngữ: hoa đào, quả na', text: 'hoa đào quả na' },
+    { title: 'Môi trường: Trồng cây xanh', text: 'Trồng cây gây rừng xanh' },
+    { title: 'Môi trường: Giữ nước sạch', text: 'Giữ sạch nguồn nước mát' },
+    { title: 'Thiên nhiên: Rừng hoa ban', text: 'Rừng xanh hoa ban nở trắng' },
     { title: 'Câu: Em yêu trường em', text: 'Em yêu trường em.' }
   ];
 

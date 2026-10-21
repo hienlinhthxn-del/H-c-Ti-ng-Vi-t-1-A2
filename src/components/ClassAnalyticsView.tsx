@@ -41,7 +41,8 @@ import {
   ArrowUpDown,
   RotateCcw,
   Check,
-  CheckSquare
+  CheckSquare,
+  ShieldCheck
 } from 'lucide-react';
 
 interface ClassAnalyticsViewProps {
@@ -58,6 +59,18 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
   // Navigation subtabs inside Analytics
   const [subTab, setSubTab] = useState<'roster' | 'matrix' | 'leaderboard' | 'needs_support'>('roster');
   
+  // Chế độ bảo vệ dữ liệu cá nhân học sinh (Nghị định 13/2023/NĐ-CP - Mục 5.b Công văn 4786)
+  const [isPrivacyMode, setIsPrivacyMode] = useState<boolean>(false);
+
+  const maskStudentName = (name: string, studentCode?: string) => {
+    if (!isPrivacyMode) return name;
+    const parts = name.trim().split(/\s+/);
+    if (parts.length <= 1) return `${name} (***)`;
+    const lastName = parts[parts.length - 1];
+    const firstPart = parts[0];
+    return `${firstPart}*** ${lastName} (${studentCode || 'HS'})`;
+  };
+
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | StudentStatus>('all');
@@ -312,6 +325,29 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
             </button>
 
             <button
+              id="analytics-toggle-privacy-btn"
+              onClick={() => {
+                const nextState = !isPrivacyMode;
+                setIsPrivacyMode(nextState);
+                speechService.playSoundEffect('pop');
+                showToast(
+                  nextState 
+                    ? 'Đã BẬT Chế độ bảo vệ dữ liệu cá nhân học sinh (Nghị định 13/2023/NĐ-CP)!' 
+                    : 'Đã TẮT Chế độ bảo vệ dữ liệu cá nhân.'
+                );
+              }}
+              className={`px-3.5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm border transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer ${
+                isPrivacyMode 
+                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-md ring-2 ring-emerald-300' 
+                  : 'bg-white/15 hover:bg-white/25 text-white border-white/20'
+              }`}
+              title="Bảo vệ dữ liệu cá nhân học sinh theo Nghị định 13/2023/NĐ-CP khi trình chiếu hoặc báo cáo chuyên môn"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-200" />
+              <span>{isPrivacyMode ? 'Bảo vệ dữ liệu (BẬT)' : 'Bảo vệ dữ liệu (NĐ 13)'}</span>
+            </button>
+
+            <button
               id="analytics-reset-zero-btn"
               onClick={() => {
                 if (window.confirm('Thầy Cô có muốn đặt lại toàn bộ tiến độ của lớp về 0 (chỉ giữ danh sách tên học sinh) không?')) {
@@ -356,6 +392,25 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
           </div>
         </div>
       </div>
+
+      {/* Privacy Notice Banner (Nghị định 13/2023/NĐ-CP) */}
+      {isPrivacyMode && (
+        <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 flex items-center justify-between text-xs text-emerald-950 shadow-xs animate-fadeIn">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+            <div>
+              <span className="font-bold text-emerald-900 block sm:inline">Chế độ Bảo vệ dữ liệu cá nhân học sinh đang BẬT: </span>
+              <span>Tên học sinh đã được mã hóa ẩn danh tự động khi trình chiếu báo cáo trên lớp, bảo đảm an toàn dữ liệu trẻ em theo Nghị định số 13/2023/NĐ-CP.</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsPrivacyMode(false)}
+            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline ml-3 shrink-0 cursor-pointer"
+          >
+            Tắt ẩn danh
+          </button>
+        </div>
+      )}
 
       {/* 4 Big KPI Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -637,7 +692,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
                               </div>
                               <div>
                                 <div className="font-extrabold text-slate-900 flex items-center gap-2">
-                                  <span>{student.name}</span>
+                                  <span>{maskStudentName(student.name, student.studentCode)}</span>
                                   <span className="text-[11px] font-mono text-slate-400 font-semibold">{student.studentCode}</span>
                                 </div>
                                 <div className="text-xs text-slate-500 line-clamp-1 max-w-[200px] sm:max-w-xs">
@@ -875,7 +930,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
                       <div className="flex flex-wrap gap-1.5">
                         {selectedMatrixLesson.completedStudents.map(name => (
                           <span key={name} className="px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 font-bold text-xs">
-                            {name}
+                            {maskStudentName(name)}
                           </span>
                         ))}
                       </div>
@@ -892,7 +947,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
                         .filter(s => !selectedMatrixLesson.completedStudents.includes(s.name))
                         .map(s => (
                           <span key={s.id} className="px-2.5 py-1 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 font-bold text-xs">
-                            {s.name}
+                            {maskStudentName(s.name, s.studentCode)}
                           </span>
                         ))}
                     </div>
@@ -955,7 +1010,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
                       }`}>
                         {idx + 1}
                       </span>
-                      <span className="font-extrabold text-slate-800 text-xs">{s.name}</span>
+                      <span className="font-extrabold text-slate-800 text-xs">{maskStudentName(s.name, s.studentCode)}</span>
                     </div>
                     <span className="font-black text-amber-600 text-xs">
                       {s.completedLessons.length} bài
@@ -989,7 +1044,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
                       }`}>
                         {idx + 1}
                       </span>
-                      <span className="font-extrabold text-slate-800 text-xs">{s.name}</span>
+                      <span className="font-extrabold text-slate-800 text-xs">{maskStudentName(s.name, s.studentCode)}</span>
                     </div>
                     <span className="font-black text-rose-600 text-xs">
                       {s.recordingsCount} bản thu
@@ -1023,7 +1078,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
                       }`}>
                         {idx + 1}
                       </span>
-                      <span className="font-extrabold text-slate-800 text-xs">{s.name}</span>
+                      <span className="font-extrabold text-slate-800 text-xs">{maskStudentName(s.name, s.studentCode)}</span>
                     </div>
                     <span className="font-black text-sky-600 text-xs">
                       {s.writingCount} bài viết
@@ -1066,7 +1121,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
                       </div>
                       <div>
                         <h4 className="font-black text-slate-900 text-sm flex items-center gap-2">
-                          <span>{student.name}</span>
+                          <span>{maskStudentName(student.name, student.studentCode)}</span>
                           <span className="text-xs font-mono text-slate-400">({student.studentCode})</span>
                         </h4>
                         <div className="text-xs text-slate-500">
@@ -1487,7 +1542,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
                   {students.map((s, idx) => (
                     <tr key={s.id}>
                       <td className="p-1.5 border-r border-slate-300 text-center">{idx + 1}</td>
-                      <td className="p-1.5 border-r border-slate-300 font-bold">{s.name}</td>
+                      <td className="p-1.5 border-r border-slate-300 font-bold">{maskStudentName(s.name, s.studentCode)}</td>
                       <td className="p-1.5 border-r border-slate-300 text-center">{s.completedLessons.filter(l => l.volume === 'vol1').length}/83</td>
                       <td className="p-1.5 border-r border-slate-300 text-center">{s.completedLessons.filter(l => l.volume === 'vol2').length}/8</td>
                       <td className="p-1.5 border-r border-slate-300 text-center">{s.recordingsCount}</td>

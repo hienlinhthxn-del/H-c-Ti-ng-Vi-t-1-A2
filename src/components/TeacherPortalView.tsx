@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Volume1Lesson, 
   Volume2Lesson, 
@@ -13,6 +13,7 @@ import { speechService } from '../services/speechService';
 import { userProfileService } from '../services/userProfileService';
 import { UserAvatar } from './UserAvatar';
 import { ClassAnalyticsView } from './ClassAnalyticsView';
+import { AILessonAssistantModal } from './AILessonAssistantModal';
 import { 
   BookOpen, 
   Mic, 
@@ -94,6 +95,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   const [reviewScore, setReviewScore] = useState<number>(5);
   const [savingReview, setSavingReview] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState<boolean>(false);
 
   // Curriculum State
   const [selectedTerm, setSelectedTerm] = useState<'term1' | 'term2'>('term1');
@@ -511,6 +513,16 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
               >
                 <Filter className="w-3.5 h-3.5" />
                 <span>Chỉ hiện bài đã sửa ({stats.totalCustomCount})</span>
+              </button>
+
+              <button
+                id="open-ai-assistant-btn"
+                onClick={() => setIsAIAssistantOpen(true)}
+                className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Trợ lý AI hỗ trợ tạo câu đố, ngữ liệu phân hóa và giáo dục bảo vệ môi trường"
+              >
+                <Bot className="w-4 h-4 text-amber-300" />
+                <span>Trợ Lý AI Soạn Bài</span>
               </button>
             </div>
 
@@ -1026,9 +1038,35 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">
-                        Lời khen & Nhận xét của Cô giáo:
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-slate-700">
+                          Lời khen & Nhận xét của Cô giáo:
+                        </label>
+                        <button
+                          type="button"
+                          id="ai-suggest-comment-btn"
+                          onClick={() => {
+                            if (!selectedRecording) return;
+                            const studentName = selectedRecording.studentName || 'Con';
+                            const score = selectedRecording.aiEvaluation?.score || 5;
+                            const accuracy = selectedRecording.aiEvaluation?.accuracy ?? 90;
+                            
+                            let suggestion = '';
+                            if (score >= 4.5 || accuracy >= 85) {
+                              suggestion = `Cô khen ${studentName} đọc bài rất to, rõ ràng và phát âm chuẩn các âm vần trong bài. Con ngắt nghỉ câu rất tự nhiên, tiếp tục phát huy con nhé! ⭐`;
+                            } else if (score >= 3.5 || accuracy >= 70) {
+                              suggestion = `Cô khen ${studentName} đã cố gắng hoàn thành bài đọc. Con chú ý rèn thêm các âm dấu thanh để giọng đọc tròn vành rõ chữ hơn nhé, cô tin con sẽ làm rất tốt! 👏`;
+                            } else {
+                              suggestion = `Cô khen tinh thần tự giác luyện đọc của ${studentName}. Con hãy lắng nghe mẫu của Cô giáo và bấm máy đọc lại từng câu ngắn cho quen tai nhé! ❤️`;
+                            }
+                            setReviewComment(suggestion);
+                          }}
+                          className="text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+                        >
+                          <Bot className="w-3 h-3 text-purple-600" />
+                          <span>AI Gợi ý nhận xét</span>
+                        </button>
+                      </div>
                       <textarea
                         rows={4}
                         value={reviewComment}
@@ -1272,6 +1310,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* AI Lesson & Phonics Assistant Modal */}
+      <AILessonAssistantModal
+        isOpen={isAIAssistantOpen}
+        onClose={() => setIsAIAssistantOpen(false)}
+      />
 
     </div>
   );

@@ -1,5 +1,6 @@
 // AI Speech Recognition & Evaluation Service
 // Phục vụ đánh giá phát âm cho học sinh Lớp 1 (Bộ sách Kết Nối Tri Thức)
+// Đáp ứng tiêu chí ứng dụng AI hỗ trợ học sinh khắc phục rào cản ngữ âm vùng miền (Công văn 4786/SGDĐT)
 
 export interface WordMatchResult {
   word: string;
@@ -253,6 +254,35 @@ export class AISpeechService {
       detailedFeedback =
         'Bé hãy nghe cô giáo đọc mẫu trước, sau đó bấm nút thu âm và đọc theo từng câu ngắn nhé.';
       phoneticTips.push('Bấm nút "Nghe cô đọc mẫu" màu cam để bắt chước ngữ điệu chuẩn.');
+    }
+
+    // Chẩn đoán chuyên sâu ngữ âm thực tế cho học sinh lớp 1 vùng cao / DTTS (Công văn 4786)
+    const mismatchedWords = wordAnalysis.filter((w) => w.status !== 'correct').map((w) => w.word);
+
+    // 1. Phân biệt L và N
+    const hasLN = mismatchedWords.some((w) => /^([ln])/i.test(w));
+    if (hasLN && phoneticTips.length < 3) {
+      phoneticTips.push(
+        'Mẹo âm đầu L / N: Khi đọc L, uốn cong đầu lưỡi chạm lợi rồi bật mạnh ra; khi đọc N, đầu lưỡi đặt phẳng chân răng và hơi thoát qua khoang mũi.'
+      );
+    }
+
+    // 2. Phân biệt TR / CH và S / X
+    const hasTrChSx = mismatchedWords.some((w) => /^(tr|ch|s|x)/i.test(w));
+    if (hasTrChSx && phoneticTips.length < 3) {
+      phoneticTips.push(
+        'Mẹo âm TR / CH, S / X: Uốn cong đầu lưỡi khi phát âm TR và S; giữ lưỡi thẳng tự nhiên sát hàm dưới khi đọc CH và X.'
+      );
+    }
+
+    // 3. Phân biệt dấu hỏi (?) và dấu ngã (~)
+    const hasTones = mismatchedWords.some((w) =>
+      /[ảẳẩẻểỉỏởổủửỷãẵẫẽễĩõỡỗũữỹ]/.test(w)
+    );
+    if (hasTones && phoneticTips.length < 3) {
+      phoneticTips.push(
+        'Mẹo dấu thanh: Thanh hỏi (?) đọc trầm xuống rồi hơi hất nhẹ; thanh ngã (~) nhấn giọng cao hơn và ngắt hơi nhẹ ở giữa.'
+      );
     }
 
     return {
