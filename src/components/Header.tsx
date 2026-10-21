@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, 
   BookCheck, 
@@ -16,8 +16,7 @@ import {
   Minimize2,
   Tv,
   X,
-  Cloud,
-  Bot
+  Cloud
 } from 'lucide-react';
 import { UserRole, AppUserProfile } from '../types';
 import { UserAvatar } from './UserAvatar';
@@ -42,7 +41,6 @@ interface HeaderProps {
   onOpenTeacherAudioStudio?: () => void;
   onOpenVoiceStudio?: () => void;
   onOpenAchievements?: () => void;
-  onOpenAIInfo?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -64,8 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTeacherManagement,
   onOpenTeacherAudioStudio,
   onOpenVoiceStudio,
-  onOpenAchievements,
-  onOpenAIInfo
+  onOpenAchievements
 }) => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState<boolean>(false);
@@ -177,20 +174,6 @@ export const Header: React.FC<HeaderProps> = ({
               <Cloud className="w-3.5 h-3.5 text-emerald-200" />
               <span className="hidden sm:inline">Google Sync</span>
               <span className="sm:hidden">Đồng bộ</span>
-            </button>
-          )}
-
-          {/* AI Contest Info Button */}
-          {onOpenAIInfo && (
-            <button
-              id="open-ai-contest-info-btn"
-              onClick={onOpenAIInfo}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-700/80 hover:bg-purple-800 text-white rounded-xl text-[11px] font-black border border-purple-300/40 backdrop-blur-md transition-all active:scale-95 cursor-pointer shrink-0 animate-pulse"
-              title="Thông tin tham gia Ngày hội Nhà giáo Sáng tạo với Công nghệ số & AI 2026 (Sở GD&ĐT Điện Biên)"
-            >
-              <Bot className="w-3.5 h-3.5 text-purple-200" />
-              <span className="hidden sm:inline">Dự Thi AI 2026</span>
-              <span className="sm:hidden">AI 2026</span>
             </button>
           )}
 

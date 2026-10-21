@@ -21,7 +21,6 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleWorkspaceModal } from './components/GoogleWorkspaceModal';
 import { TeacherLoginModal } from './components/TeacherLoginModal';
 import { StudentLoginModal } from './components/StudentLoginModal';
-import { AIContestInfoModal } from './components/AIContestInfoModal';
 import { Volume1Lesson, Volume2Lesson, RecordingTargetInfo, AchievementBadge, UserRole, AppUserProfile } from './types';
 import { lessonStorageService } from './services/lessonStorageService';
 import { teacherAudioService } from './services/teacherAudioService';
@@ -42,7 +41,6 @@ export default function App() {
   const [activeUser, setActiveUser] = useState<AppUserProfile>(() => userProfileService.getActiveUser());
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [isGoogleWorkspaceOpen, setIsGoogleWorkspaceOpen] = useState<boolean>(false);
-  const [isAIContestInfoOpen, setIsAIContestInfoOpen] = useState<boolean>(false);
 
   // Teacher Authentication & Login Modal State
   const [isTeacherLoginOpen, setIsTeacherLoginOpen] = useState(false);
@@ -417,7 +415,6 @@ export default function App() {
         onOpenTeacherAudioStudio={() => setIsTeacherAudioStudioOpen(true)}
         onOpenVoiceStudio={handleOpenVoiceStudio}
         onOpenAchievements={() => setIsAchievementModalOpen(true)}
-        onOpenAIInfo={() => setIsAIContestInfoOpen(true)}
       />
 
       {/* Main View Area based on User Role */}
@@ -714,11 +711,6 @@ export default function App() {
         />
       )}
 
-      {/* AI Contest Innovation & Dien Bien Education Info Modal */}
-      <AIContestInfoModal
-        isOpen={isAIContestInfoOpen}
-        onClose={() => setIsAIContestInfoOpen(false)}
-      />
 
       {/* Footer */}
       <footer className="bg-white border-t border-amber-100 py-6 text-xs text-amber-900/80 mb-14 md:mb-0">
@@ -736,7 +728,7 @@ export default function App() {
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
             <div className="text-left leading-relaxed">
-              <span className="font-semibold text-purple-900">Sáng kiến tham gia:</span> Ngày hội "Nhà giáo sáng tạo với công nghệ số và trí tuệ nhân tạo năm 2026" (CV số 4786/SGDĐT-QLCL tỉnh Điện Biên).
+ứng dụng học tập Tiếng Việt 1 dành cho Học sinh, Giáo viên và Phụ huynh.
             </div>
             <div className="text-right leading-relaxed text-slate-500">
               Cam kết bảo vệ dữ liệu cá nhân học sinh theo Nghị định 13/2023/NĐ-CP • Phi thương mại.
