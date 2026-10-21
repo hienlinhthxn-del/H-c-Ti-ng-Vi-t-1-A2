@@ -155,6 +155,20 @@ export interface StudentRecording {
     cheeringMessage: string;
     fluencyRating: 'excellent' | 'great' | 'good';
   };
+  aiEvaluation?: {
+    score: number;
+    accuracy: number;
+    rating: 'excellent' | 'great' | 'good' | 'practice_more';
+    cheeringTitle: string;
+    detailedFeedback: string;
+    recognizedText: string;
+    wordAnalysis?: Array<{
+      word: string;
+      status: 'correct' | 'mismatched' | 'missing';
+      spokenWord?: string;
+    }>;
+    phoneticTips?: string[];
+  };
   teacherComment?: string;
   teacherScore?: number;
   reviewedAt?: string;

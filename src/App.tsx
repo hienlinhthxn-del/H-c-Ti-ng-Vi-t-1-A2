@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { MobileNavBar } from './components/MobileNavBar';
 import { Volume1Grid } from './components/Volume1Grid';
@@ -21,6 +21,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleWorkspaceModal } from './components/GoogleWorkspaceModal';
 import { TeacherLoginModal } from './components/TeacherLoginModal';
 import { StudentLoginModal } from './components/StudentLoginModal';
+import { AIContestInfoModal } from './components/AIContestInfoModal';
 import { Volume1Lesson, Volume2Lesson, RecordingTargetInfo, AchievementBadge, UserRole, AppUserProfile } from './types';
 import { lessonStorageService } from './services/lessonStorageService';
 import { teacherAudioService } from './services/teacherAudioService';
@@ -41,6 +42,7 @@ export default function App() {
   const [activeUser, setActiveUser] = useState<AppUserProfile>(() => userProfileService.getActiveUser());
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [isGoogleWorkspaceOpen, setIsGoogleWorkspaceOpen] = useState<boolean>(false);
+  const [isAIContestInfoOpen, setIsAIContestInfoOpen] = useState<boolean>(false);
 
   // Teacher Authentication & Login Modal State
   const [isTeacherLoginOpen, setIsTeacherLoginOpen] = useState(false);
@@ -415,6 +417,7 @@ export default function App() {
         onOpenTeacherAudioStudio={() => setIsTeacherAudioStudioOpen(true)}
         onOpenVoiceStudio={handleOpenVoiceStudio}
         onOpenAchievements={() => setIsAchievementModalOpen(true)}
+        onOpenAIInfo={() => setIsAIContestInfoOpen(true)}
       />
 
       {/* Main View Area based on User Role */}
@@ -711,16 +714,33 @@ export default function App() {
         />
       )}
 
+      {/* AI Contest Innovation & Dien Bien Education Info Modal */}
+      <AIContestInfoModal
+        isOpen={isAIContestInfoOpen}
+        onClose={() => setIsAIContestInfoOpen(false)}
+      />
+
       {/* Footer */}
-      <footer className="bg-white border-t border-amber-100 py-6 text-center text-xs text-amber-900/80 mb-14 md:mb-0">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-amber-950 font-serif">Tiếng Việt Lớp 1</span>
-            <span>•</span>
-            <span>Bộ sách Kết nối tri thức với cuộc sống (NXB Giáo dục Việt Nam)</span>
+      <footer className="bg-white border-t border-amber-100 py-6 text-xs text-amber-900/80 mb-14 md:mb-0">
+        <div className="max-w-7xl mx-auto px-4 space-y-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 border-b border-amber-100 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-amber-950 font-serif text-sm">Học Tiếng Việt Lớp 1</span>
+              <span>•</span>
+              <span className="text-slate-700 font-medium">Bộ sách Kết nối tri thức với cuộc sống (NXB Giáo dục Việt Nam)</span>
+            </div>
+            <div className="text-slate-500 font-medium">
+              Tập 1: 83 bài học Âm - Tiếng - Từ - Câu • Tập 2: 8 Chủ điểm Đọc hiểu & Luyện tập
+            </div>
           </div>
-          <div className="text-slate-500">
-            Tập 1: 83 bài học Âm - Tiếng - Từ - Câu • Tập 2: 8 Chủ điểm Đọc hiểu & Luyện tập
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
+            <div className="text-left leading-relaxed">
+              <span className="font-semibold text-purple-900">Sáng kiến tham gia:</span> Ngày hội "Nhà giáo sáng tạo với công nghệ số và trí tuệ nhân tạo năm 2026" (CV số 4786/SGDĐT-QLCL tỉnh Điện Biên).
+            </div>
+            <div className="text-right leading-relaxed text-slate-500">
+              Cam kết bảo vệ dữ liệu cá nhân học sinh theo Nghị định 13/2023/NĐ-CP • Phi thương mại.
+            </div>
           </div>
         </div>
       </footer>

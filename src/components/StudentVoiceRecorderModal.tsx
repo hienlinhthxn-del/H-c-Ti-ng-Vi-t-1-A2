@@ -4,6 +4,7 @@ import { speechService } from '../services/speechService';
 import { recordingStorageService } from '../services/recordingStorageService';
 import { achievementService } from '../services/achievementService';
 import { userProfileService } from '../services/userProfileService';
+import { aiSpeechService, AIEvaluationResult } from '../services/aiSpeechService';
 import confetti from 'canvas-confetti';
 import {
   Mic,
@@ -25,7 +26,10 @@ import {
   HelpCircle,
   Trophy,
   BookOpen,
-  Type
+  Type,
+  Bot,
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 
 interface StudentVoiceRecorderModalProps {
@@ -47,7 +51,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
   const [recordings, setRecordings] = useState<StudentRecording[]>([]);
   const [fontSizeMode, setFontSizeMode] = useState<'normal' | 'large' | 'huge'>('normal');
   const [submittedSuccess, setSubmittedSuccess] = useState<boolean>(false);
-  
+
   // Recording states
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
@@ -57,7 +61,11 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
   const [currentRecordingSaved, setCurrentRecordingSaved] = useState<StudentRecording | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [audioLevels, setAudioLevels] = useState<number[]>(Array(16).fill(10));
-  
+
+  // AI Speech Recognition & Evaluation States
+  const [liveTranscript, setLiveTranscript] = useState<string>('');
+  const [aiEvaluation, setAiEvaluation] = useState<AIEvaluationResult | null>(null);
+
   // Audio playback of the recorded voice
   const [isPlayingRecorded, setIsPlayingRecorded] = useState<boolean>(false);
   const [playbackProgress, setPlaybackProgress] = useState<number>(0);
@@ -103,12 +111,13 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
   };
 
   const cleanupAudioStream = () => {
+    aiSpeechService.stopListening();
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
     }
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
@@ -142,6 +151,9 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
     setPlaybackProgress(0);
     setPlaybackCurrentTime(0);
     setPlaybackDuration(0);
+    setLiveTranscript('');
+    setAiEvaluation(null);
+    setSubmittedSuccess(false);
   };
 
   // Start audio recording
@@ -221,7 +233,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 
         // Stop stream and analyser
         if (streamRef.current) {
-          streamRef.current.getTracks().forEach(t => t.stop());
+          streamRef.current.getTracks().forEach((t) => t.stop());
           streamRef.current = null;
         }
         if (animFrameRef.current) {
@@ -229,15 +241,26 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
           animFrameRef.current = null;
         }
 
-        // Save automatically
+        // AI Speech Evaluation
+        const recognizedSpoken = aiSpeechService.stopListening();
+        const finalSpoken = recognizedSpoken || liveTranscript;
+
+        let evalResult: AIEvaluationResult | undefined = undefined;
+        if (targetInfo) {
+          evalResult = aiSpeechService.evaluatePronunciation(targetInfo.targetText, finalSpoken);
+          setAiEvaluation(evalResult);
+        }
+
+        // Save automatically with AI evaluation
         if (targetInfo && blob.size > 0) {
           const saved = await recordingStorageService.saveRecording(
             targetInfo,
             blob,
-            recordingSeconds
+            recordingSeconds,
+            evalResult
           );
           setCurrentRecordingSaved(saved);
-          
+
           // Sound & Star & Confetti celebration
           speechService.playSoundEffect('fanfare');
           if (onAddStar) {
@@ -265,6 +288,16 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
         }
       };
 
+      // Start AI speech recognition in parallel
+      aiSpeechService.startListening(
+        (interim) => {
+          setLiveTranscript(interim);
+        },
+        (err) => {
+          console.warn('AI speech recognition notice:', err);
+        }
+      );
+
       mediaRecorder.start(200);
       setIsRecording(true);
       setIsPaused(false);
@@ -273,9 +306,8 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
       // Start stopwatch
       setRecordingSeconds(0);
       timerIntervalRef.current = window.setInterval(() => {
-        setRecordingSeconds(prev => prev + 1);
+        setRecordingSeconds((prev) => prev + 1);
       }, 1000);
-
     } catch (err: any) {
       console.error('Error starting recording:', err);
       setPermissionError(
@@ -293,7 +325,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
       mediaRecorderRef.current.resume();
       setIsPaused(false);
       timerIntervalRef.current = window.setInterval(() => {
-        setRecordingSeconds(prev => prev + 1);
+        setRecordingSeconds((prev) => prev + 1);
       }, 1000);
     } else {
       mediaRecorderRef.current.pause();
@@ -325,12 +357,13 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
       audioPlayerRef.current.pause();
       setIsPlayingRecorded(false);
     } else {
-      audioPlayerRef.current.play();
-      setIsPlayingRecorded(true);
+      audioPlayerRef.current.play().then(() => {
+        setIsPlayingRecorded(true);
+      }).catch((err) => console.error('Play recorded audio error:', err));
     }
   };
 
-  // Play teacher reference audio
+  // Play teacher model speech
   const handleListenTeacherModel = () => {
     if (!targetInfo) return;
     setIsTeacherSpeaking(true);
@@ -340,30 +373,31 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
     });
   };
 
-  // Play history item
-  const handleTogglePlayHistory = (item: StudentRecording) => {
-    if (!item.audioBlobUrl) return;
+  // Play a historical recording
+  const handleTogglePlayHistory = (rec: StudentRecording) => {
+    if (!rec.audioBlobUrl) return;
 
-    if (playingHistoryId === item.id) {
+    if (playingHistoryId === rec.id) {
       if (historyAudioPlayerRef.current) {
         historyAudioPlayerRef.current.pause();
       }
       setPlayingHistoryId(null);
     } else {
-      setPlayingHistoryId(item.id);
+      setPlayingHistoryId(rec.id);
       if (historyAudioPlayerRef.current) {
-        historyAudioPlayerRef.current.src = item.audioBlobUrl;
-        historyAudioPlayerRef.current.play().catch(err => console.error('Play history error:', err));
+        historyAudioPlayerRef.current.src = rec.audioBlobUrl;
+        historyAudioPlayerRef.current.play().catch((err) => {
+          console.error('Play history error:', err);
+        });
       }
     }
   };
 
+  // Delete recording from history
   const handleDeleteHistoryItem = async (id: string) => {
     if (confirm('Bé có muốn xóa bản ghi âm này không?')) {
-      if (playingHistoryId === id) {
-        if (historyAudioPlayerRef.current) {
-          historyAudioPlayerRef.current.pause();
-        }
+      if (playingHistoryId === id && historyAudioPlayerRef.current) {
+        historyAudioPlayerRef.current.pause();
         setPlayingHistoryId(null);
       }
       await recordingStorageService.deleteRecording(id);
@@ -372,21 +406,16 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
   };
 
   // Format seconds to mm:ss
-  const formatTime = (totalSeconds: number) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = Math.floor(totalSeconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const formatTime = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const rem = Math.floor(secs % 60);
+    return `${mins.toString().padStart(2, '0')}:${rem.toString().padStart(2, '0')}`;
   };
 
   if (!isOpen) return null;
 
-  const currentLessonRecordings = targetInfo
-    ? recordings.filter(r => r.volume === targetInfo.volume && r.lessonId === targetInfo.lessonId)
-    : recordings;
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
-      
       {/* Hidden Audio Elements */}
       <audio
         ref={audioPlayerRef}
@@ -418,7 +447,6 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 
       {/* Main Studio Modal Card */}
       <div className="bg-white rounded-3xl shadow-2xl border-4 border-amber-300 w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh]">
-        
         {/* Modal Header */}
         <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-4 sm:p-5 text-white flex items-center justify-between relative shadow-md">
           <div className="flex items-center gap-3">
@@ -430,6 +458,10 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                 <span className="text-xs font-black tracking-wide uppercase bg-black/20 px-2.5 py-0.5 rounded-full">
                   Phòng Thu Âm Của Bé
                 </span>
+                <span className="text-xs font-bold bg-purple-700 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Bot className="w-3 h-3" />
+                  Trợ lý AI chấm đọc
+                </span>
                 {targetInfo && (
                   <span className="text-xs font-bold bg-amber-300 text-amber-950 px-2 py-0.5 rounded-full">
                     {targetInfo.volume === 'vol1' ? 'Tập 1' : 'Tập 2'}
@@ -437,7 +469,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                 )}
               </div>
               <h2 className="text-lg sm:text-xl font-black font-serif mt-0.5 line-clamp-1">
-                {targetInfo?.lessonTitle || 'Luyện đọc Tiếng Việt 1'}
+                {targetInfo?.lessonTitle || 'Luyện Đọc Tiếng Việt 1'}
               </h2>
             </div>
           </div>
@@ -455,7 +487,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
           </button>
         </div>
 
-        {/* Tab switcher: Luyện đọc & Thu âm vs Nhật ký đã lưu */}
+        {/* Tab switcher: Luyện đọc & Thu âm vs Sổ tay bài thu */}
         <div className="flex items-center justify-between px-4 sm:px-6 pt-3 pb-2 border-b border-amber-100 bg-amber-50/40">
           <div className="flex items-center gap-2">
             <button
@@ -467,7 +499,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
               }`}
             >
               <Mic className="w-4 h-4" />
-              <span>Luyện đọc & Ghi âm</span>
+              <span>Luyện đọc & Ghi âm AI</span>
             </button>
 
             <button
@@ -492,21 +524,24 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 
         {/* Modal Body */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5 bg-gradient-to-b from-amber-50/20 to-white">
-          
           {activeTab === 'record' ? (
             <>
-              {/* Target Reading Card - High contrast, customizable text size */}
+              {/* Target Reading Card */}
               {targetInfo && (
-                <div className={`rounded-3xl p-5 sm:p-6 border-2 transition-all relative ${
-                  isRecording
-                    ? 'bg-amber-50/90 border-orange-500 ring-4 ring-orange-400/30 shadow-lg'
-                    : 'bg-gradient-to-br from-amber-50 via-orange-50/40 to-yellow-50 border-amber-200 shadow-sm'
-                }`}>
+                <div
+                  className={`rounded-3xl p-5 sm:p-6 border-2 transition-all relative ${
+                    isRecording
+                      ? 'bg-amber-50/90 border-orange-500 ring-4 ring-orange-400/30 shadow-lg'
+                      : 'bg-gradient-to-br from-amber-50 via-orange-50/40 to-yellow-50 border-amber-200 shadow-sm'
+                  }`}
+                >
                   <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs font-black uppercase px-3 py-1 rounded-full flex items-center gap-1.5 ${
-                        isRecording ? 'bg-orange-600 text-white animate-pulse' : 'bg-orange-100 text-orange-900'
-                      }`}>
+                      <span
+                        className={`text-xs font-black uppercase px-3 py-1 rounded-full flex items-center gap-1.5 ${
+                          isRecording ? 'bg-orange-600 text-white animate-pulse' : 'bg-orange-100 text-orange-900'
+                        }`}
+                      >
                         <BookOpen className="w-3.5 h-3.5" />
                         <span>Chữ cần đọc (Bé hãy nhìn vào đây):</span>
                       </span>
@@ -562,23 +597,36 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 
                   {/* Target Text Box */}
                   <div className="bg-white rounded-2xl p-5 sm:p-6 border border-amber-200 shadow-inner">
-                    <p className={`font-reading text-slate-900 text-center font-bold tracking-wide whitespace-pre-line ${
-                      fontSizeMode === 'huge'
-                        ? 'text-2xl sm:text-3xl md:text-4xl leading-[2.3]'
-                        : fontSizeMode === 'large'
-                        ? 'text-xl sm:text-2xl md:text-3xl leading-[2.2]'
-                        : 'text-lg sm:text-xl md:text-2xl leading-[2.0]'
-                    }`}>
+                    <p
+                      className={`font-reading text-slate-900 text-center font-bold tracking-wide whitespace-pre-line ${
+                        fontSizeMode === 'huge'
+                          ? 'text-2xl sm:text-3xl md:text-4xl leading-[2.3]'
+                          : fontSizeMode === 'large'
+                          ? 'text-xl sm:text-2xl md:text-3xl leading-[2.2]'
+                          : 'text-lg sm:text-xl md:text-2xl leading-[2.0]'
+                      }`}
+                    >
                       {targetInfo.targetText}
                     </p>
                   </div>
 
                   {isRecording && (
-                    <div className="mt-2.5 text-center">
+                    <div className="mt-2.5 text-center space-y-2">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-bold">
                         <Sparkles className="w-3.5 h-3.5 text-orange-600" />
                         Micro đang thu âm! Bé hãy cất giọng đọc to theo từng chữ ở trên nhé
                       </span>
+
+                      {/* Live AI transcription */}
+                      {liveTranscript && (
+                        <div className="p-3 bg-purple-50 border border-purple-200 rounded-2xl text-xs text-purple-950 font-medium text-left flex items-start gap-2 shadow-xs">
+                          <Bot className="w-4 h-4 text-purple-600 shrink-0 mt-0.5 animate-pulse" />
+                          <div>
+                            <strong className="text-purple-800">Trợ lý AI đang nghe bé đọc:</strong>{' '}
+                            <span>"{liveTranscript}"</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -597,18 +645,16 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 
               {/* RECORDING STUDIO CONSOLE */}
               <div className="bg-white rounded-3xl p-5 sm:p-6 border-2 border-orange-200 shadow-md flex flex-col items-center justify-center text-center">
-                
                 {/* 1. STATE: RECORDING ACTIVE */}
                 {isRecording ? (
                   <div className="w-full space-y-4">
-                    
                     {/* Pulsing On-Air Indicator & Timer */}
                     <div className="flex items-center justify-center gap-3">
                       <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-500 text-white text-xs font-black animate-pulse shadow-sm">
                         <Radio className="w-4 h-4" />
                         <span>ĐANG GHI ÂM GIỌNG ĐỌC CỦA BÉ</span>
                       </div>
-                      
+
                       <div className="text-2xl sm:text-3xl font-black font-mono text-slate-800">
                         {formatTime(recordingSeconds)}
                       </div>
@@ -623,11 +669,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                           style={{
                             height: `${Math.max(12, level)}%`,
                             backgroundColor:
-                              level > 60
-                                ? '#f43f5e'
-                                : level > 30
-                                ? '#fbbf24'
-                                : '#10b981'
+                              level > 60 ? '#f43f5e' : level > 30 ? '#fbbf24' : '#10b981'
                           }}
                         />
                       ))}
@@ -650,36 +692,97 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                         className="px-7 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-95 text-white font-black text-sm sm:text-base flex items-center gap-2.5 shadow-lg shadow-emerald-500/30 transition-all cursor-pointer"
                       >
                         <Square className="w-5 h-5 fill-white" />
-                        <span>HOÀN THÀNH & NỘP BÀI ⭐</span>
+                        <span>HOÀN THÀNH & CHẤM ĐIỂM AI ⭐</span>
                       </button>
                     </div>
-
                   </div>
                 ) : audioUrl ? (
-                  /* 2. STATE: RECORDED COMPLETED / REVIEW & SUBMISSION */
+                  /* 2. STATE: RECORDED COMPLETED / REVIEW & AI EVALUATION */
                   <div className="w-full space-y-5">
-                    
-                    {/* Encouraging Feedback & Star Award Banner */}
-                    <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-300 rounded-3xl p-5 text-amber-950 shadow-md relative overflow-hidden text-left">
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-white/40 backdrop-blur-md flex items-center justify-center shrink-0 text-2xl shadow-xs">
-                          ⭐
+                    {/* AI EVALUATION REPORT CARD */}
+                    {aiEvaluation && (
+                      <div className="rounded-3xl p-5 border-2 border-purple-300 bg-gradient-to-br from-purple-50 via-indigo-50/50 to-pink-50 text-left shadow-md">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-purple-200">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center text-2xl shadow-md shrink-0">
+                              <Bot className="w-7 h-7" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-black uppercase tracking-wider bg-purple-200 text-purple-900 px-2 py-0.5 rounded-md">
+                                  Trợ lý AI chấm phát âm
+                                </span>
+                                <span className="text-xs font-bold text-purple-700">
+                                  Độ chính xác: {aiEvaluation.accuracy}%
+                                </span>
+                              </div>
+                              <h4 className="text-base sm:text-lg font-black text-purple-950 mt-0.5">
+                                {aiEvaluation.cheeringTitle}
+                              </h4>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="bg-white px-3.5 py-1.5 rounded-2xl border-2 border-purple-300 text-center shadow-xs">
+                              <span className="text-[10px] block font-bold text-slate-500 uppercase">Điểm AI</span>
+                              <span className="text-xl font-black text-purple-700">{aiEvaluation.score}/100</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black uppercase bg-white/60 px-2.5 py-0.5 rounded-full">
-                              Đã nộp bài cho thầy cô
+
+                        {/* Detailed feedback */}
+                        <p className="text-xs sm:text-sm text-purple-900/90 font-medium my-3 leading-relaxed">
+                          {aiEvaluation.detailedFeedback}
+                        </p>
+
+                        {/* Word-by-word Analysis */}
+                        {aiEvaluation.wordAnalysis && aiEvaluation.wordAnalysis.length > 0 && (
+                          <div className="mt-3 bg-white/90 rounded-2xl p-4 border border-purple-200">
+                            <span className="text-[11px] font-bold text-slate-600 block mb-2">
+                              Chi tiết phát âm từng từ trong bài:
                             </span>
-                            <span className="text-xs font-bold text-amber-900">
-                              +1 Ngôi sao chăm ngoan!
+                            <div className="flex flex-wrap gap-1.5">
+                              {aiEvaluation.wordAnalysis.map((item, idx) => (
+                                <span
+                                  key={idx}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                                    item.status === 'correct'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      : item.status === 'mismatched'
+                                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                      : 'bg-rose-100 text-rose-800 border border-rose-300'
+                                  }`}
+                                  title={
+                                    item.status === 'correct'
+                                      ? 'Bé đọc rất chuẩn'
+                                      : item.status === 'mismatched'
+                                      ? `Bé đọc thành "${item.spokenWord || ''}"`
+                                      : 'Bé chưa đọc từ này'
+                                  }
+                                >
+                                  {item.status === 'correct' ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                  )}
+                                  <span>{item.word}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Phonetic tips */}
+                        {aiEvaluation.phoneticTips && aiEvaluation.phoneticTips.length > 0 && (
+                          <div className="mt-3 flex items-start gap-2 text-[11px] text-purple-800 bg-purple-100/60 p-2.5 rounded-xl">
+                            <Sparkles className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                            <span>
+                              <strong>Lời khuyên của cô giáo AI:</strong> {aiEvaluation.phoneticTips.join(' ')}
                             </span>
                           </div>
-                          <p className="text-base sm:text-lg font-black font-serif mt-1">
-                            {currentRecordingSaved?.feedback?.cheeringMessage || 'Bé đã hoàn thành và nộp bài đọc rất xuất sắc!'}
-                          </p>
-                        </div>
+                        )}
                       </div>
-                    </div>
+                    )}
 
                     {/* Audio Player Card */}
                     <div className="bg-orange-50/70 rounded-2xl p-4 sm:p-5 border border-orange-200 flex flex-col gap-3">
@@ -739,7 +842,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                             className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer"
                           >
                             <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                            <span>{submittedSuccess ? 'Đã nộp bài cho cô giáo ✅' : 'Nộp bài cho cô giáo'}</span>
+                            <span>{submittedSuccess ? 'Đã nộp bài cho cô giáo ✓' : 'Nộp bài cho cô giáo'}</span>
                           </button>
 
                           {currentRecordingSaved && (
@@ -765,9 +868,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                           </button>
                         </div>
                       </div>
-
                     </div>
-
                   </div>
                 ) : (
                   /* 3. STATE: IDLE READY TO RECORD */
@@ -778,7 +879,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 
                     <div>
                       <h3 className="text-xl sm:text-2xl font-black font-serif text-slate-900">
-                        Sẵn sàng luyện đọc & nộp bài cùng cô!
+                        Sẵn sàng luyện đọc & nộp bài cùng Trợ lý AI!
                       </h3>
                       <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto mt-1">
                         Bấm nút bên dưới, sau đó nhìn vào bài đọc ở trên và cất giọng thật to, rõ ràng từng tiếng nhé!
@@ -791,11 +892,10 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                       className="px-8 py-4 rounded-3xl bg-gradient-to-r from-orange-500 via-amber-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white font-black text-base sm:text-lg shadow-xl shadow-orange-500/30 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 mx-auto cursor-pointer"
                     >
                       <Mic className="w-6 h-6" />
-                      <span>BẮT ĐẦU ĐỌC & GHI ÂM</span>
+                      <span>BẮT ĐẦU ĐỌC & CHẤM ĐIỂM AI</span>
                     </button>
                   </div>
                 )}
-
               </div>
             </>
           ) : (
@@ -807,7 +907,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                     Sổ tay ghi âm bài đọc ({recordings.length} bài)
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Nơi lưu giữ các bài đọc của bé để phụ huynh và giáo viên lắng nghe lại
+                    Nơi lưu giữ các bài đọc có đánh giá của Trợ lý AI để phụ huynh và giáo viên lắng nghe lại
                   </p>
                 </div>
 
@@ -831,11 +931,9 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                   <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-3xl mx-auto mb-3">
                     🎙️
                   </div>
-                  <h4 className="text-base font-bold text-slate-800 font-serif">
-                    Bé chưa có bài thu âm nào
-                  </h4>
+                  <h4 className="text-base font-bold text-slate-800 font-serif">Bé chưa có bài thu âm nào</h4>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
-                    Hãy bấm vào tab "Luyện đọc & Ghi âm" và đọc to bài học để lưu lại giọng đọc đáng yêu của mình nhé!
+                    Hãy bấm vào tab "Luyện đọc & Ghi âm AI" và đọc to bài học để lưu lại giọng đọc đáng yêu của mình nhé!
                   </p>
                   <button
                     onClick={() => setActiveTab('record')}
@@ -862,13 +960,17 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                         className="p-4 rounded-2xl bg-white border border-amber-200 hover:border-orange-400 hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                       >
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
                             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
                               {rec.volume === 'vol1' ? 'Tập 1' : 'Tập 2'}
                             </span>
                             {rec.sectionTitle && (
-                              <span className="text-[11px] font-semibold text-slate-500">
-                                • {rec.sectionTitle}
+                              <span className="text-[11px] font-semibold text-slate-500">• {rec.sectionTitle}</span>
+                            )}
+                            {rec.aiEvaluation && (
+                              <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 flex items-center gap-1">
+                                <Bot className="w-3 h-3 text-purple-600" />
+                                <span>AI: {rec.aiEvaluation.score}đ ({rec.aiEvaluation.accuracy}%)</span>
                               </span>
                             )}
                             <span className="text-[11px] text-slate-400 flex items-center gap-1 ml-auto sm:ml-0">
@@ -885,11 +987,18 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                             "{rec.targetText}"
                           </p>
 
-                          {rec.feedback && (
-                            <p className="text-[11px] font-bold text-emerald-700 mt-1 flex items-center gap-1">
-                              <span>⭐</span>
-                              <span>{rec.feedback.cheeringMessage}</span>
+                          {rec.aiEvaluation?.detailedFeedback ? (
+                            <p className="text-[11px] font-medium text-purple-800 mt-1 flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-purple-600 shrink-0" />
+                              <span>{rec.aiEvaluation.detailedFeedback}</span>
                             </p>
+                          ) : (
+                            rec.feedback && (
+                              <p className="text-[11px] font-bold text-emerald-700 mt-1 flex items-center gap-1">
+                                <span>⭐</span>
+                                <span>{rec.feedback.cheeringMessage}</span>
+                              </p>
+                            )
                           )}
                         </div>
 
@@ -903,9 +1012,15 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                                 : 'bg-orange-500 hover:bg-orange-600 text-white shadow-xs'
                             }`}
                           >
-                            {isItemPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+                            {isItemPlaying ? (
+                              <Pause className="w-3.5 h-3.5" />
+                            ) : (
+                              <Play className="w-3.5 h-3.5 fill-white" />
+                            )}
                             <span>{isItemPlaying ? 'Dừng' : 'Nghe'}</span>
-                            <span className="font-mono text-[10px] opacity-80">({formatTime(rec.durationSeconds)})</span>
+                            <span className="font-mono text-[10px] opacity-80">
+                              ({formatTime(rec.durationSeconds)})
+                            </span>
                           </button>
 
                           <button
@@ -919,7 +1034,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                           <button
                             onClick={() => handleDeleteHistoryItem(rec.id)}
                             className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-700 transition-colors cursor-pointer"
-                            title="Xóa bản ghi này"
+                            title="Xóa bài ghi âm"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -931,29 +1046,8 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
               )}
             </div>
           )}
-
         </div>
-
-        {/* Modal Footer */}
-        <div className="p-4 border-t border-amber-100 bg-amber-50/50 flex items-center justify-between text-xs text-slate-600">
-          <div className="flex items-center gap-1.5">
-            <span className="text-base">💡</span>
-            <span>Gợi ý: Bé hãy ngồi trong phòng yên tĩnh và phát âm dứt khoát nhé!</span>
-          </div>
-
-          <button
-            onClick={() => {
-              cleanupAudioStream();
-              onClose();
-            }}
-            className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 font-bold text-slate-800 transition-colors cursor-pointer"
-          >
-            Đóng lại
-          </button>
-        </div>
-
       </div>
-
     </div>
   );
 };

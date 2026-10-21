@@ -70,7 +70,8 @@ class RecordingStorageService {
   async saveRecording(
     target: RecordingTargetInfo,
     audioBlob: Blob,
-    durationSeconds: number
+    durationSeconds: number,
+    aiEvaluation?: StudentRecording['aiEvaluation']
   ): Promise<StudentRecording> {
     const id = 'rec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     const audioBlobUrl = URL.createObjectURL(audioBlob);
@@ -90,7 +91,8 @@ class RecordingStorageService {
       mimeType: audioBlob.type || 'audio/webm',
       durationSeconds: Math.round(durationSeconds),
       createdAt: new Date().toISOString(),
-      feedback
+      feedback,
+      aiEvaluation
     };
 
     // Keep in memory

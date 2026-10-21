@@ -42,7 +42,8 @@ import {
   Users,
   BarChart2,
   Cloud,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Bot
 } from 'lucide-react';
 
 interface TeacherPortalViewProps {
@@ -926,7 +927,22 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                       </div>
 
                       {/* AI Evaluation */}
-                      {rec.feedback && (
+                      {rec.aiEvaluation ? (
+                        <div className="mt-3 p-3.5 rounded-2xl bg-purple-50 border border-purple-200 text-xs space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-purple-900 flex items-center gap-1.5">
+                              <Bot className="w-4 h-4 text-purple-600" />
+                              <span>Trợ lý AI Đánh Giá: <strong className="text-purple-700">{rec.aiEvaluation.score} điểm</strong> (Độ chính xác: {rec.aiEvaluation.accuracy}%)</span>
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900">
+                              {rec.aiEvaluation.cheeringTitle}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-purple-800 italic">
+                            "{rec.aiEvaluation.detailedFeedback}"
+                          </p>
+                        </div>
+                      ) : rec.feedback && (
                         <div className="mt-3 p-3 rounded-2xl bg-amber-50/80 border border-amber-100 text-xs flex items-center justify-between">
                           <span className="text-amber-900 font-medium">{rec.feedback.cheeringMessage}</span>
                           <span className="font-black text-amber-700 flex items-center gap-1">
