@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Mic, Square, Play, Pause, RotateCcw, Save, Trash2, 
   Volume2, CheckCircle2, AlertCircle, Sparkles, User, HelpCircle, Bot
@@ -62,7 +62,9 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
   }, []);
 
   // Existing audio if any (re-evaluated on update)
-  const existingAudio = effectiveText ? teacherAudioService.getAudioByText(effectiveText) : undefined;
+  const existingAudio = effectiveText 
+    ? teacherAudioService.getAudioByText(effectiveText, target?.section, target?.lessonId) 
+    : undefined;
 
   useEffect(() => {
     setAudioBlobUrl(null);
@@ -211,7 +213,7 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
 
     speechService.stop();
     setIsPlayingSavedTeacher(true);
-    teacherAudioService.playAudio(effectiveText, () => {
+    teacherAudioService.playAudio(effectiveText, target?.section, target?.lessonId, () => {
       setIsPlayingSavedTeacher(false);
     });
   };
@@ -229,11 +231,11 @@ export const TeacherAudioRecorderModal: React.FC<TeacherAudioRecorderModalProps>
     });
   };
 
-  const handleSaveTeacherAudio = () => {
+  const handleSaveTeacherAudio = async () => {
     if (!audioBase64 || !effectiveText) return;
     localStorage.setItem('tv1_teacher_name', teacherName.trim() || 'Cô giáo');
 
-    const item = teacherAudioService.saveAudio({
+    const item = await teacherAudioService.saveAudio({
       text: effectiveText,
       volume: target.volume,
       lessonId: target.lessonId,

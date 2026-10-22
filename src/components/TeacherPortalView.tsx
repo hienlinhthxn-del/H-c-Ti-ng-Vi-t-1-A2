@@ -47,7 +47,8 @@ import {
   Cloud,
   FileSpreadsheet,
   Bot,
-  Send
+  Send,
+  AlertTriangle
 } from 'lucide-react';
 
 interface TeacherPortalViewProps {
@@ -958,7 +959,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                               {rec.lessonTitle}
                             </span>
                             <span className="text-xs text-slate-400">
-                              {new Date(rec.createdAt).toLocaleTimeString('vi-VN')} • {new Date(rec.createdAt).toLocaleDateString('vi-VN')}
+                              {(() => {
+                                const d = rec.createdAt ? new Date(rec.createdAt) : null;
+                                return d && !isNaN(d.getTime())
+                                  ? `${d.toLocaleTimeString('vi-VN')} • ${d.toLocaleDateString('vi-VN')}`
+                                  : 'Gần đây';
+                              })()}
                             </span>
                           </div>
                           <div className="text-lg font-black text-slate-900 font-reading mt-2">

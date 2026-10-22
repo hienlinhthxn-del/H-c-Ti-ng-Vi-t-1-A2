@@ -1,4 +1,4 @@
-﻿import { db } from './firebaseConfig';
+import { db } from './firebaseConfig';
 import { collection, doc, setDoc, getDocs, deleteDoc, onSnapshot, query } from 'firebase/firestore';
 
 export interface TeacherAudioItem {
@@ -17,6 +17,7 @@ export interface TeacherAudioItem {
 
 const COLLECTION_NAME = 'teacher_audios';
 const PREFER_TEACHER_VOICE_KEY = 'tv1_prefer_teacher_voice';
+const LOCAL_STORAGE_AUDIOS_KEY = 'tv1_teacher_audios_local';
 
 class TeacherAudioService {
   private listeners: (() => void)[] = [];
@@ -26,7 +27,31 @@ class TeacherAudioService {
 
   constructor() {
     if (typeof window !== 'undefined') {
+      this.loadFromLocalStorage();
       this.initFirebaseSync();
+    }
+  }
+
+  private loadFromLocalStorage() {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_AUDIOS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<string, TeacherAudioItem>;
+        if (parsed && typeof parsed === 'object') {
+          this.memoryMap = { ...parsed };
+          this.isInitialized = true;
+        }
+      }
+    } catch (e) {
+      console.warn('Không thể tải bộ nhớ đệm âm thanh giáo viên từ LocalStorage:', e);
+    }
+  }
+
+  private saveToLocalStorage() {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_AUDIOS_KEY, JSON.stringify(this.memoryMap));
+    } catch (e) {
+      console.warn('Không thể lưu âm thanh giáo viên vào LocalStorage:', e);
     }
   }
 
@@ -34,12 +59,14 @@ class TeacherAudioService {
     try {
       const q = query(collection(db, COLLECTION_NAME));
       onSnapshot(q, (snapshot) => {
-        const newMap: Record<string, TeacherAudioItem> = {};
+        // Merge cloud audios into memoryMap, preserving any locally recorded items
         snapshot.forEach((doc) => {
           const item = doc.data() as TeacherAudioItem;
-          newMap[item.key] = item;
+          if (item && item.key) {
+            this.memoryMap[item.key] = item;
+          }
         });
-        this.memoryMap = newMap;
+        this.saveToLocalStorage();
         this.isInitialized = true;
         this.notify();
       }, (error) => {
@@ -101,36 +128,56 @@ class TeacherAudioService {
       teacherName: item.teacherName || 'Cô giáo'
     };
 
-    // Save to local memory immediately for fast UI
+    // Save to local memory and LocalStorage immediately for fast, offline-ready UI
     this.memoryMap[key] = fullItem;
+    this.saveToLocalStorage();
     this.notify();
 
-    // Sync to Firebase
+    // Sync to Firebase Cloud
     try {
       await setDoc(doc(db, COLLECTION_NAME, id), fullItem);
     } catch (e) {
-      console.error('Lỗi khi lưu âm thanh lên Đám mây:', e);
+      console.error('Lỗi khi lưu âm thanh lên Đám mây (đã lưu bộ nhớ cục bộ):', e);
     }
 
     return fullItem;
   }
 
   public getAudioByText(text?: string, context?: string, lessonId?: string | number): TeacherAudioItem | undefined {
-    if (!text) return undefined;
+    if (!text || typeof text !== 'string') return undefined;
+    const cleanText = text.trim();
+    if (!cleanText) return undefined;
+
+    // 1. Specific by Context + LessonId
     if (context && lessonId !== undefined) {
-      const strictKey = this.normalizeKey(text, context, lessonId);
-      if (this.memoryMap[strictKey] && this.memoryMap[strictKey].audioBase64) return this.memoryMap[strictKey];
+      const strictKey = this.normalizeKey(cleanText, context, lessonId);
+      if (this.memoryMap[strictKey]?.audioBase64) return this.memoryMap[strictKey];
     }
+
+    // 2. Specific by Context
     if (context) {
-      const specificKey = this.normalizeKey(text, context);
-      if (this.memoryMap[specificKey] && this.memoryMap[specificKey].audioBase64) return this.memoryMap[specificKey];
+      const specificKey = this.normalizeKey(cleanText, context);
+      if (this.memoryMap[specificKey]?.audioBase64) return this.memoryMap[specificKey];
     }
+
+    // 3. Specific by LessonId
     if (lessonId !== undefined) {
-      const lessonOnlyKey = this.normalizeKey(text, undefined, lessonId);
-      if (this.memoryMap[lessonOnlyKey] && this.memoryMap[lessonOnlyKey].audioBase64) return this.memoryMap[lessonOnlyKey];
+      const lessonOnlyKey = this.normalizeKey(cleanText, undefined, lessonId);
+      if (this.memoryMap[lessonOnlyKey]?.audioBase64) return this.memoryMap[lessonOnlyKey];
     }
-    const genericKey = this.normalizeKey(text);
-    return Boolean(this.memoryMap[genericKey] && this.memoryMap[genericKey].audioBase64) ? this.memoryMap[genericKey] : undefined;
+
+    // 4. Generic key
+    const genericKey = this.normalizeKey(cleanText);
+    if (this.memoryMap[genericKey]?.audioBase64) return this.memoryMap[genericKey];
+
+    // 5. Broad text search fallback: match regardless of prefix
+    const lower = cleanText.toLowerCase();
+    const found = Object.values(this.memoryMap).find(a => 
+      a.text?.trim().toLowerCase() === lower && a.audioBase64
+    );
+    if (found) return found;
+
+    return undefined;
   }
 
   public hasAudioForText(text?: string, context?: string, lessonId?: string | number): boolean {
@@ -175,6 +222,7 @@ class TeacherAudioService {
     }
     if (foundKey) {
       delete this.memoryMap[foundKey];
+      this.saveToLocalStorage();
       this.notify();
     }
     
@@ -210,7 +258,7 @@ class TeacherAudioService {
     });
   }
 
-    public exportToJson(): string {
+  public exportToJson(): string {
     return JSON.stringify(Object.values(this.memoryMap));
   }
 
@@ -237,10 +285,33 @@ class TeacherAudioService {
     }
   }
 
-  public playAudio(text: string, context?: string, lessonId?: string | number, onEnd?: () => void): HTMLAudioElement | null {
-    // Note: this is kept for backwards compatibility
+  public playAudio(
+    text: string,
+    contextOrOnEnd?: string | (() => void),
+    lessonIdOrOnEnd?: string | number | (() => void),
+    onEnd?: () => void
+  ): HTMLAudioElement | null {
+    let context: string | undefined;
+    let lessonId: string | number | undefined;
+    let callback: (() => void) | undefined;
+
+    if (typeof contextOrOnEnd === 'function') {
+      callback = contextOrOnEnd;
+    } else {
+      context = contextOrOnEnd;
+      if (typeof lessonIdOrOnEnd === 'function') {
+        callback = lessonIdOrOnEnd;
+      } else {
+        lessonId = lessonIdOrOnEnd;
+        callback = onEnd;
+      }
+    }
+
     const item = this.getAudioByText(text, context, lessonId);
-    if (!item || !item.audioBase64) return null;
+    if (!item || !item.audioBase64) {
+      if (callback) callback();
+      return null;
+    }
 
     this.stopCurrentAudio();
 
@@ -249,20 +320,21 @@ class TeacherAudioService {
       this.currentAudioElement = audio;
       audio.onended = () => {
         this.currentAudioElement = null;
-        if (onEnd) onEnd();
+        if (callback) callback();
       };
       audio.onerror = () => {
         console.error('Failed to play custom audio for', text);
         this.currentAudioElement = null;
-        if (onEnd) onEnd();
+        if (callback) callback();
       };
       audio.play().catch(e => {
         console.error('Audio play blocked:', e);
-        if (onEnd) onEnd();
+        if (callback) callback();
       });
       return audio;
     } catch (e) {
       console.error('Error playing audio', e);
+      if (callback) callback();
       return null;
     }
   }

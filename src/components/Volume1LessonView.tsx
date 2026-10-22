@@ -144,6 +144,24 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
     lessonId: string
   ) => {
     setSpellingActiveIdx(idx);
+
+    // 1. If Teacher has recorded sample audio for this spelling model and preferTeacherVoice is active:
+    if (
+      teacherAudioService.isPreferTeacherVoice() &&
+      (teacherAudioService.hasAudioForText(model.result, 'syllable', lessonId) ||
+       teacherAudioService.hasAudioForText(model.result, undefined, lessonId))
+    ) {
+      speechService.stop();
+      const audio = teacherAudioService.playAudio(model.result, 'syllable', lessonId, () => {
+        speechService.playSoundEffect('sparkle');
+        setSpellingActiveIdx(null);
+      });
+      if (audio) {
+        return;
+      }
+    }
+
+    // 2. Otherwise play AI Grade 1 phonetic spelling chain: "bờ - a - ba"
     const steps = generateSpellingSteps(model);
     speechService.spellOut(steps, model.result, () => {
       speechService.playSoundEffect('sparkle');
@@ -364,10 +382,27 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-1">
               {isCustomized && (
-                <span className="bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-orange-500 fill-orange-400" />
-                  Đã tùy chỉnh bởi GV
-                </span>
+                <>
+                  <span className="bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-orange-500 fill-orange-400" />
+                    Đã tùy chỉnh bởi GV
+                  </span>
+                  {onEditLesson && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Thầy Cô có muốn khôi phục Bài ${lesson.lessonNumber} về nội dung chuẩn sách giáo khoa ban đầu không?`)) {
+                          lessonStorageService.resetVolume1Lesson(lesson.id);
+                          window.location.reload();
+                        }
+                      }}
+                      className="text-xs text-orange-700 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2 py-0.5 rounded-full font-semibold transition-all cursor-pointer flex items-center gap-1"
+                      title="Khôi phục bài học về dữ liệu gốc SGK Kết Nối Tri Thức"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Khôi phục gốc SGK</span>
+                    </button>
+                  )}
+                </>
               )}
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 font-serif tracking-tight">
