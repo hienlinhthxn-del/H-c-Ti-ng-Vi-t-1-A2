@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Volume1Lesson, RecordingTargetInfo, AchievementBadge } from '../types';
-import { speechService } from '../services/speechService';
+import { speechService, generateSpellingSteps, getPhoneticSound } from '../services/speechService';
 import { lessonStorageService } from '../services/lessonStorageService';
 import { teacherAudioService } from '../services/teacherAudioService';
 import { achievementService } from '../services/achievementService';
@@ -138,14 +138,19 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
     }
   };
 
-  const handleSpellingModel = (steps: string[] | undefined, fullResult: string, idx: number, lessonId: string) => {
+  const handleSpellingModel = (
+    model: { initial?: string; vowel?: string; tone?: string; result: string; spellingSteps?: string[] },
+    idx: number,
+    lessonId: string
+  ) => {
     setSpellingActiveIdx(idx);
-    speechService.spellOut(steps, fullResult, () => {
+    const steps = generateSpellingSteps(model);
+    speechService.spellOut(steps, model.result, () => {
       speechService.playSoundEffect('sparkle');
-    });
+    }, lessonId);
     setTimeout(() => {
       setSpellingActiveIdx(null);
-    }, (steps ? steps.length * 750 : 1000) + 1200);
+    }, (steps ? steps.length * 800 : 1000) + 1200);
   };
 
   const handleAnswerQuiz = (quizId: string, optionIdx: number, correctIdx: number) => {
@@ -404,9 +409,14 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   id="speak-all-letters-btn"
-                  onClick={() => speechService.speak(lesson.part1_Letters.letters.join(', '))}
+                  onClick={() => {
+                    const lettersSpoken = lesson.part1_Letters.letters
+                      .map(l => getPhoneticSound(l))
+                      .join(', ');
+                    speechService.speak(lettersSpoken, undefined, 0.75, 'letter', lesson.id);
+                  }}
                   className="w-9 h-9 rounded-xl border border-slate-200/80 bg-white hover:bg-orange-50 text-orange-500 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
-                  title="Nghe phát âm tất cả các âm vần"
+                  title="Nghe phát âm tất cả các âm vần (chuẩn âm: a, bờ, cờ...)"
                 >
                   <Volume2 className="w-4 h-4" />
                 </button>
@@ -521,7 +531,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                     return (
                       <div
                         key={idx}
-                        onClick={() => handleSpellingModel(model.spellingSteps, model.result, idx, lesson.id)}
+                        onClick={() => handleSpellingModel(model, idx, lesson.id)}
                         className={`cursor-pointer p-3 rounded-xl border transition-all flex items-center justify-between group relative ${
                           spellingActiveIdx === idx
                             ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-300'

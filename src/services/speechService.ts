@@ -197,6 +197,225 @@ class SoundService {
 
 export const soundEffects = new SoundService();
 
+// Grade 1 Vietnamese Phonetic Letter Dictionary (Phát âm chuẩn theo âm chữ cái, không đọc tên chữ cái Latin)
+export const VIETNAMESE_PHONETIC_CONSONANTS: Record<string, string> = {
+  // Digraphs & trigraphs (phụ âm ghép)
+  'ngh': 'ngờ',
+  'ng': 'ngờ',
+  'ch': 'chờ',
+  'gh': 'gờ',
+  'gi': 'gi',
+  'kh': 'khờ',
+  'nh': 'nhờ',
+  'ph': 'phờ',
+  'qu': 'quờ',
+  'th': 'thờ',
+  'tr': 'trờ',
+
+  // Single consonants (phụ âm đơn)
+  'b': 'bờ',
+  'c': 'cờ',
+  'd': 'dờ',
+  'đ': 'đờ',
+  'g': 'gờ',
+  'h': 'hờ',
+  'k': 'cờ',
+  'l': 'lờ',
+  'm': 'mờ',
+  'n': 'nờ',
+  'p': 'pờ',
+  'q': 'cu',
+  'r': 'rờ',
+  's': 'sờ',
+  't': 'tờ',
+  'v': 'vờ',
+  'x': 'xờ'
+};
+
+// Vowels in isolation (nguyên âm đứng độc lập)
+export const VIETNAMESE_PHONETIC_VOWELS: Record<string, string> = {
+  'a': 'a',
+  'ă': 'á',
+  'â': 'ớ',
+  'e': 'e',
+  'ê': 'ê',
+  'i': 'i',
+  'o': 'o',
+  'ô': 'ô',
+  'ơ': 'ơ',
+  'u': 'u',
+  'ư': 'ư',
+  'y': 'i'
+};
+
+// Standalone tone marks & tone names
+export const VIETNAMESE_PHONETIC_TONES: Record<string, string> = {
+  '`': 'dấu huyền',
+  '´': 'dấu sắc',
+  '?': 'dấu hỏi',
+  '~': 'dấu ngã',
+  '.': 'dấu nặng',
+  '—': 'thanh ngang',
+  '-': 'thanh ngang',
+  'huyen': 'huyền',
+  'huyền': 'huyền',
+  'sac': 'sắc',
+  'sắc': 'sắc',
+  'hoi': 'hỏi',
+  'hỏi': 'hỏi',
+  'nga': 'ngã',
+  'ngã': 'ngã',
+  'nang': 'nặng',
+  'nặng': 'nặng'
+};
+
+/**
+ * Returns the Grade 1 phonetic sound for a letter token, tone mark, or spelling step.
+ * e.g. 'b' -> 'bờ', 'c' -> 'cờ', 'd' -> 'dờ', 'đ' -> 'đờ', 'ă' -> 'á', 'ch' -> 'chờ', '`' -> 'dấu huyền'
+ */
+export function getPhoneticSound(token: string): string {
+  if (!token || typeof token !== 'string') return '';
+  const clean = token.trim();
+  const lower = clean.toLowerCase();
+
+  // Check tone marks & tone words
+  if (VIETNAMESE_PHONETIC_TONES[lower]) {
+    return VIETNAMESE_PHONETIC_TONES[lower];
+  }
+
+  // Check compound consonants first (e.g. ngh, ng, ch...)
+  if (VIETNAMESE_PHONETIC_CONSONANTS[lower]) {
+    return VIETNAMESE_PHONETIC_CONSONANTS[lower];
+  }
+
+  // Check isolated vowels (e.g. ă -> á, â -> ớ)
+  if (VIETNAMESE_PHONETIC_VOWELS[lower]) {
+    return VIETNAMESE_PHONETIC_VOWELS[lower];
+  }
+
+  // Check pattern like "A a" or "B b"
+  const pairMatch = clean.match(/^([a-zA-ZăâđêôơưĂÂĐÊÔƠƯ])\s+([a-zA-ZăâđêôơưĂÂĐÊÔƠƯ])$/i);
+  if (pairMatch && pairMatch[1].toLowerCase() === pairMatch[2].toLowerCase()) {
+    return getPhoneticSound(pairMatch[1]);
+  }
+
+  return clean;
+}
+
+/**
+ * Converts speech input text so isolated letters are pronounced phonetically
+ * (e.g. "b" -> "bờ", "c" -> "cờ", "b, c" -> "bờ, cờ", "b, quả bơ" -> "bờ, quả bơ")
+ * while preserving full Vietnamese sentences and words.
+ */
+export function convertToPhoneticVietnamese(text: string, context?: string): string {
+  if (!text || typeof text !== 'string') return '';
+  const clean = text.trim();
+  if (!clean) return '';
+
+  // 1. If explicit context is 'letter'
+  if (context === 'letter') {
+    // If comma or slash separated list of letters: "b, c" or "a, b, c"
+    if (clean.includes(',') || clean.includes(';') || clean.includes('/') || clean.includes(' - ')) {
+      const parts = clean.split(/[,;/]|\s+-\s+/).map(p => p.trim()).filter(Boolean);
+      return parts.map(p => getPhoneticSound(p)).join(', ');
+    }
+    return getPhoneticSound(clean);
+  }
+
+  // 2. Format from AlphabetBoard: "${item.letter}, ${item.example}" (e.g. "b, quả bơ", "c, con cá", "d, quả dưa")
+  const leadingLetterMatch = clean.match(/^([a-zA-ZăâđêôơưĂÂĐÊÔƠƯ]{1,3}),\s*(.+)$/);
+  if (leadingLetterMatch) {
+    const leader = leadingLetterMatch[1].toLowerCase();
+    if (VIETNAMESE_PHONETIC_CONSONANTS[leader] || VIETNAMESE_PHONETIC_VOWELS[leader]) {
+      const leaderSound = getPhoneticSound(leadingLetterMatch[1]);
+      return `${leaderSound}, ${leadingLetterMatch[2]}`;
+    }
+  }
+
+  // 3. Isolated letter or tone mark (e.g. "b", "c", "d", "đ", "s", "x", "`", "?")
+  const lower = clean.toLowerCase();
+  if (VIETNAMESE_PHONETIC_CONSONANTS[lower]) {
+    return VIETNAMESE_PHONETIC_CONSONANTS[lower];
+  }
+  if (VIETNAMESE_PHONETIC_TONES[lower]) {
+    return VIETNAMESE_PHONETIC_TONES[lower];
+  }
+  if (lower === 'ă') return 'á';
+  if (lower === 'â') return 'ớ';
+
+  // 4. Comma-separated list of short letters: e.g. "a, b, c, d, đ" or "b, c"
+  if (clean.includes(',')) {
+    const parts = clean.split(',').map(p => p.trim()).filter(Boolean);
+    const allShortLetters = parts.length > 0 && parts.every(p => {
+      const pLower = p.toLowerCase();
+      return VIETNAMESE_PHONETIC_CONSONANTS[pLower] || VIETNAMESE_PHONETIC_VOWELS[pLower] || p.length <= 2;
+    });
+    if (allShortLetters) {
+      return parts.map(p => getPhoneticSound(p)).join(', ');
+    }
+  }
+
+  // Otherwise keep normal text / full sentences intact
+  return clean;
+}
+
+export interface SpellingModelInput {
+  initial?: string;
+  vowel?: string;
+  tone?: string;
+  result: string;
+  spellingSteps?: string[];
+}
+
+/**
+ * Builds standard Grade 1 phonetic spelling steps from a syllable model.
+ * If model.spellingSteps is provided, ensures all steps use phonetic sounds (e.g. 'b' -> 'bờ', 'bê' fix).
+ * If model.spellingSteps is missing, generates:
+ * - With tone: ['bờ', 'a', 'ba', 'huyền', 'bà']
+ * - Without tone: ['bờ', 'a', 'ba']
+ */
+export function generateSpellingSteps(model: SpellingModelInput): string[] {
+  const rawResult = model.result || '';
+  const cleanResult = rawResult.replace(/\s*\([^)]*\)/g, '').trim();
+
+  // If explicit spellingSteps exist, normalize them phonetically
+  if (model.spellingSteps && model.spellingSteps.length > 0) {
+    const mapped = model.spellingSteps.map((step, idx) => {
+      // Fix typo where intermediate base step repeated initial: e.g. ['bờ', 'ê', 'bờ', 'sắc', 'bế'] -> base should be 'bê'
+      if (idx === 2 && model.spellingSteps!.length >= 4 && step === getPhoneticSound(model.initial || '')) {
+        if (model.vowel && cleanResult) {
+          return `${model.initial || ''}${model.vowel}`;
+        }
+      }
+      return getPhoneticSound(step);
+    });
+    return mapped;
+  }
+
+  // Derive spelling steps automatically
+  const initial = (model.initial || '').trim();
+  const vowel = (model.vowel || '').trim();
+  const rawTone = (model.tone || '').trim();
+  const tone = rawTone ? (VIETNAMESE_PHONETIC_TONES[rawTone.toLowerCase()] || rawTone) : '';
+
+  if (!initial) {
+    // No initial consonant: e.g. vowel only
+    if (tone) {
+      return [vowel, tone, cleanResult];
+    }
+    return [vowel || cleanResult];
+  }
+
+  const initialSound = getPhoneticSound(initial);
+  const baseSyllable = `${initial}${vowel}`;
+
+  if (tone) {
+    return [initialSound, vowel, baseSyllable, tone, cleanResult];
+  }
+
+  return [initialSound, vowel, cleanResult];
+}
+
 class SpeechService {
   private isSpeaking = false;
   private slowMode = true; // default true for Grade 1 kids
@@ -272,10 +491,20 @@ class SpeechService {
       return;
     }
 
+    // Convert isolated letters / spelling steps to phonetic Grade 1 Vietnamese sounds (e.g. b -> bờ, c -> cờ)
+    const phoneticText = convertToPhoneticVietnamese(cleanText, context);
+
     // 1. Check if Teacher has recorded authentic reference audio and preferTeacherVoice is active
-    if (teacherAudioService.isPreferTeacherVoice() && teacherAudioService.hasAudioForText(cleanText, context, lessonId)) {
+    if (
+      teacherAudioService.isPreferTeacherVoice() &&
+      (teacherAudioService.hasAudioForText(cleanText, context, lessonId) ||
+       teacherAudioService.hasAudioForText(phoneticText, context, lessonId))
+    ) {
       this.isSpeaking = true;
-      const audio = teacherAudioService.playAudio(cleanText, context, lessonId, () => {
+      const targetAudioText = teacherAudioService.hasAudioForText(cleanText, context, lessonId)
+        ? cleanText
+        : phoneticText;
+      const audio = teacherAudioService.playAudio(targetAudioText, context, lessonId, () => {
         this.isSpeaking = false;
         if (onEnd) onEnd();
       });
@@ -290,12 +519,12 @@ class SpeechService {
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const utterance = new SpeechSynthesisUtterance(phoneticText);
     utterance.lang = 'vi-VN';
     
-    // Speed adapted for Grade 1
-    utterance.rate = rateOverride ?? (this.slowMode ? 0.78 : 0.95);
-    utterance.pitch = 1.05; // Slightly cheerful, kid-friendly pitch
+    // Speed adapted for Grade 1 children
+    utterance.rate = rateOverride ?? (this.slowMode ? 0.76 : 0.92);
+    utterance.pitch = 1.05; // Cheerful, kid-friendly pitch
 
     // Try to find a Vietnamese voice
     const voices = window.speechSynthesis.getVoices();
@@ -320,7 +549,7 @@ class SpeechService {
   }
 
   // Force speaking using AI only (ignoring teacher recording, useful for preview/comparison)
-  speakWithAIOnly(text: string, onEnd?: () => void, rateOverride?: number) {
+  speakWithAIOnly(text: string, onEnd?: () => void, rateOverride?: number, context?: string) {
     this.stop();
     soundEffects.playPop();
 
@@ -335,9 +564,10 @@ class SpeechService {
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const phoneticText = convertToPhoneticVietnamese(cleanText, context);
+    const utterance = new SpeechSynthesisUtterance(phoneticText);
     utterance.lang = 'vi-VN';
-    utterance.rate = rateOverride ?? (this.slowMode ? 0.78 : 0.95);
+    utterance.rate = rateOverride ?? (this.slowMode ? 0.76 : 0.92);
     utterance.pitch = 1.05;
 
     const voices = window.speechSynthesis.getVoices();
@@ -363,32 +593,42 @@ class SpeechService {
   async spellOut(steps?: string[], fullResult?: string, onDone?: () => void, lessonId?: string | number) {
     if (!steps || steps.length === 0) {
       if (fullResult) {
-        this.speak(fullResult, onDone, undefined, 'syllable', lessonId);
+        this.speak(fullResult, onDone, 0.78, 'syllable', lessonId);
       } else if (onDone) {
         onDone();
       }
       return;
     }
 
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
+    const cleanFullResult = (fullResult || '').replace(/\s*\([^)]*\)/g, '').trim();
+    const phoneticSteps = steps.map(s => getPhoneticSound(s));
+
+    for (let i = 0; i < phoneticSteps.length; i++) {
+      const step = phoneticSteps[i];
       await new Promise<void>((resolve) => {
         this.speak(step, () => {
-          setTimeout(resolve, 300);
-        }, 0.75, 'letter');
+          setTimeout(resolve, 320);
+        }, 0.72, 'letter', lessonId);
       });
     }
 
-    if (fullResult) {
-      await new Promise<void>((resolve) => {
-        setTimeout(() => {
-          this.speak(fullResult, () => {
-            resolve();
-            if (onDone) onDone();
-          }, 0.8, 'syllable');
-        }, 300);
-      });
-    } else if (onDone) {
+    if (cleanFullResult) {
+      const lastStep = phoneticSteps[phoneticSteps.length - 1].toLowerCase();
+      // Only read extra final result if last step wasn't already the final result
+      if (lastStep !== cleanFullResult.toLowerCase()) {
+        await new Promise<void>((resolve) => {
+          setTimeout(() => {
+            this.speak(cleanFullResult, () => {
+              resolve();
+              if (onDone) onDone();
+            }, 0.78, 'syllable', lessonId);
+          }, 350);
+        });
+        return;
+      }
+    }
+
+    if (onDone) {
       onDone();
     }
   }

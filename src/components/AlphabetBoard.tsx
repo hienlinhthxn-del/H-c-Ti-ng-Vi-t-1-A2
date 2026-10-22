@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Volume2, Sparkles, Filter, Mic } from 'lucide-react';
 import { speechService } from '../services/speechService';
 import { teacherAudioService } from '../services/teacherAudioService';
@@ -35,35 +35,35 @@ export const AlphabetBoard: React.FC<AlphabetBoardProps> = ({ onOpenTeacherRecor
   };
 
   const singleLetters = [
-    { letter: 'a', upper: 'A', name: 'a', example: 'quả na', icon: '🍐' },
-    { letter: 'ă', upper: 'Ă', name: 'á', example: 'con trăn', icon: '🐍' },
-    { letter: 'â', upper: 'Â', name: 'ớ', example: 'cây nấm', icon: '🍄' },
-    { letter: 'b', upper: 'B', name: 'bê (bờ)', example: 'quả bơ', icon: '🥑' },
-    { letter: 'c', upper: 'C', name: 'xê (cờ)', example: 'con cá', icon: '🐟' },
-    { letter: 'd', upper: 'D', name: 'dê (dờ)', example: 'quả dưa', icon: '🍈' },
-    { letter: 'đ', upper: 'Đ', name: 'đê (đờ)', example: 'hoa đào', icon: '🌸' },
-    { letter: 'e', upper: 'E', name: 'e', example: 'con me (bê)', icon: '🐮' },
-    { letter: 'ê', upper: 'Ê', name: 'ê', example: 'con ếch', icon: '🐸' },
-    { letter: 'g', upper: 'G', name: 'giê (gờ)', example: 'con gà', icon: '🐔' },
-    { letter: 'h', upper: 'H', name: 'hát (hờ)', example: 'hoa hồng', icon: '🌹' },
-    { letter: 'i', upper: 'I', name: 'i ngắn', example: 'viên bi', icon: '🔮' },
-    { letter: 'k', upper: 'K', name: 'ca (cờ)', example: 'cái kéo', icon: '✂️' },
-    { letter: 'l', upper: 'L', name: 'e-lờ (lờ)', example: 'quả lê', icon: '🍐' },
-    { letter: 'm', upper: 'M', name: 'e-mờ (mờ)', example: 'con mèo', icon: '🐱' },
-    { letter: 'n', upper: 'N', name: 'e-nờ (nờ)', example: 'cái nơ', icon: '🎀' },
-    { letter: 'o', upper: 'O', name: 'o', example: 'con ong', icon: '🐝' },
-    { letter: 'ô', upper: 'Ô', name: 'ô', example: 'cái ô', icon: '☂️' },
-    { letter: 'ơ', upper: 'Ơ', name: 'ơ', example: 'lá cờ', icon: '🚩' },
-    { letter: 'p', upper: 'P', name: 'pê (pờ)', example: 'đèn pin', icon: '🔦' },
-    { letter: 'q', upper: 'Q', name: 'quy (cu)', example: 'quả quế', icon: '🌿' },
-    { letter: 'r', upper: 'R', name: 'e-rờ (rờ)', example: 'con rùa', icon: '🐢' },
-    { letter: 's', upper: 'S', name: 'ét-sì (sờ)', example: 'ngôi sao', icon: '⭐' },
-    { letter: 't', upper: 'T', name: 'tê (tờ)', example: 'con tàu', icon: '🚢' },
-    { letter: 'u', upper: 'U', name: 'u', example: 'chim cú', icon: '🦉' },
-    { letter: 'ư', upper: 'Ư', name: 'ư', example: 'con mực', icon: '🦑' },
-    { letter: 'v', upper: 'V', name: 'vê (vờ)', example: 'con voi', icon: '🐘' },
-    { letter: 'x', upper: 'X', name: 'ích-xì (xờ)', example: 'xe máy', icon: '🛵' },
-    { letter: 'y', upper: 'Y', name: 'i dài', example: 'y tá', icon: '👩‍⚕️' }
+    { letter: 'a', upper: 'A', name: 'a', phonetic: 'a', example: 'quả na', icon: '🍐' },
+    { letter: 'ă', upper: 'Ă', name: 'á (ă)', phonetic: 'á', example: 'con trăn', icon: '🐍' },
+    { letter: 'â', upper: 'Â', name: 'ớ (â)', phonetic: 'ớ', example: 'cây nấm', icon: '🍄' },
+    { letter: 'b', upper: 'B', name: 'âm bờ', phonetic: 'bờ', example: 'quả bơ', icon: '🥑' },
+    { letter: 'c', upper: 'C', name: 'âm cờ', phonetic: 'cờ', example: 'con cá', icon: '🐟' },
+    { letter: 'd', upper: 'D', name: 'âm dờ', phonetic: 'dờ', example: 'quả dưa', icon: '🍈' },
+    { letter: 'đ', upper: 'Đ', name: 'âm đờ', phonetic: 'đờ', example: 'hoa đào', icon: '🌸' },
+    { letter: 'e', upper: 'E', name: 'e', phonetic: 'e', example: 'con me (bê)', icon: '🐮' },
+    { letter: 'ê', upper: 'Ê', name: 'ê', phonetic: 'ê', example: 'con ếch', icon: '🐸' },
+    { letter: 'g', upper: 'G', name: 'âm gờ', phonetic: 'gờ', example: 'con gà', icon: '🐔' },
+    { letter: 'h', upper: 'H', name: 'âm hờ', phonetic: 'hờ', example: 'hoa hồng', icon: '🌹' },
+    { letter: 'i', upper: 'I', name: 'i (i ngắn)', phonetic: 'i', example: 'viên bi', icon: '🔮' },
+    { letter: 'k', upper: 'K', name: 'âm cờ (ca)', phonetic: 'cờ', example: 'cái kéo', icon: '✂️' },
+    { letter: 'l', upper: 'L', name: 'âm lờ', phonetic: 'lờ', example: 'quả lê', icon: '🍐' },
+    { letter: 'm', upper: 'M', name: 'âm mờ', phonetic: 'mờ', example: 'con mèo', icon: '🐱' },
+    { letter: 'n', upper: 'N', name: 'âm nờ', phonetic: 'nờ', example: 'cái nơ', icon: '🎀' },
+    { letter: 'o', upper: 'O', name: 'o', phonetic: 'o', example: 'con ong', icon: '🐝' },
+    { letter: 'ô', upper: 'Ô', name: 'ô', phonetic: 'ô', example: 'cái ô', icon: '☂️' },
+    { letter: 'ơ', upper: 'Ơ', name: 'ơ', phonetic: 'ơ', example: 'lá cờ', icon: '🚩' },
+    { letter: 'p', upper: 'P', name: 'âm pờ', phonetic: 'pờ', example: 'đèn pin', icon: '🔦' },
+    { letter: 'q', upper: 'Q', name: 'âm quờ (cu)', phonetic: 'quờ', example: 'quả quế', icon: '🌿' },
+    { letter: 'r', upper: 'R', name: 'âm rờ', phonetic: 'rờ', example: 'con rùa', icon: '🐢' },
+    { letter: 's', upper: 'S', name: 'âm sờ', phonetic: 'sờ', example: 'ngôi sao', icon: '⭐' },
+    { letter: 't', upper: 'T', name: 'âm tờ', phonetic: 'tờ', example: 'con tàu', icon: '🚢' },
+    { letter: 'u', upper: 'U', name: 'u', phonetic: 'u', example: 'chim cú', icon: '🦉' },
+    { letter: 'ư', upper: 'Ư', name: 'ư', phonetic: 'ư', example: 'con mực', icon: '🦑' },
+    { letter: 'v', upper: 'V', name: 'âm vờ', phonetic: 'vờ', example: 'con voi', icon: '🐘' },
+    { letter: 'x', upper: 'X', name: 'âm xờ', phonetic: 'xờ', example: 'xe máy', icon: '🛵' },
+    { letter: 'y', upper: 'Y', name: 'i (i dài)', phonetic: 'i', example: 'y tá', icon: '👩‍⚕️' }
   ];
 
   const compoundSounds = [
@@ -168,14 +168,28 @@ export const AlphabetBoard: React.FC<AlphabetBoardProps> = ({ onOpenTeacherRecor
         {/* 29 Single Letters */}
         {(activeCategory === 'all' || activeCategory === 'single') && (
           <div className="mt-8">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h2 className="text-lg font-bold text-amber-900 flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-amber-500" />
-                29 Chữ Cái Tiếng Việt (Chữ thường & Chữ hoa)
+                29 Chữ Cái Tiếng Việt (Phát âm chuẩn âm: a, bờ, cờ, dờ...)
               </h2>
-              <span className="text-xs text-amber-700 font-semibold bg-amber-100 px-2.5 py-1 rounded-full">
-                29 Chữ cái
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  id="speak-entire-alphabet-btn"
+                  onClick={() => {
+                    const allPhonetic = singleLetters.map(l => l.phonetic || l.letter).join(', ');
+                    handlePlayLetter(allPhonetic);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold rounded-xl border border-amber-300 transition-all cursor-pointer shadow-2xs active:scale-95"
+                  title="Nghe AI đọc toàn bộ bảng 29 chữ cái theo chuẩn âm tiếng Việt: a, bờ, cờ, dờ..."
+                >
+                  <Volume2 className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Nghe toàn bộ 29 chữ</span>
+                </button>
+                <span className="text-xs text-amber-700 font-semibold bg-amber-100 px-2.5 py-1 rounded-full">
+                  29 Chữ cái
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -185,12 +199,12 @@ export const AlphabetBoard: React.FC<AlphabetBoardProps> = ({ onOpenTeacherRecor
                   <div
                     key={item.letter}
                     id={`single-letter-card-${item.letter}`}
-                    onClick={() => handlePlayLetter(`${item.letter}, ${item.example}`)}
+                    onClick={() => handlePlayLetter(`${item.phonetic}, ${item.example}`)}
                     className="group cursor-pointer bg-gradient-to-b from-amber-50/50 to-orange-50/30 hover:to-orange-100/60 p-4 rounded-2xl border border-amber-200/70 hover:border-orange-400 hover:shadow-md transition-all text-center flex flex-col items-center justify-between relative"
                   >
                     {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                       <button
-                        onClick={(e) => handleTeacherRecordClick(e, `${item.letter}, ${item.example}`, `Chữ cái: ${item.letter.toUpperCase()} (${item.letter})`)}
+                        onClick={(e) => handleTeacherRecordClick(e, `${item.phonetic}, ${item.example}`, `Chữ cái: ${item.letter.toUpperCase()} (${item.letter})`)}
                         className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-xs transition-all active:scale-90 cursor-pointer ${
                           isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                         } ${hasTeacherAudio ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'}`}
@@ -214,7 +228,7 @@ export const AlphabetBoard: React.FC<AlphabetBoardProps> = ({ onOpenTeacherRecor
                     </div>
                     <div className="mt-2 flex items-center gap-1 text-[11px] font-bold text-orange-700 bg-orange-100/70 px-2 py-0.5 rounded-full group-hover:bg-orange-500 group-hover:text-white transition-colors">
                       <Volume2 className="w-3 h-3" />
-                      <span>{hasTeacherAudio ? 'Giọng GV' : 'Đọc'}</span>
+                      <span>{hasTeacherAudio ? 'Giọng GV' : item.name}</span>
                     </div>
                   </div>
                 );

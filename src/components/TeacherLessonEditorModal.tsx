@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Volume1Lesson, Volume2Lesson, SyllableModel, WordItem, QuizQuestion } from '../types';
-import { speechService } from '../services/speechService';
+import { speechService, generateSpellingSteps } from '../services/speechService';
 import { lessonStorageService } from '../services/lessonStorageService';
 import { 
   X, Save, RotateCcw, Volume2, Plus, Trash2, Edit3, 
@@ -461,7 +461,7 @@ const Volume1Editor: React.FC<Volume1EditorProps> = ({ initialLesson, onClose, o
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => speechService.spellOut(model.spellingSteps, model.result)}
+                            onClick={() => speechService.spellOut(generateSpellingSteps(model), model.result)}
                             className="text-xs text-orange-600 hover:text-orange-800 flex items-center gap-1 font-bold bg-orange-50 px-2 py-1 rounded-lg"
                           >
                             <Volume2 className="w-3.5 h-3.5" />

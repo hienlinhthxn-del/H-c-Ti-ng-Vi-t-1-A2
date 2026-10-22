@@ -1,4 +1,4 @@
-﻿import { Volume1Lesson } from '../types';
+import { Volume1Lesson } from '../types';
 
 export const LESSONS_PART_1: Volume1Lesson[] = [
   {
@@ -154,7 +154,7 @@ export const LESSONS_PART_1: Volume1Lesson[] = [
       title: 'Đọc âm, tiếng, từ ngữ',
       models: [
         { initial: 'b', vowel: 'e', tone: 'sắc', result: 'bé', spellingSteps: ['bờ', 'e', 'be', 'sắc', 'bé'] },
-        { initial: 'b', vowel: 'ê', tone: 'sắc', result: 'bế', spellingSteps: ['bờ', 'ê', 'bờ', 'sắc', 'bế'] }
+        { initial: 'b', vowel: 'ê', tone: 'sắc', result: 'bế', spellingSteps: ['bờ', 'ê', 'bê', 'sắc', 'bế'] }
       ],
       readingSyllables: ['bè', 'bé', 'bế'],
       words: [
