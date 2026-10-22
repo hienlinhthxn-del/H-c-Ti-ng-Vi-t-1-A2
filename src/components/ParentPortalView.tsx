@@ -33,7 +33,9 @@ import {
   Cloud,
   MessageSquare,
   Send,
-  Check
+  Check,
+  Bot,
+  AlertTriangle
 } from 'lucide-react';
 
 interface ParentPortalViewProps {
@@ -707,6 +709,11 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
                           <div className="font-bold text-slate-700 flex items-center gap-1.5">
                             <Mic className="w-3.5 h-3.5 text-rose-500" />
                             <span>Bản ghi âm bài đọc của con:</span>
+                            {relatedRec.aiEvaluation && (
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-200">
+                                AI: {relatedRec.aiEvaluation.score}đ
+                              </span>
+                            )}
                           </div>
                           <div className="italic text-slate-600 font-reading mt-0.5">"{relatedRec.targetText}"</div>
                         </div>
@@ -815,8 +822,83 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
                       <audio controls src={rec.audioBlobUrl} className="w-full h-10 mt-1" />
                     )}
 
-                    {/* AI Feedback */}
-                    {rec.feedback && (
+                    {/* AI Pronunciation Evaluation & Error Analysis */}
+                    {rec.aiEvaluation ? (
+                      <div className="p-4 rounded-2xl bg-purple-50/80 border border-purple-200 text-xs space-y-2.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-purple-200">
+                          <span className="font-black text-purple-900 flex items-center gap-1.5 text-xs sm:text-sm">
+                            <Bot className="w-4 h-4 text-purple-600" />
+                            <span>Trợ lý AI chấm: <strong className="text-purple-700 font-mono text-sm">{rec.aiEvaluation.score}/100 điểm</strong></span>
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-200 text-purple-950">
+                            {rec.aiEvaluation.cheeringTitle}
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] text-purple-900 leading-relaxed font-medium">
+                          {rec.aiEvaluation.detailedFeedback}
+                        </p>
+
+                        {/* Word Analysis Badges */}
+                        {rec.aiEvaluation.wordAnalysis && rec.aiEvaluation.wordAnalysis.length > 0 && (
+                          <div className="space-y-1 pt-1">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Chi tiết phát âm từng từ của con:
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {rec.aiEvaluation.wordAnalysis.map((item, wIdx) => (
+                                <span
+                                  key={wIdx}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold ${
+                                    item.status === 'correct'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      : item.status === 'mismatched'
+                                      ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                                      : 'bg-amber-100 text-amber-900 border border-amber-300'
+                                  }`}
+                                  title={
+                                    item.status === 'correct'
+                                      ? 'Con đọc chuẩn'
+                                      : item.status === 'mismatched'
+                                      ? `Con đọc thành "${item.spokenWord || ''}"`
+                                      : 'Con chưa đọc từ này'
+                                  }
+                                >
+                                  {item.status === 'correct' ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <AlertTriangle className="w-3 h-3 text-rose-600" />
+                                  )}
+                                  <span>{item.word}</span>
+                                  {item.status === 'mismatched' && item.spokenWord && (
+                                    <span className="text-[10px] text-rose-700 line-through">
+                                      ({item.spokenWord})
+                                    </span>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Mistakes Guidance for Parents */}
+                        {rec.aiEvaluation.mistakesList && rec.aiEvaluation.mistakesList.length > 0 && (
+                          <div className="p-2.5 rounded-xl bg-white border border-rose-200 text-[11px] space-y-1">
+                            <span className="font-black text-rose-900 flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Gợi ý Bố Mẹ nhắc con rèn thêm {rec.aiEvaluation.mistakesList.length} từ:</span>
+                            </span>
+                            <ul className="list-disc list-inside space-y-1 text-[10px] text-slate-700">
+                              {rec.aiEvaluation.mistakesList.map((m, mIdx) => (
+                                <li key={mIdx}>
+                                  <strong>"{m.word}"</strong> {m.spokenWord ? `(con phát âm thành "${m.spokenWord}")` : ''}: <em>{m.suggestion}</em>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : rec.feedback && (
                       <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs flex items-center justify-between">
                         <span className="text-amber-900 font-medium">{rec.feedback.cheeringMessage}</span>
                         <span className="font-black text-amber-700 whitespace-nowrap">⭐ +{rec.feedback.starsEarned}</span>

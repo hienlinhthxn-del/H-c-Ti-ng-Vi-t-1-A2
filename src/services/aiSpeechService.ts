@@ -1,11 +1,32 @@
 // AI Speech Recognition & Evaluation Service
-// Phục vụ đánh giá phát âm cho học sinh Lớp 1 (Bộ sách Kết Nối Tri Thức)
+// Phục vụ chấm điểm phát âm & phát hiện lỗi sai cho học sinh Lớp 1 (Bộ sách Kết Nối Tri Thức)
 // Đáp ứng tiêu chí ứng dụng AI hỗ trợ học sinh khắc phục rào cản ngữ âm vùng miền (Công văn 4786/SGDĐT)
+
+export type WordErrorType =
+  | 'none'
+  | 'initial_confusion' // Ngọng L/N, TR/CH, S/X, R/D/GI
+  | 'tone_confusion'    // Lẫn dấu Hỏi/Ngã, Sắc/Nặng, v.v.
+  | 'final_confusion'   // Sai âm cuối T/C, N/NG, v.v.
+  | 'vowel_confusion'   // Sai vần / nguyên âm
+  | 'substitution'      // Bé đọc thành từ khác
+  | 'missing'           // Bé đọc sót từ
+  | 'extra';            // Bé đọc thừa từ
 
 export interface WordMatchResult {
   word: string;
-  status: 'correct' | 'mismatched' | 'missing';
+  status: 'correct' | 'mismatched' | 'missing' | 'extra';
   spokenWord?: string;
+  errorType?: WordErrorType;
+  errorLabel?: string;
+  phoneticTip?: string;
+}
+
+export interface AIMistakeDetail {
+  word: string;
+  spokenWord?: string;
+  errorType: WordErrorType;
+  errorLabel: string;
+  suggestion: string;
 }
 
 export interface AIEvaluationResult {
@@ -17,6 +38,10 @@ export interface AIEvaluationResult {
   recognizedText: string;
   wordAnalysis: WordMatchResult[];
   phoneticTips: string[];
+  mistakesCount: number;
+  correctCount: number;
+  missingCount: number;
+  mistakesList: AIMistakeDetail[];
 }
 
 export class AISpeechService {
@@ -92,7 +117,6 @@ export class AISpeechService {
       };
 
       this.recognition.onend = () => {
-        // If still flagged as listening (e.g. paused temporarily by engine), restart
         if (this.isListening) {
           try {
             this.recognition.start();
@@ -127,7 +151,7 @@ export class AISpeechService {
   }
 
   // Chuẩn hóa chuỗi tiếng Việt để so sánh ngữ âm
-  private normalizeVietnamese(text: string): string[] {
+  public normalizeVietnamese(text: string): string[] {
     return text
       .toLowerCase()
       .replace(/[.,!?;:"'()\[\]\n\r\t\-–—]/g, ' ')
@@ -137,7 +161,187 @@ export class AISpeechService {
       .filter((w) => w.length > 0);
   }
 
-  // Thuật toán so khớp thông minh âm vị Tiếng Việt cho học sinh Lớp 1
+  // Nhận diện dấu thanh tiếng Việt
+  private detectTone(word: string): { tone: 'ngang' | 'sac' | 'huyen' | 'hoi' | 'nga' | 'nang'; name: string } {
+    if (/[áắấéếíóốớúứý]/.test(word)) return { tone: 'sac', name: 'Sắc (/)' };
+    if (/[àằầèềìòồờùừỳ]/.test(word)) return { tone: 'huyen', name: 'Huyền (\\)' };
+    if (/[ảẳẩẻểỉỏởổủửỷ]/.test(word)) return { tone: 'hoi', name: 'Hỏi (?)' };
+    if (/[ãẵẫẽễĩõỡỗũữỹ]/.test(word)) return { tone: 'nga', name: 'Ngã (~)' };
+    if (/[ạặậẹệịọộợụựỵ]/.test(word)) return { tone: 'nang', name: 'Nặng (.)' };
+    return { tone: 'ngang', name: 'Ngang (không dấu)' };
+  }
+
+  // Bỏ dấu thanh để lấy âm tiết gốc (vẫn giữ dấu mũ ă, â, ê, ô, ơ, ư, đ)
+  private stripTone(word: string): string {
+    const toneMap: Record<string, string> = {
+      'á': 'a', 'à': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+      'ắ': 'ă', 'ằ': 'ă', 'ẳ': 'ă', 'ẵ': 'ă', 'ặ': 'ă',
+      'ấ': 'â', 'ầ': 'â', 'ẩ': 'â', 'ẫ': 'â', 'ậ': 'â',
+      'é': 'e', 'è': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+      'ế': 'ê', 'ề': 'ê', 'ể': 'ê', 'ễ': 'ê', 'ệ': 'ê',
+      'í': 'i', 'ì': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+      'ó': 'o', 'ò': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+      'ố': 'ô', 'ồ': 'ô', 'ổ': 'ô', 'ỗ': 'ô', 'ộ': 'ô',
+      'ớ': 'ơ', 'ờ': 'ơ', 'ở': 'ơ', 'ỡ': 'ơ', 'ợ': 'ơ',
+      'ú': 'u', 'ù': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+      'ứ': 'ư', 'ừ': 'ư', 'ử': 'ư', 'ữ': 'ư', 'ự': 'ư',
+      'ý': 'y', 'ỳ': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y'
+    };
+    return word.split('').map((char) => toneMap[char] || char).join('');
+  }
+
+  // Tách âm đầu
+  private extractInitialConsonant(word: string): string {
+    const stripped = this.stripTone(word);
+    const initials = [
+      'ngh', 'ng', 'gh', 'ch', 'tr', 'nh', 'th', 'ph', 'kh', 'gi', 'qu',
+      'b', 'c', 'd', 'đ', 'g', 'h', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'x'
+    ];
+    for (const init of initials) {
+      if (stripped.startsWith(init)) return init;
+    }
+    return '';
+  }
+
+  // Tách âm cuối
+  private extractFinalConsonant(word: string): string {
+    const stripped = this.stripTone(word);
+    const finals = ['ng', 'nh', 'ch', 'c', 't', 'p', 'm', 'n'];
+    for (const fin of finals) {
+      if (stripped.endsWith(fin)) return fin;
+    }
+    return '';
+  }
+
+  // Chẩn đoán chi tiết lỗi sai khi đọc từ theo ngữ âm lớp 1
+  private diagnoseWordMistake(
+    targetWord: string,
+    spokenWord: string
+  ): { errorType: WordErrorType; errorLabel: string; tip: string } {
+    const targetTone = this.detectTone(targetWord);
+    const spokenTone = this.detectTone(spokenWord);
+    const targetBase = this.stripTone(targetWord);
+    const spokenBase = this.stripTone(spokenWord);
+
+    // 1. Kiểm tra lẫn dấu thanh (cùng chữ gốc nhưng khác dấu)
+    if (targetBase === spokenBase && targetTone.tone !== spokenTone.tone) {
+      let specificTip = `Bé chú ý phát âm đúng thanh ${targetTone.name}.`;
+      if (
+        (targetTone.tone === 'nga' && spokenTone.tone === 'hoi') ||
+        (targetTone.tone === 'hoi' && spokenTone.tone === 'nga')
+      ) {
+        specificTip = `Thanh ngã (~) đọc nhấn giọng cao và hơi ngắt hơi nhẹ ở giữa; thanh hỏi (?) đọc trầm xuống rồi hơi hất nhẹ.`;
+      } else if (
+        (targetTone.tone === 'sac' && spokenTone.tone === 'nang') ||
+        (targetTone.tone === 'nang' && spokenTone.tone === 'sac')
+      ) {
+        specificTip = `Thanh sắc (/) lên cao giọng; thanh nặng (.) nhấn mạnh xuống và ngắt hơi dứt khoát.`;
+      }
+      return {
+        errorType: 'tone_confusion',
+        errorLabel: `Lẫn dấu ${targetTone.name} thành dấu ${spokenTone.name}`,
+        tip: specificTip
+      };
+    }
+
+    const targetInit = this.extractInitialConsonant(targetWord);
+    const spokenInit = this.extractInitialConsonant(spokenWord);
+
+    // 2. Kiểm tra lẫn âm đầu phổ biến (L/N, TR/CH, S/X, R/D/GI)
+    if (targetInit && spokenInit && targetInit !== spokenInit) {
+      // L vs N
+      if (
+        (targetInit === 'l' && spokenInit === 'n') ||
+        (targetInit === 'n' && spokenInit === 'l')
+      ) {
+        return {
+          errorType: 'initial_confusion',
+          errorLabel: `Ngọng âm L và N (bé đọc thành "${spokenWord}")`,
+          tip: `Âm 'L' uốn cong đầu lưỡi chạm lợi trên rồi bật mạnh; âm 'N' đầu lưỡi đặt thẳng chân răng trên và hơi thoát qua mũi.`
+        };
+      }
+
+      // TR vs CH
+      if (
+        (targetInit === 'tr' && spokenInit === 'ch') ||
+        (targetInit === 'ch' && spokenInit === 'tr')
+      ) {
+        return {
+          errorType: 'initial_confusion',
+          errorLabel: `Lẫn âm TR và CH (bé đọc thành "${spokenWord}")`,
+          tip: `Âm 'TR' uốn cong đầu lưỡi chạm vòm miệng cứng; âm 'CH' mở miệng tự nhiên, đầu lưỡi thẳng sát hàm dưới.`
+        };
+      }
+
+      // S vs X
+      if (
+        (targetInit === 's' && spokenInit === 'x') ||
+        (targetInit === 'x' && spokenInit === 's')
+      ) {
+        return {
+          errorType: 'initial_confusion',
+          errorLabel: `Lẫn âm S và X (bé đọc thành "${spokenWord}")`,
+          tip: `Âm 'S' uốn cong lưỡi sâu vào trong khoang miệng; âm 'X' đầu lưỡi để thẳng sát kẽ răng dưới.`
+        };
+      }
+
+      // R vs D / GI / G
+      if (
+        targetInit === 'r' &&
+        ['d', 'gi', 'g'].includes(spokenInit)
+      ) {
+        return {
+          errorType: 'initial_confusion',
+          errorLabel: `Lẫn âm R thành ${spokenInit.toUpperCase()} (bé đọc thành "${spokenWord}")`,
+          tip: `Âm 'R' rung nhẹ đầu lưỡi ở vòm miệng; không đọc lướt thành 'D' hay 'GI'.`
+        };
+      }
+    }
+
+    // 3. Kiểm tra sai âm cuối (T vs C, N vs NG)
+    const targetFin = this.extractFinalConsonant(targetWord);
+    const spokenFin = this.extractFinalConsonant(spokenWord);
+    if (targetFin && spokenFin && targetFin !== spokenFin) {
+      if (
+        (targetFin === 't' && spokenFin === 'c') ||
+        (targetFin === 'c' && spokenFin === 't')
+      ) {
+        return {
+          errorType: 'final_confusion',
+          errorLabel: `Lẫn âm cuối T và C (bé đọc thành "${spokenWord}")`,
+          tip: `Âm cuối 'T' đầu lưỡi chặn sau răng trên; âm cuối 'C' nâng phần cuống lưỡi chạm vòm họng.`
+        };
+      }
+      if (
+        (targetFin === 'n' && spokenFin === 'ng') ||
+        (targetFin === 'ng' && spokenFin === 'n')
+      ) {
+        return {
+          errorType: 'final_confusion',
+          errorLabel: `Lẫn âm cuối N và NG (bé đọc thành "${spokenWord}")`,
+          tip: `Âm cuối 'N' đầu lưỡi áp vào lợi trên; âm cuối 'NG' nâng cuống lưỡi lên vòm họng mềm.`
+        };
+      }
+    }
+
+    // 4. Nếu từ gốc gần giống nhau (sai vần)
+    if (targetInit === spokenInit && targetInit !== '') {
+      return {
+        errorType: 'vowel_confusion',
+        errorLabel: `Phát âm chưa chuẩn vần (bé đọc thành "${spokenWord}")`,
+        tip: `Bé chú ý đọc tròn vành rõ chữ, chú ý âm chính và vần của tiếng "${targetWord}".`
+      };
+    }
+
+    // 5. Thay thế từ hoàn toàn
+    return {
+      errorType: 'substitution',
+      errorLabel: `Đọc nhầm thành "${spokenWord}"`,
+      tip: `Bé hãy nhìn kỹ mặt chữ "${targetWord}" trong bài và phát âm chậm lại từng tiếng nhé.`
+    };
+  }
+
+  // Thuật toán so khớp thông minh & chẩn đoán lỗi âm vị Tiếng Việt cho học sinh Lớp 1
   public evaluatePronunciation(
     targetText: string,
     spokenText: string
@@ -154,134 +358,241 @@ export class AISpeechService {
         detailedFeedback: 'Bé đã hoàn thành bài tập xuất sắc.',
         recognizedText: spokenText,
         wordAnalysis: [],
-        phoneticTips: []
+        phoneticTips: [],
+        mistakesCount: 0,
+        correctCount: 0,
+        missingCount: 0,
+        mistakesList: []
       };
     }
 
     if (spokenWords.length === 0) {
+      const missingList: AIMistakeDetail[] = targetWords.slice(0, 5).map((w) => ({
+        word: w,
+        errorType: 'missing',
+        errorLabel: 'Bé chưa đọc tiếng này',
+        suggestion: 'Hãy ngồi gần micro và cất giọng to rõ ràng.'
+      }));
+
       return {
-        score: 40,
+        score: 35,
         accuracy: 0,
         rating: 'practice_more',
         cheeringTitle: 'Chưa nhận diện được giọng bé!',
         detailedFeedback:
-          'Hệ thống chưa nghe rõ giọng đọc của bé. Bé hãy ngồi gần microphone hơn, nói to và rõ từng tiếng nhé!',
+          'Hệ thống chưa nghe rõ giọng đọc của bé. Bé hãy ngồi gần microphone hơn (cách khoảng 15cm), nói to và rõ từng tiếng nhé!',
         recognizedText: '',
         wordAnalysis: targetWords.map((w) => ({
           word: w,
-          status: 'missing'
+          status: 'missing',
+          errorType: 'missing',
+          errorLabel: 'Chưa đọc',
+          phoneticTip: 'Bé hãy đọc to từng tiếng.'
         })),
-        phoneticTips: ['Hãy nói to, rõ ràng và giữ khoảng cách micro khoảng 10 - 15cm.']
+        phoneticTips: [
+          'Hãy kiểm tra quyền Microphone của trình duyệt.',
+          'Nói to, rõ ràng và đọc từng tiếng theo bài học.'
+        ],
+        mistakesCount: targetWords.length,
+        correctCount: 0,
+        missingCount: targetWords.length,
+        mistakesList: missingList
       };
     }
 
-    const wordAnalysis: WordMatchResult[] = [];
-    let matchedCount = 0;
-    let spokenIndex = 0;
+    // ALIGNMENT USING DYNAMIC PROGRAMMING (Needleman-Wunsch inspired for Grade 1 words)
+    const n = targetWords.length;
+    const m = spokenWords.length;
 
-    // So khớp tuần tự theo thứ tự từ
-    for (let i = 0; i < targetWords.length; i++) {
-      const targetW = targetWords[i];
+    // dp[i][j]: best alignment score
+    const dp: number[][] = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+    const path: ('diag' | 'up' | 'left')[][] = Array.from({ length: n + 1 }, () =>
+      Array(m + 1).fill('diag')
+    );
 
-      // Tìm từ khớp trong khoảng lân cận (cửa sổ 3 từ)
-      let foundIdx = -1;
-      for (
-        let j = spokenIndex;
-        j < Math.min(spokenIndex + 4, spokenWords.length);
-        j++
-      ) {
-        if (spokenWords[j] === targetW) {
-          foundIdx = j;
-          break;
+    for (let i = 1; i <= n; i++) {
+      dp[i][0] = -i * 1.5;
+      path[i][0] = 'up';
+    }
+    for (let j = 1; j <= m; j++) {
+      dp[0][j] = -j * 1.2;
+      path[0][j] = 'left';
+    }
+
+    for (let i = 1; i <= n; i++) {
+      for (let j = 1; j <= m; j++) {
+        const tw = targetWords[i - 1];
+        const sw = spokenWords[j - 1];
+
+        let matchScore = -2.0;
+        if (tw === sw) {
+          matchScore = 3.0; // exact match
+        } else if (this.stripTone(tw) === this.stripTone(sw)) {
+          matchScore = 1.6; // same base, tone slip
+        } else if (
+          this.extractInitialConsonant(tw) === this.extractInitialConsonant(sw) &&
+          this.extractInitialConsonant(tw) !== ''
+        ) {
+          matchScore = 0.8; // same initial
         }
-      }
 
-      if (foundIdx !== -1) {
-        matchedCount++;
-        wordAnalysis.push({
-          word: targetW,
-          status: 'correct',
-          spokenWord: spokenWords[foundIdx]
-        });
-        spokenIndex = foundIdx + 1;
-      } else {
-        // Kiểm tra xem có nói từ khác thế chỗ không
-        if (spokenIndex < spokenWords.length) {
-          wordAnalysis.push({
-            word: targetW,
-            status: 'mismatched',
-            spokenWord: spokenWords[spokenIndex]
-          });
-          spokenIndex++;
+        const scoreDiag = dp[i - 1][j - 1] + matchScore;
+        const scoreUp = dp[i - 1][j] - 1.5; // target word missing
+        const scoreLeft = dp[i][j - 1] - 1.2; // spoken extra word
+
+        if (scoreDiag >= scoreUp && scoreDiag >= scoreLeft) {
+          dp[i][j] = scoreDiag;
+          path[i][j] = 'diag';
+        } else if (scoreUp >= scoreLeft) {
+          dp[i][j] = scoreUp;
+          path[i][j] = 'up';
         } else {
-          wordAnalysis.push({
-            word: targetW,
-            status: 'missing'
-          });
+          dp[i][j] = scoreLeft;
+          path[i][j] = 'left';
         }
       }
     }
 
-    const accuracy = Math.round((matchedCount / targetWords.length) * 100);
-    const score = Math.max(30, Math.min(100, accuracy));
+    // Backtrack to build aligned wordAnalysis
+    let i = n;
+    let j = m;
+    const alignedTarget: {
+      word: string;
+      status: 'correct' | 'mismatched' | 'missing';
+      spokenWord?: string;
+    }[] = [];
+
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && path[i][j] === 'diag') {
+        const tw = targetWords[i - 1];
+        const sw = spokenWords[j - 1];
+        if (tw === sw) {
+          alignedTarget.unshift({ word: tw, status: 'correct', spokenWord: sw });
+        } else {
+          alignedTarget.unshift({ word: tw, status: 'mismatched', spokenWord: sw });
+        }
+        i--;
+        j--;
+      } else if (i > 0 && (j === 0 || path[i][j] === 'up')) {
+        alignedTarget.unshift({
+          word: targetWords[i - 1],
+          status: 'missing'
+        });
+        i--;
+      } else {
+        // Extra spoken word by student, skip in backtrack
+        j--;
+      }
+    }
+
+    const wordAnalysis: WordMatchResult[] = [];
+    const mistakesList: AIMistakeDetail[] = [];
+    let correctCount = 0;
+    let missingCount = 0;
+    let mismatchedCount = 0;
+
+    for (const item of alignedTarget) {
+      if (item.status === 'correct') {
+        correctCount++;
+        wordAnalysis.push({
+          word: item.word,
+          status: 'correct',
+          spokenWord: item.spokenWord
+        });
+      } else if (item.status === 'mismatched' && item.spokenWord) {
+        mismatchedCount++;
+        const diag = this.diagnoseWordMistake(item.word, item.spokenWord);
+        wordAnalysis.push({
+          word: item.word,
+          status: 'mismatched',
+          spokenWord: item.spokenWord,
+          errorType: diag.errorType,
+          errorLabel: diag.errorLabel,
+          phoneticTip: diag.tip
+        });
+        mistakesList.push({
+          word: item.word,
+          spokenWord: item.spokenWord,
+          errorType: diag.errorType,
+          errorLabel: diag.errorLabel,
+          suggestion: diag.tip
+        });
+      } else {
+        missingCount++;
+        wordAnalysis.push({
+          word: item.word,
+          status: 'missing',
+          errorType: 'missing',
+          errorLabel: 'Bé đọc sót tiếng này',
+          phoneticTip: `Bé nhớ đọc đủ từ "${item.word}", không đọc lướt qua nhé.`
+        });
+        mistakesList.push({
+          word: item.word,
+          errorType: 'missing',
+          errorLabel: 'Đọc sót từ',
+          suggestion: `Nhìn kỹ chữ "${item.word}" và đọc to rõ ràng.`
+        });
+      }
+    }
+
+    // Điểm số và độ chính xác
+    const accuracy = Math.round((correctCount / targetWords.length) * 100);
+    // Tính điểm sư phạm (có hỗ trợ điểm khuyến khích cho các từ chỉ sai nhẹ dấu thanh)
+    let score = Math.round(
+      (correctCount * 100 + mismatchedCount * 45) / targetWords.length
+    );
+    score = Math.max(35, Math.min(100, score));
 
     let rating: 'excellent' | 'great' | 'good' | 'practice_more';
     let cheeringTitle = '';
     let detailedFeedback = '';
     const phoneticTips: string[] = [];
 
-    if (accuracy >= 85) {
+    const totalMistakes = mismatchedCount + missingCount;
+
+    if (accuracy >= 85 || totalMistakes === 0) {
       rating = 'excellent';
       cheeringTitle = '🌟 Xuất Sắc! Phát Âm Rất Chuẩn';
       detailedFeedback =
-        'Bé phát âm rất chuẩn xác, tròn vành rõ chữ, giọng đọc lưu loát đúng theo chuẩn SGK Tiếng Việt 1.';
-      phoneticTips.push('Bé giữ vững phong độ này khi đọc bài trên lớp cùng cô giáo nhé!');
+        'Bé phát âm rất chuẩn xác, tròn vành rõ chữ, giọng đọc lưu loát và đúng theo chuẩn SGK Tiếng Việt 1.';
+      phoneticTips.push('Bé hãy giữ vững phong độ này khi đọc bài cùng Cô giáo trên lớp nhé!');
     } else if (accuracy >= 70) {
       rating = 'great';
       cheeringTitle = '👏 Rất Tốt! Đọc Khá Lưu Loát';
-      detailedFeedback =
-        'Bé đọc rất to và rõ ràng! Có một vài từ bé đọc nhanh nên cần chú ý phát âm rõ hơn dấu thanh và âm cuối.';
-      phoneticTips.push('Bé hãy chú ý nhấn giọng ở các từ có dấu ngã (~) và dấu hỏi (?).');
+      detailedFeedback = `Bé đọc rất to và tự tin! AI phát hiện bé cần rèn thêm ${totalMistakes} từ để bài đọc đạt điểm 10 tuyệt đối.`;
+      phoneticTips.push('Bé hãy bấm vào các từ màu đỏ bên dưới để nghe cô đọc mẫu và sửa phát âm nhé.');
     } else if (accuracy >= 50) {
       rating = 'good';
       cheeringTitle = '👍 Đạt Yêu Cầu! Cố Gắng Thêm Chút Nữa';
-      detailedFeedback =
-        'Bé đã nỗ lực đọc bài tương đối tốt. Bé hãy bấm nghe lại giọng đọc mẫu của cô giáo để phát âm chuẩn hơn các âm khó nhé!';
+      detailedFeedback = `Bé đã đọc được ${correctCount}/${targetWords.length} từ chuẩn. Bé hãy chú ý phát âm rõ hơn dấu thanh và các âm đầu khó.`;
       phoneticTips.push('Luyện phát âm chậm từng tiếng một, không cần đọc quá nhanh.');
     } else {
       rating = 'practice_more';
       cheeringTitle = '💪 Bé Cố Gắng Luyện Thêm Nhé!';
       detailedFeedback =
-        'Bé hãy nghe cô giáo đọc mẫu trước, sau đó bấm nút thu âm và đọc theo từng câu ngắn nhé.';
-      phoneticTips.push('Bấm nút "Nghe cô đọc mẫu" màu cam để bắt chước ngữ điệu chuẩn.');
+        'Bé hãy bấm nút "Nghe cô đọc mẫu" trước, sau đó bấm nút thu âm và đọc theo từng câu ngắn nhé.';
+      phoneticTips.push('Chỉ tay vào từng chữ khi đọc để không bị bỏ sót tiếng.');
     }
 
-    // Chẩn đoán chuyên sâu ngữ âm thực tế cho học sinh lớp 1 vùng cao / DTTS (Công văn 4786)
-    const mismatchedWords = wordAnalysis.filter((w) => w.status !== 'correct').map((w) => w.word);
-
-    // 1. Phân biệt L và N
-    const hasLN = mismatchedWords.some((w) => /^([ln])/i.test(w));
+    // Chắt lọc lời khuyên sư phạm theo lỗi thực tế (Công văn 4786)
+    const hasLN = mistakesList.some((m) => m.errorLabel.includes('L và N'));
     if (hasLN && phoneticTips.length < 3) {
       phoneticTips.push(
-        'Mẹo âm đầu L / N: Khi đọc L, uốn cong đầu lưỡi chạm lợi rồi bật mạnh ra; khi đọc N, đầu lưỡi đặt phẳng chân răng và hơi thoát qua khoang mũi.'
+        'Mẹo âm L / N: Khi đọc L, uốn cong đầu lưỡi chạm lợi trên; khi đọc N, đầu lưỡi đặt thẳng chân răng.'
       );
     }
 
-    // 2. Phân biệt TR / CH và S / X
-    const hasTrChSx = mismatchedWords.some((w) => /^(tr|ch|s|x)/i.test(w));
-    if (hasTrChSx && phoneticTips.length < 3) {
+    const hasTrCh = mistakesList.some((m) => m.errorLabel.includes('TR và CH'));
+    if (hasTrCh && phoneticTips.length < 3) {
       phoneticTips.push(
-        'Mẹo âm TR / CH, S / X: Uốn cong đầu lưỡi khi phát âm TR và S; giữ lưỡi thẳng tự nhiên sát hàm dưới khi đọc CH và X.'
+        'Mẹo âm TR / CH: Uốn cong đầu lưỡi khi đọc TR; để lưỡi thẳng tự nhiên sát hàm dưới khi đọc CH.'
       );
     }
 
-    // 3. Phân biệt dấu hỏi (?) và dấu ngã (~)
-    const hasTones = mismatchedWords.some((w) =>
-      /[ảẳẩẻểỉỏởổủửỷãẵẫẽễĩõỡỗũữỹ]/.test(w)
-    );
+    const hasTones = mistakesList.some((m) => m.errorType === 'tone_confusion');
     if (hasTones && phoneticTips.length < 3) {
       phoneticTips.push(
-        'Mẹo dấu thanh: Thanh hỏi (?) đọc trầm xuống rồi hơi hất nhẹ; thanh ngã (~) nhấn giọng cao hơn và ngắt hơi nhẹ ở giữa.'
+        'Mẹo dấu thanh: Chú ý nhấn giọng cao hơn ở dấu ngã (~) và hạ trầm ở dấu hỏi (?).'
       );
     }
 
@@ -293,7 +604,11 @@ export class AISpeechService {
       detailedFeedback,
       recognizedText: spokenWords.join(' '),
       wordAnalysis,
-      phoneticTips
+      phoneticTips,
+      mistakesCount: totalMistakes,
+      correctCount,
+      missingCount,
+      mistakesList
     };
   }
 }

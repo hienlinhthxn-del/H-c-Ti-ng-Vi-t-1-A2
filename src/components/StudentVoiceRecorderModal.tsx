@@ -65,6 +65,15 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
   // AI Speech Recognition & Evaluation States
   const [liveTranscript, setLiveTranscript] = useState<string>('');
   const [aiEvaluation, setAiEvaluation] = useState<AIEvaluationResult | null>(null);
+  const [selectedWordDetail, setSelectedWordDetail] = useState<{
+    word: string;
+    spokenWord?: string;
+    status: 'correct' | 'mismatched' | 'missing' | 'extra';
+    errorLabel?: string;
+    phoneticTip?: string;
+  } | null>(null);
+  const [speakingWord, setSpeakingWord] = useState<string | null>(null);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
   // Audio playback of the recorded voice
   const [isPlayingRecorded, setIsPlayingRecorded] = useState<boolean>(false);
@@ -153,7 +162,16 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
     setPlaybackDuration(0);
     setLiveTranscript('');
     setAiEvaluation(null);
+    setSelectedWordDetail(null);
+    setSpeakingWord(null);
     setSubmittedSuccess(false);
+  };
+
+  const handleSpeakWord = (word: string) => {
+    setSpeakingWord(word);
+    speechService.speak(word, () => {
+      setSpeakingWord(null);
+    });
   };
 
   // Start audio recording
@@ -703,86 +721,281 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                 ) : audioUrl ? (
                   /* 2. STATE: RECORDED COMPLETED / REVIEW & AI EVALUATION */
                   <div className="w-full space-y-5">
-                    {/* AI EVALUATION REPORT CARD */}
+                    {/* SUBMITTED SUCCESS BANNER */}
+                    {submittedSuccess && (
+                      <div className="rounded-3xl p-5 border-2 border-emerald-400 bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 text-white shadow-xl animate-in zoom-in-95 duration-200">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex items-start gap-3.5">
+                            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-3xl shrink-0 shadow-inner">
+                              🎉
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[11px] font-black uppercase tracking-wider bg-white/25 px-2.5 py-0.5 rounded-full">
+                                  Đã Nộp Bài Cho Cô Giáo ✓
+                                </span>
+                                {aiEvaluation && (
+                                  <span className="text-xs font-black bg-amber-400 text-amber-950 px-2.5 py-0.5 rounded-full shadow-xs">
+                                    AI Chấm: {aiEvaluation.score}/100 Điểm
+                                  </span>
+                                )}
+                              </div>
+                              <h4 className="text-base sm:text-lg font-black font-serif">
+                                Hoan hô bé! Bài đọc đã được gửi tới Cô giáo và Bố Mẹ!
+                              </h4>
+                              <p className="text-xs text-emerald-50 font-medium">
+                                Bản ghi âm và phiếu chẩn đoán ngữ âm chi tiết đã được lưu vào Học bạ & Sổ liên lạc Cổng Phụ Huynh.
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('history')}
+                            className="px-4 py-2 bg-white text-emerald-900 hover:bg-emerald-50 rounded-2xl font-black text-xs shadow-md transition-all self-start sm:self-auto cursor-pointer"
+                          >
+                            Xem Sổ Bài Đọc ({recordings.length})
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AI EVALUATION & ERROR DETECTION REPORT CARD */}
                     {aiEvaluation && (
-                      <div className="rounded-3xl p-5 border-2 border-purple-300 bg-gradient-to-br from-purple-50 via-indigo-50/50 to-pink-50 text-left shadow-md">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-purple-200">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center text-2xl shadow-md shrink-0">
-                              <Bot className="w-7 h-7" />
+                      <div className="rounded-3xl p-5 sm:p-6 border-2 border-purple-300 bg-gradient-to-br from-purple-50 via-indigo-50/60 to-pink-50 text-left shadow-lg space-y-5">
+                        {/* Header: Score & Title */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-purple-200">
+                          <div className="flex items-center gap-3.5">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-md shrink-0">
+                              <Bot className="w-8 h-8" />
                             </div>
                             <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-black uppercase tracking-wider bg-purple-200 text-purple-900 px-2 py-0.5 rounded-md">
-                                  Trợ lý AI chấm phát âm
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[11px] font-black uppercase tracking-wider bg-purple-200 text-purple-950 px-2.5 py-0.5 rounded-md">
+                                  Trợ lý AI chấm & phát hiện lỗi
                                 </span>
-                                <span className="text-xs font-bold text-purple-700">
-                                  Độ chính xác: {aiEvaluation.accuracy}%
+                                <span className="text-xs font-extrabold text-purple-700">
+                                  Độ chuẩn xác: {aiEvaluation.accuracy}%
                                 </span>
                               </div>
-                              <h4 className="text-base sm:text-lg font-black text-purple-950 mt-0.5">
+                              <h4 className="text-base sm:text-lg font-black text-purple-950 mt-1 font-serif">
                                 {aiEvaluation.cheeringTitle}
                               </h4>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
-                            <div className="bg-white px-3.5 py-1.5 rounded-2xl border-2 border-purple-300 text-center shadow-xs">
-                              <span className="text-[10px] block font-bold text-slate-500 uppercase">Điểm AI</span>
-                              <span className="text-xl font-black text-purple-700">{aiEvaluation.score}/100</span>
+                          {/* Score Gauge */}
+                          <div className="flex items-center gap-3 shrink-0 self-start sm:self-auto">
+                            <div className="bg-white px-4 py-2 rounded-2xl border-2 border-purple-300 text-center shadow-xs">
+                              <span className="text-[10px] block font-black text-slate-500 uppercase tracking-wider">
+                                Điểm Đọc AI
+                              </span>
+                              <div className="flex items-baseline justify-center gap-0.5">
+                                <span className="text-2xl sm:text-3xl font-black text-purple-700 font-mono">
+                                  {aiEvaluation.score}
+                                </span>
+                                <span className="text-xs font-bold text-slate-400">/100</span>
+                              </div>
                             </div>
                           </div>
                         </div>
 
-                        {/* Detailed feedback */}
-                        <p className="text-xs sm:text-sm text-purple-900/90 font-medium my-3 leading-relaxed">
-                          {aiEvaluation.detailedFeedback}
-                        </p>
+                        {/* Detailed feedback banner */}
+                        <div className="p-3.5 bg-white/85 rounded-2xl border border-purple-200 text-xs sm:text-sm text-purple-950 font-medium leading-relaxed flex items-start gap-2.5">
+                          <Sparkles className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                          <span>{aiEvaluation.detailedFeedback}</span>
+                        </div>
 
-                        {/* Word-by-word Analysis */}
-                        {aiEvaluation.wordAnalysis && aiEvaluation.wordAnalysis.length > 0 && (
-                          <div className="mt-3 bg-white/90 rounded-2xl p-4 border border-purple-200">
-                            <span className="text-[11px] font-bold text-slate-600 block mb-2">
-                              Chi tiết phát âm từng từ trong bài:
+                        {/* 3 Summary Counters: Correct / Mispronounced / Missing */}
+                        <div className="grid grid-cols-3 gap-2.5 text-center">
+                          <div className="bg-emerald-100/90 border border-emerald-300 rounded-2xl p-2.5 shadow-2xs">
+                            <div className="text-[10px] font-bold text-emerald-800 uppercase">Từ Đọc Chuẩn</div>
+                            <div className="text-lg sm:text-xl font-black text-emerald-700 mt-0.5">
+                              {aiEvaluation.correctCount ?? aiEvaluation.wordAnalysis.filter(w => w.status === 'correct').length} từ
+                            </div>
+                          </div>
+
+                          <div className="bg-rose-100/90 border border-rose-300 rounded-2xl p-2.5 shadow-2xs">
+                            <div className="text-[10px] font-bold text-rose-800 uppercase">Cần Sửa Phát Âm</div>
+                            <div className="text-lg sm:text-xl font-black text-rose-700 mt-0.5">
+                              {aiEvaluation.mistakesCount ?? aiEvaluation.wordAnalysis.filter(w => w.status === 'mismatched').length} từ
+                            </div>
+                          </div>
+
+                          <div className="bg-amber-100/90 border border-amber-300 rounded-2xl p-2.5 shadow-2xs">
+                            <div className="text-[10px] font-bold text-amber-800 uppercase">Từ Đọc Sót</div>
+                            <div className="text-lg sm:text-xl font-black text-amber-700 mt-0.5">
+                              {aiEvaluation.missingCount ?? aiEvaluation.wordAnalysis.filter(w => w.status === 'missing').length} từ
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Interactive Word Inspection Board */}
+                        <div className="bg-white rounded-2xl p-4 border border-purple-200 space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-100">
+                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                              <Volume2 className="w-4 h-4 text-purple-600" />
+                              <span>So sánh từng từ (Chạm vào từng từ để nghe Cô phát âm mẫu):</span>
                             </span>
-                            <div className="flex flex-wrap gap-1.5">
-                              {aiEvaluation.wordAnalysis.map((item, idx) => (
-                                <span
+                            <div className="flex items-center gap-3 text-[11px] font-medium text-slate-500">
+                              <span className="flex items-center gap-1">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Đọc đúng
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> Đọc sai/ngọng
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Đọc sót
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Word Badges */}
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {aiEvaluation.wordAnalysis.map((item, idx) => {
+                              const isSelected = selectedWordDetail?.word === item.word;
+                              const isSpeaking = speakingWord === item.word;
+
+                              return (
+                                <button
                                   key={idx}
-                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedWordDetail(item);
+                                    handleSpeakWord(item.word);
+                                  }}
+                                  className={`inline-flex flex-col items-center px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer select-none active:scale-95 ${
                                     item.status === 'correct'
-                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-2 border-emerald-300'
                                       : item.status === 'mismatched'
-                                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                      : 'bg-rose-100 text-rose-800 border border-rose-300'
-                                  }`}
-                                  title={
-                                    item.status === 'correct'
-                                      ? 'Bé đọc rất chuẩn'
-                                      : item.status === 'mismatched'
-                                      ? `Bé đọc thành "${item.spokenWord || ''}"`
-                                      : 'Bé chưa đọc từ này'
-                                  }
+                                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-900 border-2 border-rose-400 ring-2 ring-rose-200'
+                                      : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-2 border-dashed border-amber-400'
+                                  } ${isSelected ? 'scale-105 shadow-md' : ''}`}
                                 >
-                                  {item.status === 'correct' ? (
-                                    <Check className="w-3 h-3 text-emerald-600" />
-                                  ) : (
-                                    <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                  <div className="flex items-center gap-1">
+                                    {item.status === 'correct' ? (
+                                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                    ) : item.status === 'mismatched' ? (
+                                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                                    ) : (
+                                      <span className="text-[10px] text-amber-600 font-black">?</span>
+                                    )}
+                                    <span className="text-sm font-black font-reading">{item.word}</span>
+                                    {isSpeaking && <Volume2 className="w-3 h-3 text-purple-600 animate-pulse" />}
+                                  </div>
+
+                                  {item.status === 'mismatched' && item.spokenWord && (
+                                    <span className="text-[10px] font-normal text-rose-600 line-through">
+                                      {item.spokenWord}
+                                    </span>
                                   )}
-                                  <span>{item.word}</span>
-                                </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Selected Word Detail Box */}
+                          {selectedWordDetail && (
+                            <div className="mt-3 p-3.5 rounded-2xl bg-indigo-50/90 border border-indigo-200 text-xs text-indigo-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-black text-sm text-indigo-950 font-reading">
+                                    Từ: "{selectedWordDetail.word}"
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                                    selectedWordDetail.status === 'correct'
+                                      ? 'bg-emerald-200 text-emerald-900'
+                                      : selectedWordDetail.status === 'mismatched'
+                                      ? 'bg-rose-200 text-rose-900'
+                                      : 'bg-amber-200 text-amber-900'
+                                  }`}>
+                                    {selectedWordDetail.status === 'correct'
+                                      ? 'Đọc rất chuẩn ✓'
+                                      : selectedWordDetail.errorLabel || 'Phát âm chưa chuẩn'}
+                                  </span>
+                                </div>
+                                {selectedWordDetail.phoneticTip && (
+                                  <p className="text-[11px] text-slate-700 italic">
+                                    💡 {selectedWordDetail.phoneticTip}
+                                  </p>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleSpeakWord(selectedWordDetail.word)}
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer self-start sm:self-auto"
+                              >
+                                <Volume2 className="w-3.5 h-3.5" />
+                                <span>Nghe cô phát âm</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Dedicated List of Mistakes (if any) */}
+                        {aiEvaluation.mistakesList && aiEvaluation.mistakesList.length > 0 && (
+                          <div className="p-4 rounded-2xl bg-rose-50/90 border border-rose-200 space-y-3">
+                            <div className="flex items-center gap-2 text-xs font-black text-rose-900 uppercase">
+                              <AlertCircle className="w-4 h-4 text-rose-600" />
+                              <span>Chi tiết {aiEvaluation.mistakesList.length} lỗi phát âm AI phát hiện cần lưu ý:</span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {aiEvaluation.mistakesList.map((err, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-3 rounded-xl bg-white border border-rose-200 shadow-2xs space-y-1.5"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                                      <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                                        Đúng: "{err.word}"
+                                      </span>
+                                      {err.spokenWord && (
+                                        <span className="text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
+                                          Bé đọc: "{err.spokenWord}"
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSpeakWord(err.word)}
+                                      className="p-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors"
+                                      title="Nghe mẫu từ này"
+                                    >
+                                      <Volume2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+
+                                  <div className="text-[11px] font-bold text-rose-800">
+                                    {err.errorLabel}
+                                  </div>
+
+                                  <div className="text-[10px] text-slate-600 leading-tight">
+                                    {err.suggestion}
+                                  </div>
+                                </div>
                               ))}
                             </div>
                           </div>
                         )}
 
-                        {/* Phonetic tips */}
+                        {/* Phonetic tips from AI Teacher */}
                         {aiEvaluation.phoneticTips && aiEvaluation.phoneticTips.length > 0 && (
-                          <div className="mt-3 flex items-start gap-2 text-[11px] text-purple-800 bg-purple-100/60 p-2.5 rounded-xl">
+                          <div className="flex items-start gap-2.5 text-xs text-purple-900 bg-purple-100/70 p-3.5 rounded-2xl border border-purple-200">
                             <Sparkles className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                            <span>
-                              <strong>Lời khuyên của cô giáo AI:</strong> {aiEvaluation.phoneticTips.join(' ')}
-                            </span>
+                            <div>
+                              <strong className="block font-black text-purple-950 mb-0.5">
+                                Hướng dẫn rèn luyện từ Cô giáo AI:
+                              </strong>
+                              <ul className="list-disc list-inside space-y-1 text-[11px] text-purple-900/90">
+                                {aiEvaluation.phoneticTips.map((tip, idx) => (
+                                  <li key={idx}>{tip}</li>
+                                ))}
+                              </ul>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -841,9 +1054,13 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                               setSubmittedSuccess(true);
                               speechService.playSoundEffect('fanfare');
                               speechService.speak('Bài đọc đã được lưu và nộp thành công cho giáo viên!');
-                              confetti({ particleCount: 60, spread: 60, origin: { y: 0.7 } });
+                              confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
                             }}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+                            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer ${
+                              submittedSuccess
+                                ? 'bg-emerald-700 text-white ring-2 ring-emerald-300'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            }`}
                           >
                             <CheckCircle2 className="w-4 h-4 text-emerald-200" />
                             <span>{submittedSuccess ? 'Đã nộp bài cho cô giáo ✓' : 'Nộp bài cho cô giáo'}</span>
@@ -1003,6 +1220,38 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                                 <span>{rec.feedback.cheeringMessage}</span>
                               </p>
                             )
+                          )}
+
+                          {/* Word analysis badges if available */}
+                          {rec.aiEvaluation?.wordAnalysis && rec.aiEvaluation.wordAnalysis.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-amber-100/60">
+                              <div className="flex flex-wrap gap-1">
+                                {rec.aiEvaluation.wordAnalysis.map((item, wIdx) => (
+                                  <span
+                                    key={wIdx}
+                                    className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                                      item.status === 'correct'
+                                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                        : item.status === 'mismatched'
+                                        ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                                        : 'bg-amber-50 text-amber-800 border border-amber-200'
+                                    }`}
+                                    title={
+                                      item.status === 'correct'
+                                        ? 'Đọc chuẩn'
+                                        : item.status === 'mismatched'
+                                        ? `Đọc thành "${item.spokenWord || ''}" (${item.errorLabel || 'Cần sửa'})`
+                                        : 'Đọc sót'
+                                    }
+                                  >
+                                    <span>{item.word}</span>
+                                    {item.status === 'mismatched' && item.spokenWord && (
+                                      <span className="text-[9px] opacity-75">({item.spokenWord})</span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </div>
 

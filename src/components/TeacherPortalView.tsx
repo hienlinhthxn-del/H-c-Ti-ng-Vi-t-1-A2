@@ -976,21 +976,76 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                         )}
                       </div>
 
-                      {/* AI Evaluation */}
+                      {/* AI Evaluation & Error Analysis */}
                       {rec.aiEvaluation ? (
-                        <div className="mt-3 p-3.5 rounded-2xl bg-purple-50 border border-purple-200 text-xs space-y-1.5">
-                          <div className="flex items-center justify-between">
+                        <div className="mt-3 p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200 text-xs space-y-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <span className="font-bold text-purple-900 flex items-center gap-1.5">
                               <Bot className="w-4 h-4 text-purple-600" />
-                              <span>Trợ lý AI Đánh Giá: <strong className="text-purple-700">{rec.aiEvaluation.score} điểm</strong> (Độ chính xác: {rec.aiEvaluation.accuracy}%)</span>
+                              <span>Trợ lý AI Đánh Giá: <strong className="text-purple-700 font-black">{rec.aiEvaluation.score} điểm</strong> (Độ chính xác: {rec.aiEvaluation.accuracy}%)</span>
                             </span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-200 text-purple-950 self-start sm:self-auto">
                               {rec.aiEvaluation.cheeringTitle}
                             </span>
                           </div>
-                          <p className="text-[11px] text-purple-800 italic">
+
+                          <p className="text-[11px] text-purple-900 italic bg-white/70 p-2 rounded-xl border border-purple-100">
                             "{rec.aiEvaluation.detailedFeedback}"
                           </p>
+
+                          {/* Word-by-word Analysis Badges */}
+                          {rec.aiEvaluation.wordAnalysis && rec.aiEvaluation.wordAnalysis.length > 0 && (
+                            <div className="space-y-1 pt-1 border-t border-purple-100">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                                Kết quả nhận diện từng từ:
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {rec.aiEvaluation.wordAnalysis.map((item, wIdx) => (
+                                  <span
+                                    key={wIdx}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                                      item.status === 'correct'
+                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                        : item.status === 'mismatched'
+                                        ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                                        : 'bg-amber-100 text-amber-900 border border-amber-300'
+                                    }`}
+                                    title={
+                                      item.status === 'correct'
+                                        ? 'Đọc chuẩn'
+                                        : item.status === 'mismatched'
+                                        ? `Đọc thành "${item.spokenWord || ''}" (${item.errorLabel || 'Cần sửa'})`
+                                        : 'Đọc sót'
+                                    }
+                                  >
+                                    <span>{item.word}</span>
+                                    {item.status === 'mismatched' && item.spokenWord && (
+                                      <span className="text-[9px] text-rose-600 line-through">
+                                        ({item.spokenWord})
+                                      </span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Detected Mistakes Details */}
+                          {rec.aiEvaluation.mistakesList && rec.aiEvaluation.mistakesList.length > 0 && (
+                            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-[11px] text-rose-950 space-y-1">
+                              <span className="font-bold block text-rose-900 flex items-center gap-1">
+                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                                <span>Phát hiện {rec.aiEvaluation.mistakesList.length} lỗi phát âm cần cô giáo lưu ý:</span>
+                              </span>
+                              <ul className="list-disc list-inside space-y-0.5 text-[10px] text-rose-900">
+                                {rec.aiEvaluation.mistakesList.map((m, mIdx) => (
+                                  <li key={mIdx}>
+                                    <strong>"{m.word}"</strong>: {m.errorLabel} {m.spokenWord ? `(nói thành "${m.spokenWord}")` : ''} - <em>{m.suggestion}</em>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
                       ) : rec.feedback && (
                         <div className="mt-3 p-3 rounded-2xl bg-amber-50/80 border border-amber-100 text-xs flex items-center justify-between">
@@ -1067,9 +1122,20 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
                 {selectedRecording ? (
                   <div className="space-y-4">
-                    <div className="p-3 bg-amber-50 rounded-2xl border border-amber-100 text-xs space-y-1">
+                    <div className="p-3 bg-amber-50 rounded-2xl border border-amber-100 text-xs space-y-1.5">
                       <div className="font-bold text-amber-900">{selectedRecording.lessonTitle}</div>
                       <div className="text-slate-700 italic">"{selectedRecording.targetText}"</div>
+                      {selectedRecording.aiEvaluation && (
+                        <div className="pt-1.5 border-t border-amber-200/60 flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-purple-900 flex items-center gap-1">
+                            <Bot className="w-3.5 h-3.5 text-purple-600" />
+                            <span>AI Chấm: {selectedRecording.aiEvaluation.score}/100đ</span>
+                          </span>
+                          <span className="font-semibold text-rose-700">
+                            {selectedRecording.aiEvaluation.mistakesCount ?? selectedRecording.aiEvaluation.wordAnalysis?.filter(w => w.status !== 'correct').length ?? 0} lỗi phát âm
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -1105,13 +1171,17 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                           onClick={() => {
                             if (!selectedRecording) return;
                             const studentName = selectedRecording.studentName || 'Con';
-                            const score = selectedRecording.aiEvaluation?.score || 5;
-                            const accuracy = selectedRecording.aiEvaluation?.accuracy ?? 90;
+                            const evalRes = selectedRecording.aiEvaluation;
+                            const score = evalRes?.score ?? 85;
+                            const mistakes = evalRes?.mistakesList || [];
                             
                             let suggestion = '';
-                            if (score >= 4.5 || accuracy >= 85) {
-                              suggestion = `Cô khen ${studentName} đọc bài rất to, rõ ràng và phát âm chuẩn các âm vần trong bài. Con ngắt nghỉ câu rất tự nhiên, tiếp tục phát huy con nhé! ⭐`;
-                            } else if (score >= 3.5 || accuracy >= 70) {
+                            if (mistakes.length > 0) {
+                              const firstMistake = mistakes[0];
+                              suggestion = `Cô khen ${studentName} đọc to, tự tin. Con chú ý rèn lại từ "${firstMistake.word}" (tránh đọc nhầm thành "${firstMistake.spokenWord || 'âm khác'}"): ${firstMistake.suggestion}. Chúc con đọc ngày càng hay! 👏`;
+                            } else if (score >= 85) {
+                              suggestion = `Cô khen ${studentName} đọc bài rất to, rõ ràng và phát âm chuẩn xác từng tiếng trong bài (${score}/100 điểm AI). Con ngắt nghỉ câu rất tự nhiên, tiếp tục phát huy nhé! ⭐`;
+                            } else if (score >= 60) {
                               suggestion = `Cô khen ${studentName} đã cố gắng hoàn thành bài đọc. Con chú ý rèn thêm các âm dấu thanh để giọng đọc tròn vành rõ chữ hơn nhé, cô tin con sẽ làm rất tốt! 👏`;
                             } else {
                               suggestion = `Cô khen tinh thần tự giác luyện đọc của ${studentName}. Con hãy lắng nghe mẫu của Cô giáo và bấm máy đọc lại từng câu ngắn cho quen tai nhé! ❤️`;

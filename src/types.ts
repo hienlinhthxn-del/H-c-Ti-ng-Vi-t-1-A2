@@ -164,10 +164,23 @@ export interface StudentRecording {
     recognizedText: string;
     wordAnalysis?: Array<{
       word: string;
-      status: 'correct' | 'mismatched' | 'missing';
+      status: 'correct' | 'mismatched' | 'missing' | 'extra';
       spokenWord?: string;
+      errorType?: string;
+      errorLabel?: string;
+      phoneticTip?: string;
     }>;
     phoneticTips?: string[];
+    mistakesCount?: number;
+    correctCount?: number;
+    missingCount?: number;
+    mistakesList?: Array<{
+      word: string;
+      spokenWord?: string;
+      errorType: string;
+      errorLabel: string;
+      suggestion: string;
+    }>;
   };
   teacherComment?: string;
   teacherScore?: number;
