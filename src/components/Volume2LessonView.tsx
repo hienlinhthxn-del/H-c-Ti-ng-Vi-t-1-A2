@@ -6,6 +6,7 @@ import { teacherAudioService } from '../services/teacherAudioService';
 import { achievementService } from '../services/achievementService';
 import { userProfileService } from '../services/userProfileService';
 import { TeacherAudioTarget } from './TeacherAudioRecorderModal';
+import confetti from 'canvas-confetti';
 import {
   Volume2,
   CheckCircle2,
@@ -19,7 +20,9 @@ import {
   Edit3,
   Mic,
   Type,
-  Check
+  Check,
+  Bot,
+  AlertCircle
 } from 'lucide-react';
 
 interface Volume2LessonViewProps {
@@ -56,6 +59,7 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
   const [selectedAnswers, setSelectedAnswers] = useState<{ [key: string]: number }>({});
   const [showAnswerFor, setShowAnswerFor] = useState<{ [key: string]: boolean }>({});
   const [spellingSelections, setSpellingSelections] = useState<{ [key: number]: string }>({});
+  const [readingPromptKey, setReadingPromptKey] = useState<string | null>(null);
   const [, setAudioVersion] = useState<number>(0);
   const [isCompleted, setIsCompleted] = useState<boolean>(() => achievementService.isLessonCompleted('vol2', lesson.id));
 
@@ -75,6 +79,19 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
   }, []);
 
   const isCustomized = lessonStorageService.isVolume2Customized(lesson.id);
+
+  const handleReadPrompt = (key: string, textToRead: string) => {
+    if (readingPromptKey === key) {
+      speechService.stop();
+      setReadingPromptKey(null);
+      return;
+    }
+    setReadingPromptKey(key);
+    speechService.playSoundEffect('pop');
+    speechService.speak(textToRead, () => {
+      setReadingPromptKey(null);
+    });
+  };
 
   const handleToggleCompletion = () => {
     const nextState = !isCompleted;
@@ -120,6 +137,15 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
   const handleSelectQuiz = (qId: string, optIdx: number, correctOpt: number | undefined) => {
     setSelectedAnswers(prev => ({ ...prev, [qId]: optIdx }));
     if (correctOpt !== undefined && optIdx === correctOpt) {
+      speechService.playSoundEffect('correct');
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+      const praises = [
+        'Đúng rồi! Bé giỏi quá!',
+        'Hoan hô bé! Câu trả lời rất chính xác!',
+        'Tuyệt vời! Bé thông minh lắm!'
+      ];
+      const randomPraise = praises[Math.floor(Math.random() * praises.length)];
+
       const alreadyAnswered = selectedAnswers[qId] === correctOpt;
       if (!alreadyAnswered) {
         const nextAnswers = { ...selectedAnswers, [qId]: optIdx };
@@ -129,19 +155,32 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
         ).length;
 
         if (questions.length > 0 && answeredCount === questions.length) {
-          speechService.playSoundEffect('sectionComplete');
           setTimeout(() => {
-            speechService.speak('Hoan hô bé! Bé đã trả lời đúng toàn bộ câu hỏi đọc hiểu!');
-          }, 500);
+            speechService.playSoundEffect('sectionComplete');
+            speechService.speak('Hoan hô bé! Bé đã xuất sắc trả lời đúng toàn bộ câu hỏi đọc hiểu!');
+            confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 } });
+          }, 350);
         } else {
-          speechService.playSoundEffect('correct');
+          setTimeout(() => {
+            speechService.speak(randomPraise);
+          }, 300);
         }
         onAddStar();
       } else {
-        speechService.playSoundEffect('correct');
+        setTimeout(() => {
+          speechService.speak(randomPraise);
+        }, 300);
       }
     } else {
-      speechService.playSoundEffect('tryAgain');
+      speechService.playSoundEffect('wrong');
+      const encouragements = [
+        'Chưa đúng rồi, bé hãy thử chọn lại nhé!',
+        'Bé hãy suy nghĩ kỹ hơn một chút và thử lại nào!'
+      ];
+      const randomEncouragement = encouragements[Math.floor(Math.random() * encouragements.length)];
+      setTimeout(() => {
+        speechService.speak(randomEncouragement);
+      }, 350);
     }
   };
 
@@ -464,24 +503,60 @@ export const Volume2LessonView: React.FC<Volume2LessonViewProps> = ({
           {/* 3. TRẢ LỜI CÂU HỎI ĐỌC HIỂU */}
           {lesson.comprehensionQuestions && lesson.comprehensionQuestions.length > 0 && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2.5">
-                <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-sm font-serif shadow-2xs">
-                  2
-                </span>
-                <h2 className="text-base sm:text-lg font-bold text-blue-600 font-serif">
-                  Trả lời câu hỏi
-                </h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-sm font-serif shadow-2xs">
+                    2
+                  </span>
+                  <h2 className="text-base sm:text-lg font-bold text-blue-600 font-serif">
+                    Trả lời câu hỏi
+                  </h2>
+                </div>
+                <button
+                  id="speak-comprehension-instruction-btn"
+                  onClick={() => handleReadPrompt('comp_header', 'Trả lời câu hỏi đọc hiểu: Bé hãy bấm vào nút chiếc loa để nghe AI đọc câu hỏi, sau đó bấm chọn đáp án đúng nhất nhé!')}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    readingPromptKey === 'comp_header'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-200'
+                  }`}
+                  title="AI đọc hướng dẫn trả lời câu hỏi"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>AI đọc hướng dẫn</span>
+                </button>
               </div>
 
               <div className="space-y-3">
                 {lesson.comprehensionQuestions.map((q, qIdx) => {
                   const userSelected = selectedAnswers[q.id];
                   const isShowingAnswer = showAnswerFor[q.id];
+                  const isReadingThisQ = readingPromptKey === `q2_${q.id}`;
 
                   return (
                     <div key={q.id} className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
-                      <div className="text-sm sm:text-base font-bold text-slate-800 font-serif">
-                        Câu {qIdx + 1}: {q.question}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200/60">
+                        <div className="text-sm sm:text-base font-bold text-slate-800 font-serif">
+                          Câu {qIdx + 1}: {q.question}
+                        </div>
+
+                        <button
+                          type="button"
+                          id={`speak-comp-q-${q.id}`}
+                          onClick={() => {
+                            const optionsText = q.options ? q.options.map((opt, oIdx) => `Đáp án ${oIdx + 1}: ${opt}`).join('. ') : '';
+                            handleReadPrompt(`q2_${q.id}`, `Câu hỏi số ${qIdx + 1}: ${q.question}. ${optionsText}`);
+                          }}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer shadow-2xs self-start sm:self-auto shrink-0 ${
+                            isReadingThisQ
+                              ? 'bg-blue-600 text-white ring-2 ring-blue-300'
+                              : 'bg-white hover:bg-blue-50 text-blue-950 border border-blue-200'
+                          }`}
+                          title="Bấm để AI đọc to câu hỏi cho bé nghe"
+                        >
+                          <Volume2 className={`w-3.5 h-3.5 text-blue-600 ${isReadingThisQ ? 'animate-bounce text-white' : ''}`} />
+                          <span>{isReadingThisQ ? 'AI đang đọc...' : 'AI đọc câu hỏi'}</span>
+                        </button>
                       </div>
 
                       {q.options && (

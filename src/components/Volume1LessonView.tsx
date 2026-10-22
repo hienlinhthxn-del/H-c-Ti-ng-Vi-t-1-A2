@@ -6,6 +6,7 @@ import { teacherAudioService } from '../services/teacherAudioService';
 import { achievementService } from '../services/achievementService';
 import { userProfileService } from '../services/userProfileService';
 import { TeacherAudioTarget } from './TeacherAudioRecorderModal';
+import confetti from 'canvas-confetti';
 import {
   Volume2,
   Play,
@@ -21,7 +22,12 @@ import {
   Mic,
   Type,
   Check,
-  Radio
+  Radio,
+  Bot,
+  AlertCircle,
+  RotateCcw,
+  VolumeX,
+  HelpCircle
 } from 'lucide-react';
 
 interface Volume1LessonViewProps {
@@ -57,6 +63,8 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
   const [isTeacherVoiceEditMode, setIsTeacherVoiceEditMode] = useState<boolean>(false);
   const [selectedQuizAnswers, setSelectedQuizAnswers] = useState<{ [key: string]: number }>({});
   const [answeredCorrectly, setAnsweredCorrectly] = useState<{ [key: string]: boolean }>({});
+  const [quizFeedbacks, setQuizFeedbacks] = useState<{ [key: string]: 'correct' | 'wrong' }>({});
+  const [readingPromptKey, setReadingPromptKey] = useState<string | null>(null);
   const [activeStoryPic, setActiveStoryPic] = useState<number>(1);
   const [spellingActiveIdx, setSpellingActiveIdx] = useState<number | null>(null);
   const [isCompleted, setIsCompleted] = useState<boolean>(() => achievementService.isLessonCompleted('vol1', lesson.id));
@@ -75,6 +83,19 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
   }, []);
 
   const isCustomized = lessonStorageService.isVolume1Customized(lesson.id);
+
+  const handleReadPrompt = (key: string, textToRead: string) => {
+    if (readingPromptKey === key) {
+      speechService.stop();
+      setReadingPromptKey(null);
+      return;
+    }
+    setReadingPromptKey(key);
+    speechService.playSoundEffect('pop');
+    speechService.speak(textToRead, () => {
+      setReadingPromptKey(null);
+    });
+  };
 
   const handleTeacherRecordClick = (e: React.MouseEvent, text: string, sectionTitle: string, section?: 'letter' | 'syllable' | 'word' | 'sentence' | 'passage' | 'quiz' | 'general') => {
     e.stopPropagation();
@@ -130,7 +151,24 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
   const handleAnswerQuiz = (quizId: string, optionIdx: number, correctIdx: number) => {
     setSelectedQuizAnswers(prev => ({ ...prev, [quizId]: optionIdx }));
     const isCorrect = optionIdx === correctIdx;
+    setQuizFeedbacks(prev => ({ ...prev, [quizId]: isCorrect ? 'correct' : 'wrong' }));
+
     if (isCorrect) {
+      // Play pleasant correct chime
+      speechService.playSoundEffect('correct');
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.7 }
+      });
+
+      const praises = [
+        'Đúng rồi! Bé giỏi quá!',
+        'Hoan hô bé! Câu trả lời rất chính xác!',
+        'Tuyệt vời! Bé thông minh lắm!'
+      ];
+      const randomPraise = praises[Math.floor(Math.random() * praises.length)];
+
       if (!answeredCorrectly[quizId]) {
         const nextCorrectMap = { ...answeredCorrectly, [quizId]: true };
         setAnsweredCorrectly(nextCorrectMap);
@@ -140,22 +178,33 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
         const totalCompleted = Object.keys(nextCorrectMap).length;
         
         if (totalQuizzes > 0 && totalCompleted >= totalQuizzes) {
-          // Play celebratory section complete chime
-          speechService.playSoundEffect('sectionComplete');
           setTimeout(() => {
+            speechService.playSoundEffect('fanfare');
             speechService.speak('Hoan hô bé! Bé đã xuất sắc trả lời đúng tất cả câu hỏi thử thách!');
-          }, 500);
+            confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 } });
+          }, 350);
         } else {
-          // Play gentle pleasant correct chime
-          speechService.playSoundEffect('correct');
+          setTimeout(() => {
+            speechService.speak(randomPraise);
+          }, 350);
         }
         onAddStar();
       } else {
-        speechService.playSoundEffect('correct');
+        setTimeout(() => {
+          speechService.speak(randomPraise);
+        }, 300);
       }
     } else {
-      // Play gentle encouraging sound
-      speechService.playSoundEffect('tryAgain');
+      // Play gentle encouraging sound for incorrect answer
+      speechService.playSoundEffect('wrong');
+      const encouragements = [
+        'Chưa đúng rồi, bé hãy thử chọn lại nhé!',
+        'Bé hãy suy nghĩ kỹ hơn một chút và thử lại nào!'
+      ];
+      const randomEncouragement = encouragements[Math.floor(Math.random() * encouragements.length)];
+      setTimeout(() => {
+        speechService.speak(randomEncouragement);
+      }, 350);
     }
   };
 
@@ -328,7 +377,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
               PHẦN 1: PHÁT ÂM (ÂM / VẦN)
              ======================================================== */}
           <div className="space-y-3 sm:space-y-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-orange-100 text-orange-600 font-bold flex items-center justify-center text-sm font-serif shadow-2xs">
                   1
@@ -336,6 +385,19 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 <h2 className="text-base sm:text-lg font-bold text-orange-600 font-serif">
                   Phát âm
                 </h2>
+                <button
+                  id="speak-p1-instruction-btn"
+                  onClick={() => handleReadPrompt('p1_title', 'Phần một: Phát âm. Bé hãy lắng nghe cô giáo đọc mẫu và phát âm theo các âm chữ dưới đây nhé!')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                    readingPromptKey === 'p1_title'
+                      ? 'bg-orange-600 text-white shadow-2xs'
+                      : 'bg-orange-100 hover:bg-orange-200 text-orange-900 border border-orange-200'
+                  }`}
+                  title="AI đọc giúp bé yêu cầu phần phát âm"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>AI đọc yêu cầu</span>
+                </button>
               </div>
 
               {/* Action Buttons for Section 1 */}
@@ -371,6 +433,44 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Câu nhận biết mở đầu bài học (SGK Tiếng Việt 1 - KNTT) */}
+            {lesson.part1_Letters.recognitionSentence && (
+              <div className="bg-gradient-to-r from-amber-50 via-orange-50/80 to-amber-100/70 p-3.5 sm:p-4 rounded-2xl border border-orange-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-start sm:items-center gap-3">
+                  <span className="w-9 h-9 rounded-xl bg-orange-500 text-white flex items-center justify-center text-lg shrink-0 shadow-xs">
+                    👀
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase text-orange-950 tracking-wider bg-orange-200/90 px-2 py-0.5 rounded-md">
+                        Câu nhận biết (Khởi động)
+                      </span>
+                      <span className="text-xs text-orange-800 font-medium hidden sm:inline">
+                        Bé lắng nghe câu mở đầu giới thiệu bài
+                      </span>
+                    </div>
+                    <p className="text-sm sm:text-base font-bold text-slate-800 font-reading mt-1">
+                      "{lesson.part1_Letters.recognitionSentence}"
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  id="speak-recognition-sentence-btn"
+                  onClick={() => handleReadPrompt('recognition', `Câu nhận biết: ${lesson.part1_Letters.recognitionSentence}`)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95 self-start sm:self-auto shrink-0 ${
+                    readingPromptKey === 'recognition'
+                      ? 'bg-orange-600 text-white ring-2 ring-orange-300'
+                      : 'bg-white hover:bg-orange-100 text-orange-950 border border-orange-300'
+                  }`}
+                  title="AI đọc giúp bé câu nhận biết vì câu dài bé chưa tự đọc được"
+                >
+                  <Volume2 className={`w-4 h-4 text-orange-600 ${readingPromptKey === 'recognition' ? 'animate-bounce text-white' : ''}`} />
+                  <span>{readingPromptKey === 'recognition' ? 'AI đang đọc...' : 'AI đọc câu nhận biết'}</span>
+                </button>
+              </div>
+            )}
 
             {/* Letter Cards Grid */}
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-1">
@@ -514,7 +614,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
               PHẦN 2: TỪ NGỮ (TỪ ỨNG DỤNG)
              ======================================================== */}
           <div className="space-y-3 sm:space-y-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-sm font-serif shadow-2xs">
                   2
@@ -522,6 +622,19 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 <h2 className="text-base sm:text-lg font-bold text-blue-600 font-serif">
                   Từ ngữ
                 </h2>
+                <button
+                  id="speak-p2-instruction-btn"
+                  onClick={() => handleReadPrompt('p2_title', 'Phần hai: Đọc tiếng và từ ngữ. Bé hãy đánh vần theo mô hình và luyện đọc trơn các tiếng, từ ngữ dưới đây nhé!')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                    readingPromptKey === 'p2_title'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-200'
+                  }`}
+                  title="AI đọc giúp bé yêu cầu phần từ ngữ"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>AI đọc yêu cầu</span>
+                </button>
               </div>
 
               {/* Action Buttons for Section 2 */}
@@ -599,7 +712,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
               PHẦN 3: LUYỆN ĐỌC ĐOẠN VĂN (CÂU & ĐOẠN VĂN)
              ======================================================== */}
           <div className="bg-[#f4fbf7] rounded-3xl p-5 sm:p-7 border border-emerald-100/90 space-y-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-sm font-serif shadow-2xs">
                   3
@@ -607,6 +720,19 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 <h2 className="text-base sm:text-lg font-bold text-emerald-700 font-serif">
                   Luyện đọc đoạn văn
                 </h2>
+                <button
+                  id="speak-p3-instruction-btn"
+                  onClick={() => handleReadPrompt('p3_title', 'Phần ba: Luyện đọc đoạn văn. Bé hãy chỉ tay vào từng chữ, lắng nghe và đọc to theo từng câu văn nhé!')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                    readingPromptKey === 'p3_title'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-200'
+                  }`}
+                  title="AI đọc giúp bé yêu cầu phần đoạn văn"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>AI đọc yêu cầu</span>
+                </button>
               </div>
 
               {/* Action Buttons for Section 3 */}
@@ -707,9 +833,22 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
              ======================================================== */}
           {lesson.part3_SentenceAndPractice.writingSamples && lesson.part3_SentenceAndPractice.writingSamples.length > 0 && (
             <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <PenTool className="w-4 h-4 text-purple-600" />
                 <span className="text-xs font-bold text-purple-900 uppercase">Tập viết:</span>
+                <button
+                  id="speak-writing-instruction-btn"
+                  onClick={() => handleReadPrompt('writing', 'Tập viết: Bé hãy cầm bút đúng tư thế và luyện viết các mẫu chữ dưới đây vào vở ô ly nhé!')}
+                  className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                    readingPromptKey === 'writing'
+                      ? 'bg-purple-600 text-white shadow-2xs'
+                      : 'bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-200'
+                  }`}
+                  title="AI đọc giúp bé yêu cầu tập viết"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>AI đọc yêu cầu</span>
+                </button>
                 <div className="flex flex-wrap gap-2">
                   {lesson.part3_SentenceAndPractice.writingSamples.map((w, i) => (
                     <span key={i} className="px-3 py-1 bg-white font-handwriting text-xl font-bold text-purple-900 rounded-lg border border-purple-200 shadow-2xs">
@@ -731,12 +870,24 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
           {/* Story for Review lessons */}
           {lesson.part3_SentenceAndPractice.story && (
             <div className="bg-amber-50/60 p-5 rounded-2xl border border-amber-200/80 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🦊</span>
                   <h3 className="font-bold text-amber-950 text-base font-serif">
                     Kể chuyện: {lesson.part3_SentenceAndPractice.story.title}
                   </h3>
+                  <button
+                    onClick={() => handleReadPrompt('story', `Kể chuyện: ${lesson.part3_SentenceAndPractice.story!.title}. Bé hãy bấm vào từng bức tranh để nghe kể từng đoạn hoặc bấm nút Kể toàn truyện nhé!`)}
+                    className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                      readingPromptKey === 'story'
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-amber-100 hover:bg-amber-200 text-amber-900'
+                    }`}
+                    title="AI đọc hướng dẫn kể chuyện cho bé"
+                  >
+                    <Bot className="w-3.5 h-3.5" />
+                    <span>AI đọc yêu cầu</span>
+                  </button>
                 </div>
                 <button
                   onClick={() => {
@@ -771,11 +922,11 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
               {(() => {
                 const currentPic = lesson.part3_SentenceAndPractice.story.pictures.find(p => p.id === activeStoryPic) || lesson.part3_SentenceAndPractice.story.pictures[0];
                 return (
-                  <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-2xs text-sm">
+                  <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-2xs text-sm space-y-2">
                     <p className="text-slate-700 leading-relaxed font-serif">{currentPic.content}</p>
                     <button
                       onClick={() => speechService.speak(currentPic.content)}
-                      className="mt-2 text-xs font-bold text-amber-700 hover:underline flex items-center gap-1 cursor-pointer"
+                      className="text-xs font-bold text-amber-700 hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       <Volume2 className="w-3.5 h-3.5" />
                       <span>Nghe đoạn này</span>
@@ -786,43 +937,172 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
             </div>
           )}
 
-          {/* Mini Quiz if present */}
+          {/* Mini Quiz: Thử thách vui */}
           {lesson.quiz && lesson.quiz.length > 0 && (
-            <div className="bg-yellow-50/60 p-5 rounded-2xl border border-yellow-200/80 space-y-3">
-              <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-amber-600" />
-                <h3 className="font-bold text-amber-950 text-base font-serif">
-                  Thử thách vui
-                </h3>
+            <div className="bg-gradient-to-br from-amber-50/80 via-yellow-50 to-orange-50/60 p-5 sm:p-6 rounded-3xl border-2 border-yellow-300 shadow-md space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-yellow-200/80">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-xl shadow-xs">
+                    🏆
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-amber-200 text-amber-950 px-2 py-0.5 rounded-md">
+                        Phần vui thử thách
+                      </span>
+                      <span className="text-xs font-bold text-amber-800">
+                        ({lesson.quiz.length} câu hỏi)
+                      </span>
+                    </div>
+                    <h3 className="font-black text-amber-950 text-base sm:text-lg font-serif mt-0.5">
+                      Thử Thách Vui Dành Cho Bé
+                    </h3>
+                  </div>
+                </div>
+
+                {/* AI Read Instructions for Quiz */}
+                <button
+                  id="speak-quiz-instruction-btn"
+                  onClick={() => handleReadPrompt('quiz_header', 'Thử thách vui: Bé hãy bấm nút chiếc loa bên cạnh mỗi câu hỏi để nghe AI đọc câu hỏi, sau đó bấm chọn đáp án đúng nhất nhé!')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black transition-all cursor-pointer shadow-2xs self-start sm:self-auto ${
+                    readingPromptKey === 'quiz_header'
+                      ? 'bg-amber-600 text-white ring-2 ring-amber-300'
+                      : 'bg-white hover:bg-amber-100 text-amber-950 border border-amber-300'
+                  }`}
+                  title="AI đọc hướng dẫn cách làm thử thách vui"
+                >
+                  <Bot className="w-4 h-4 text-amber-700" />
+                  <span>{readingPromptKey === 'quiz_header' ? 'AI đang đọc hướng dẫn...' : 'AI đọc hướng dẫn thử thách'}</span>
+                </button>
               </div>
-              <div className="space-y-3">
-                {lesson.quiz.map((q) => {
+
+              <div className="space-y-4">
+                {lesson.quiz.map((q, qIdx) => {
                   const userSelected = selectedQuizAnswers[q.id];
                   const isCorrect = answeredCorrectly[q.id];
+                  const isWrong = userSelected !== undefined && !isCorrect;
+                  const targetCorrectIndex = (q as any).correctIndex ?? (q as any).correctAnswer ?? 0;
+                  const isReadingThisQ = readingPromptKey === `q_${q.id}`;
+
                   return (
-                    <div key={q.id} className="bg-white p-4 rounded-xl border border-yellow-200 shadow-2xs">
-                      <div className="text-sm font-bold text-slate-800 mb-2 font-serif">{q.question}</div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div
+                      key={q.id}
+                      className={`bg-white p-4 sm:p-5 rounded-2xl border-2 transition-all shadow-xs space-y-3 ${
+                        isCorrect
+                          ? 'border-emerald-300 bg-emerald-50/30'
+                          : isWrong
+                          ? 'border-rose-300 bg-rose-50/20'
+                          : 'border-yellow-200'
+                      }`}
+                    >
+                      {/* Question Header with AI Voice Button */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-100">
+                        <div className="flex items-center gap-2.5 flex-1">
+                          <span className={`w-7 h-7 rounded-xl font-black text-xs flex items-center justify-center shrink-0 ${
+                            isCorrect
+                              ? 'bg-emerald-500 text-white'
+                              : isWrong
+                              ? 'bg-rose-500 text-white'
+                              : 'bg-amber-500 text-white'
+                          }`}>
+                            {qIdx + 1}
+                          </span>
+                          <div className="text-sm sm:text-base font-bold text-slate-900 font-serif leading-snug">
+                            {q.question}
+                          </div>
+                        </div>
+
+                        {/* AI Read Question Button */}
+                        <button
+                          type="button"
+                          id={`speak-quiz-q-${q.id}`}
+                          onClick={() => {
+                            const optionsText = q.options.map((opt, oIdx) => `Lựa chọn ${oIdx + 1}: ${opt}`).join('. ');
+                            handleReadPrompt(`q_${q.id}`, `Câu hỏi số ${qIdx + 1}: ${q.question}. ${optionsText}`);
+                          }}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer shadow-2xs self-start sm:self-auto shrink-0 ${
+                            isReadingThisQ
+                              ? 'bg-orange-600 text-white ring-2 ring-orange-300 animate-pulse'
+                              : 'bg-amber-50 hover:bg-orange-100 text-orange-950 border border-orange-300'
+                          }`}
+                          title="Bấm để AI đọc to câu hỏi và các lựa chọn cho bé nghe"
+                        >
+                          <Volume2 className={`w-3.5 h-3.5 text-orange-600 ${isReadingThisQ ? 'animate-bounce text-white' : ''}`} />
+                          <span>{isReadingThisQ ? 'AI đang đọc câu hỏi...' : 'AI đọc câu hỏi'}</span>
+                        </button>
+                      </div>
+
+                      {/* Options Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         {q.options.map((opt, optIdx) => {
                           const isOptSelected = userSelected === optIdx;
-                          const isThisCorrect = optIdx === q.correctAnswer;
-                          let btnStyle = 'bg-slate-50 hover:bg-amber-50 text-slate-700 border-slate-200';
+                          const isThisCorrect = optIdx === targetCorrectIndex;
+
+                          let btnStyle = 'bg-slate-50 hover:bg-amber-50 text-slate-800 border-slate-200';
                           if (isOptSelected) {
                             btnStyle = isThisCorrect
-                              ? 'bg-emerald-500 text-white border-emerald-500 font-bold'
-                              : 'bg-rose-500 text-white border-rose-500 font-bold';
+                              ? 'bg-emerald-500 text-white border-emerald-600 font-black shadow-sm ring-2 ring-emerald-300'
+                              : 'bg-rose-500 text-white border-rose-600 font-black shadow-sm ring-2 ring-rose-300';
+                          } else if (isCorrect && isThisCorrect) {
+                            btnStyle = 'bg-emerald-100 text-emerald-950 border-emerald-400 font-bold';
                           }
+
                           return (
                             <button
                               key={optIdx}
-                              onClick={() => handleAnswerQuiz(q.id, optIdx, q.correctAnswer)}
-                              className={`p-2.5 rounded-xl border text-xs sm:text-sm text-left transition-all cursor-pointer ${btnStyle}`}
+                              id={`quiz-${q.id}-opt-${optIdx}`}
+                              onClick={() => handleAnswerQuiz(q.id, optIdx, targetCorrectIndex)}
+                              className={`p-3 rounded-2xl border-2 text-xs sm:text-sm text-left transition-all cursor-pointer font-serif flex items-center justify-between gap-2 active:scale-95 ${btnStyle}`}
                             >
-                              {opt}
+                              <span className="flex items-center gap-2">
+                                <span className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${
+                                  isOptSelected ? 'bg-white/30 text-white' : 'bg-slate-200 text-slate-700'
+                                }`}>
+                                  {String.fromCharCode(65 + optIdx)}
+                                </span>
+                                <span>{opt}</span>
+                              </span>
+
+                              {isOptSelected && (
+                                isThisCorrect ? (
+                                  <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
+                                ) : (
+                                  <AlertCircle className="w-5 h-5 text-white shrink-0" />
+                                )
+                              )}
                             </button>
                           );
                         })}
                       </div>
+
+                      {/* Interactive Answer Feedback Banner */}
+                      {userSelected !== undefined && (
+                        <div className={`p-2.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 animate-in fade-in duration-200 ${
+                          isCorrect
+                            ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                            : 'bg-rose-100 text-rose-900 border border-rose-300'
+                        }`}>
+                          <div className="flex items-center gap-1.5">
+                            {isCorrect ? (
+                              <>
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <span>🎉 Chính xác! Bé trả lời rất giỏi (+1 ⭐)</span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                                <span>Chưa đúng rồi! Bé hãy bấm "AI đọc câu hỏi" để nghe lại và chọn đáp án khác nhé.</span>
+                              </>
+                            )}
+                          </div>
+
+                          {q.explanation && isCorrect && (
+                            <span className="text-[11px] font-normal text-emerald-800 italic hidden sm:inline">
+                              💡 {q.explanation}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

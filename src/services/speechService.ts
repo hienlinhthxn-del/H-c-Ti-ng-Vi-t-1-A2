@@ -1,4 +1,4 @@
-﻿// Speech Synthesis & Sound Effect Engine for Grade 1 Vietnamese
+// Speech Synthesis & Sound Effect Engine for Grade 1 Vietnamese
 import { teacherAudioService, TeacherAudioItem } from './teacherAudioService';
 
 class SoundService {
@@ -118,22 +118,22 @@ class SoundService {
     if (!ctx) return;
     const now = ctx.currentTime;
     
-    // Soft double marimba tap (E4 -> C4)
+    // Soft double wooden marimba tap (E4 330Hz -> C4 261Hz)
     const notes = [
-      { f: 329.63, time: 0.0, dur: 0.15 },
-      { f: 261.63, time: 0.12, dur: 0.22 }
+      { f: 329.63, time: 0.0, dur: 0.18, gain: 0.16 },
+      { f: 261.63, time: 0.12, dur: 0.25, gain: 0.14 }
     ];
 
     notes.forEach((n) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       
-      osc.type = 'sine';
+      osc.type = 'triangle'; // gentle warm marimba tone
       osc.frequency.setValueAtTime(n.f, now + n.time);
       
       gain.gain.setValueAtTime(0.001, now + n.time);
-      gain.gain.linearRampToValueAtTime(0.09, now + n.time + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + n.time + n.dur);
+      gain.gain.linearRampToValueAtTime(n.gain, now + n.time + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + n.time + n.dur);
       
       osc.connect(gain);
       gain.connect(ctx.destination);
