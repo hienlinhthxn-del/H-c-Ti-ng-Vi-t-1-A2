@@ -172,6 +172,9 @@ export interface StudentRecording {
   teacherComment?: string;
   teacherScore?: number;
   reviewedAt?: string;
+  studentId?: string;
+  studentName?: string;
+  studentCode?: string;
 }
 
 export interface RecordingTargetInfo {
@@ -353,6 +356,26 @@ export interface GoogleClassroomAssignment {
   alternateLink?: string;
   maxPoints?: number;
   dueDate?: { year: number; month: number; day: number };
+}
+
+export type FeedbackCategory = 'praise' | 'practice_needed' | 'homework' | 'weekly_review' | 'recording_eval';
+
+export interface TeacherParentFeedback {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentCode?: string;
+  teacherName: string;
+  category: FeedbackCategory;
+  title: string;
+  content: string;
+  score?: number; // 1 - 5 stars
+  lessonTitle?: string;
+  recordingId?: string;
+  createdAt: string;
+  isReadByParent: boolean;
+  parentReply?: string;
+  parentAcknowledgedAt?: string;
 }
 
 

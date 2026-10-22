@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { StudentRecording, AchievementState, AcademicRank, AppUserProfile } from '../types';
+import { StudentRecording, AchievementState, AcademicRank, AppUserProfile, TeacherParentFeedback } from '../types';
 import { recordingStorageService } from '../services/recordingStorageService';
 import { achievementService, ACADEMIC_RANKS } from '../services/achievementService';
 import { lessonStorageService } from '../services/lessonStorageService';
 import { userProfileService } from '../services/userProfileService';
+import { teacherFeedbackService } from '../services/teacherFeedbackService';
 import { speechService } from '../services/speechService';
 import confetti from 'canvas-confetti';
 import { 
@@ -29,7 +30,10 @@ import {
   Download,
   Info,
   Timer,
-  Cloud
+  Cloud,
+  MessageSquare,
+  Send,
+  Check
 } from 'lucide-react';
 
 interface ParentPortalViewProps {
@@ -49,8 +53,10 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
   starsCount,
   onOpenGoogleWorkspace
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'recordings' | 'handbook' | 'timer'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'feedbacks' | 'recordings' | 'handbook' | 'timer'>('dashboard');
   const [recordings, setRecordings] = useState<StudentRecording[]>([]);
+  const [feedbacks, setFeedbacks] = useState<TeacherParentFeedback[]>(() => teacherFeedbackService.getAllFeedbacks());
+  const [parentReplies, setParentReplies] = useState<{ [feedbackId: string]: string }>({});
   const [achievementState, setAchievementState] = useState<AchievementState>(() => achievementService.getState());
   const [currentRank, setCurrentRank] = useState<AcademicRank>(() => achievementService.getCurrentRank());
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -96,10 +102,15 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
       setAllStudents(userProfileService.getAllUsers().filter(u => u.role === 'student'));
     });
 
+    const unsubFeedbacks = teacherFeedbackService.subscribe(() => {
+      setFeedbacks(teacherFeedbackService.getAllFeedbacks());
+    });
+
     return () => {
       unsubRecs();
       unsubAchieve();
       unsubUsers();
+      unsubFeedbacks();
     };
   }, []);
 
@@ -154,6 +165,10 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
   const completedVol2Count = achievementState.completedLessonKeys.filter(k => k.startsWith('vol2_')).length;
   const totalCompleted = achievementState.completedLessonKeys.length;
 
+  const currentStudent = allStudents.find(s => s.id === selectedStudentId) || allStudents[0];
+  const studentFeedbacks = teacherFeedbackService.getFeedbacksForStudent(selectedStudentId, currentStudent?.name);
+  const unreadFeedbackCount = studentFeedbacks.filter(f => !f.isReadByParent).length;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 animate-in fade-in duration-200">
       
@@ -197,39 +212,92 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
         </div>
 
         {/* Child's Progress Metric Cards */}
-        <div className="mt-6 pt-6 border-t border-white/20 grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3.5 border border-white/10">
+        <div className="mt-6 pt-6 border-t border-white/20 grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 border border-white/10">
             <div className="text-xs text-emerald-200 font-medium">Danh hiệu hiện tại</div>
-            <div className="text-xl sm:text-2xl font-black text-white mt-1 flex items-center gap-1.5">
+            <div className="text-lg sm:text-xl font-black text-white mt-1 flex items-center gap-1.5">
               <span>{currentRank.badgeIcon}</span>
               <span className="truncate">{currentRank.title}</span>
             </div>
             <div className="text-[11px] text-emerald-100">Cấp {currentRank.level} / 8</div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3.5 border border-white/10">
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 border border-white/10">
             <div className="text-xs text-emerald-200 font-medium">Sao thưởng tích lũy</div>
-            <div className="text-2xl font-black text-amber-300 mt-1 flex items-center gap-1">
+            <div className="text-xl sm:text-2xl font-black text-amber-300 mt-1 flex items-center gap-1">
               <span>⭐</span>
               <span>{starsCount}</span>
             </div>
             <div className="text-[11px] text-emerald-100">Bé rất chăm ngoan!</div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3.5 border border-white/10">
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 border border-white/10">
             <div className="text-xs text-emerald-200 font-medium">Bài đã hoàn thành</div>
-            <div className="text-2xl font-black text-white mt-1">
+            <div className="text-xl sm:text-2xl font-black text-white mt-1">
               {totalCompleted} <span className="text-xs text-emerald-200 font-normal">/ 91 bài</span>
             </div>
-            <div className="text-[11px] text-emerald-100">{completedVol1Count} Tập 1 • {completedVol2Count} Tập 2</div>
+            <div className="text-[11px] text-emerald-100">{completedVol1Count} T1 • {completedVol2Count} T2</div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3.5 border border-white/10">
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 border border-white/10">
             <div className="text-xs text-emerald-200 font-medium">Bản thu âm của con</div>
-            <div className="text-2xl font-black text-white mt-1">{recordings.length} Bài</div>
+            <div className="text-xl sm:text-2xl font-black text-white mt-1">{recordings.length} Bài</div>
             <div className="text-[11px] text-emerald-100">{recordings.filter(r => r.teacherComment).length} bài có lời cô khen</div>
           </div>
+
+          <div 
+            onClick={() => {
+              setActiveTab('feedbacks');
+              teacherFeedbackService.markAllAsReadForStudent(selectedStudentId, currentStudent?.name);
+            }}
+            className="bg-white/15 hover:bg-white/25 transition-all backdrop-blur-sm rounded-2xl p-3 border border-white/20 cursor-pointer"
+          >
+            <div className="text-xs text-emerald-200 font-medium flex items-center justify-between">
+              <span>Lời Cô nhận xét</span>
+              {unreadFeedbackCount > 0 && (
+                <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+              )}
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-white mt-1 flex items-center gap-1.5">
+              <span>💌</span>
+              <span>{studentFeedbacks.length} Lời</span>
+            </div>
+            <div className="text-[11px] text-amber-200 font-bold">
+              {unreadFeedbackCount > 0 ? `${unreadFeedbackCount} nhận xét mới!` : 'Xem sổ liên lạc →'}
+            </div>
+          </div>
         </div>
+
+        {/* Notice of new teacher feedback for parent */}
+        {studentFeedbacks.length > 0 && (
+          <div 
+            onClick={() => {
+              setActiveTab('feedbacks');
+              teacherFeedbackService.markAllAsReadForStudent(selectedStudentId, currentStudent?.name);
+            }}
+            className="mt-5 p-3.5 bg-gradient-to-r from-amber-400 via-rose-300 to-amber-300 text-slate-900 rounded-2xl shadow-lg border border-amber-200 flex items-center justify-between cursor-pointer hover:shadow-xl transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">💌</span>
+              <div>
+                <span className="font-black text-xs sm:text-sm text-slate-950 flex items-center gap-2">
+                  <span>Cô giáo vừa gửi nhận xét & dặn dò cho {currentStudent?.name || 'con'}!</span>
+                  {unreadFeedbackCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-600 text-white font-black animate-pulse">
+                      {unreadFeedbackCount} Mới
+                    </span>
+                  )}
+                </span>
+                <span className="text-[11px] text-slate-800 font-medium line-clamp-1 mt-0.5">
+                  "{studentFeedbacks[0].title}: {studentFeedbacks[0].content}"
+                </span>
+              </div>
+            </div>
+            <button className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-xs whitespace-nowrap shrink-0 ml-2 cursor-pointer">
+              Xem ngay →
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Child Profile Display */}
@@ -273,6 +341,31 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
         </button>
 
         <button
+          id="parent-tab-feedbacks-btn"
+          onClick={() => {
+            setActiveTab('feedbacks');
+            teacherFeedbackService.markAllAsReadForStudent(selectedStudentId, currentStudent?.name);
+          }}
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs sm:text-sm whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === 'feedbacks'
+              ? 'bg-teal-600 text-white shadow-md'
+              : 'bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-200'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4 text-rose-500" />
+          <span>2. Sổ Liên Lạc & Lời Cô Nhận Xét</span>
+          {unreadFeedbackCount > 0 ? (
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-black animate-bounce">
+              {unreadFeedbackCount} Mới
+            </span>
+          ) : studentFeedbacks.length > 0 ? (
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
+              {studentFeedbacks.length}
+            </span>
+          ) : null}
+        </button>
+
+        <button
           id="parent-tab-recordings-btn"
           onClick={() => setActiveTab('recordings')}
           className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs sm:text-sm whitespace-nowrap transition-all cursor-pointer ${
@@ -282,7 +375,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
           }`}
         >
           <Mic className="w-4 h-4" />
-          <span>2. Sổ Tay Giọng Đọc Của Con</span>
+          <span>3. Sổ Tay Giọng Đọc Của Con</span>
           {recordings.length > 0 && (
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-bold">
               {recordings.length}
@@ -300,7 +393,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
           }`}
         >
           <Lightbulb className="w-4 h-4" />
-          <span>3. Cẩm Nang & Phương Pháp Dạy Con</span>
+          <span>4. Cẩm Nang & Phương Pháp Dạy Con</span>
         </button>
 
         <button
@@ -313,7 +406,7 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>4. Hẹn Giờ Học & Bảo Vệ Mắt</span>
+          <span>5. Hẹn Giờ Học & Bảo Vệ Mắt</span>
         </button>
       </div>
 
@@ -403,6 +496,54 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
             </div>
           </div>
 
+          {/* Latest Teacher Feedback Widget */}
+          {studentFeedbacks.length > 0 && (
+            <div className="bg-gradient-to-r from-rose-50 via-amber-50 to-orange-50 p-6 rounded-3xl border border-rose-200/80 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">💌</span>
+                  <h3 className="text-base font-black text-slate-900">
+                    Lời Nhắn & Đánh Giá Mới Nhất Của Cô Giáo
+                  </h3>
+                </div>
+                <button
+                  onClick={() => {
+                    setActiveTab('feedbacks');
+                    teacherFeedbackService.markAllAsReadForStudent(selectedStudentId, currentStudent?.name);
+                  }}
+                  className="text-xs font-black text-rose-700 hover:text-rose-900 flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Xem tất cả ({studentFeedbacks.length})</span>
+                  <span>→</span>
+                </button>
+              </div>
+
+              <div className="p-4 bg-white/90 rounded-2xl border border-amber-200/60 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                    <span>👩‍🏫 {studentFeedbacks[0].teacherName}</span>
+                    <span className="text-amber-500 font-black">
+                      {Array.from({ length: studentFeedbacks[0].score || 5 }).map((_, i) => (
+                        <span key={i}>⭐</span>
+                      ))}
+                    </span>
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    {new Date(studentFeedbacks[0].createdAt).toLocaleDateString('vi-VN')}
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-800 font-serif italic leading-relaxed">
+                  "{studentFeedbacks[0].content}"
+                </p>
+                {studentFeedbacks[0].lessonTitle && (
+                  <div className="text-[11px] font-bold text-amber-800">
+                    📖 Bài học: {studentFeedbacks[0].lessonTitle}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Quick Action Navigation for Parents */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-gradient-to-br from-orange-50 to-amber-100 p-6 rounded-3xl border border-orange-200 flex items-center justify-between">
@@ -445,7 +586,179 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
         </div>
       )}
 
-      {/* TAB 2: CHILD'S VOICE RECORDINGS */}
+      {/* TAB 2: TEACHER FEEDBACKS & ELECTRONIC CONTACT BOOK */}
+      {activeTab === 'feedbacks' && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200 mb-2">
+                <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500" />
+                <span>Kênh Liên Lạc Trực Tiếp Nhà Trường & Gia Đình</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2">
+                <MessageSquare className="w-6 h-6 text-rose-500" />
+                <span>Sổ Liên Lạc Điện Tử & Lời Cô Nhận Xét</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                Nơi tổng hợp những lời khen ngợi, chấm điểm bài đọc và các dặn dò ôn bài quý báu từ Cô giáo chủ nhiệm ({currentStudent?.classroom || 'Lớp 1'}) gửi đến Bố Mẹ và bé {currentStudent?.name || 'con'}.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 bg-emerald-50 p-3 rounded-2xl border border-emerald-200 text-xs text-emerald-950 font-bold shrink-0">
+              <span className="text-xl">👩‍🏫</span>
+              <div>
+                <div>GVCN: Cô Hiền Phan</div>
+                <div className="text-[11px] text-emerald-700 font-medium">Đã gửi: {studentFeedbacks.length} nhận xét</div>
+              </div>
+            </div>
+          </div>
+
+          {studentFeedbacks.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-emerald-200 space-y-3">
+              <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 mx-auto flex items-center justify-center text-3xl">
+                💌
+              </div>
+              <h3 className="text-lg font-bold text-slate-800">Chưa có nhận xét mới nào cho bé</h3>
+              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+                Khi Cô giáo chấm bài đọc thu âm trên lớp hoặc gửi lời dặn dò định kỳ, thông báo và lời khen sẽ lập tức xuất hiện tại đây để Bố Mẹ cùng theo dõi.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {studentFeedbacks.map(fb => {
+                const getCategoryInfo = (cat: FeedbackCategory) => {
+                  switch (cat) {
+                    case 'praise':
+                      return { label: 'Lời Khen Ngợi', color: 'bg-emerald-100 text-emerald-900 border-emerald-300', icon: '🌟' };
+                    case 'recording_eval':
+                      return { label: 'Đánh Giá Bài Đọc', color: 'bg-orange-100 text-orange-900 border-orange-300', icon: '🎙️' };
+                    case 'homework':
+                      return { label: 'Dặn Dò Ôn Tập', color: 'bg-sky-100 text-sky-900 border-sky-300', icon: '📝' };
+                    case 'weekly_review':
+                      return { label: 'Phiếu Nhận Xét Tuần', color: 'bg-purple-100 text-purple-900 border-purple-300', icon: '📅' };
+                    case 'practice_needed':
+                      return { label: 'Cần Hỗ Trợ Rèn Thêm', color: 'bg-rose-100 text-rose-900 border-rose-300', icon: '💡' };
+                  }
+                };
+
+                const catInfo = getCategoryInfo(fb.category);
+                const relatedRec = fb.recordingId ? recordings.find(r => r.id === fb.recordingId) : null;
+
+                return (
+                  <div
+                    key={fb.id}
+                    className="bg-white rounded-3xl p-6 border border-emerald-100 shadow-sm hover:shadow-md transition-all space-y-4"
+                  >
+                    {/* Feedback Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black border ${catInfo.color}`}>
+                          <span>{catInfo.icon}</span>
+                          <span>{catInfo.label}</span>
+                        </span>
+
+                        <h3 className="text-base sm:text-lg font-black text-slate-900">
+                          {fb.title}
+                        </h3>
+
+                        {fb.lessonTitle && (
+                          <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                            {fb.lessonTitle}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs text-slate-400">
+                        {fb.score && (
+                          <div className="flex items-center text-amber-500 font-black">
+                            {Array.from({ length: fb.score }).map((_, i) => (
+                              <span key={i}>⭐</span>
+                            ))}
+                          </div>
+                        )}
+                        <span>
+                          {new Date(fb.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} • {new Date(fb.createdAt).toLocaleDateString('vi-VN')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Teacher Info & Content */}
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-100 border border-amber-200 text-2xl flex items-center justify-center shrink-0 shadow-2xs">
+                        👩‍🏫
+                      </div>
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm text-slate-900">{fb.teacherName}</span>
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            Giáo viên gửi
+                          </span>
+                        </div>
+                        <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200/80 text-sm sm:text-base text-slate-800 leading-relaxed font-serif">
+                          "{fb.content}"
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* If related to an audio recording, embed player */}
+                    {relatedRec && relatedRec.audioBlobUrl && (
+                      <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div>
+                          <div className="font-bold text-slate-700 flex items-center gap-1.5">
+                            <Mic className="w-3.5 h-3.5 text-rose-500" />
+                            <span>Bản ghi âm bài đọc của con:</span>
+                          </div>
+                          <div className="italic text-slate-600 font-reading mt-0.5">"{relatedRec.targetText}"</div>
+                        </div>
+                        <audio controls src={relatedRec.audioBlobUrl} className="h-9 w-full sm:w-64" />
+                      </div>
+                    )}
+
+                    {/* Parent Acknowledgement / Reply */}
+                    <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100">
+                      {fb.parentAcknowledgedAt ? (
+                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Bố Mẹ đã gửi lời cảm ơn tới Cô giáo lúc {new Date(fb.parentAcknowledgedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ({new Date(fb.parentAcknowledgedAt).toLocaleDateString('vi-VN')})</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                          <input
+                            type="text"
+                            placeholder="Gửi lời phản hồi nhanh tới Cô (VD: Cảm ơn Cô nhiều ạ!)..."
+                            value={parentReplies[fb.id] || ''}
+                            onChange={(e) => setParentReplies({ ...parentReplies, [fb.id]: e.target.value })}
+                            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs flex-1 sm:w-72 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <button
+                            onClick={() => {
+                              teacherFeedbackService.acknowledgeFeedback(fb.id, parentReplies[fb.id]);
+                              speechService.playSoundEffect('fanfare');
+                              confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+                            }}
+                            className="px-4 py-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <Heart className="w-3.5 h-3.5 fill-white" />
+                            <span>Đã đọc & Cảm ơn Cô</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {fb.parentReply && (
+                        <div className="text-xs text-slate-500 italic">
+                          Lời nhắn của Bố Mẹ: "{fb.parentReply}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: CHILD'S VOICE RECORDINGS */}
       {activeTab === 'recordings' && (
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl border border-emerald-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -253,11 +253,15 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 
         // Save automatically with AI evaluation
         if (targetInfo && blob.size > 0) {
+          const activeUser = userProfileService.getActiveUser();
           const saved = await recordingStorageService.saveRecording(
             targetInfo,
             blob,
             recordingSeconds,
-            evalResult
+            evalResult,
+            activeUser.name,
+            activeUser.id,
+            activeUser.studentCode
           );
           setCurrentRecordingSaved(saved);
 

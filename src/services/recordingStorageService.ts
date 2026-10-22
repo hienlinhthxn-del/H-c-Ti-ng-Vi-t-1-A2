@@ -71,7 +71,10 @@ class RecordingStorageService {
     target: RecordingTargetInfo,
     audioBlob: Blob,
     durationSeconds: number,
-    aiEvaluation?: StudentRecording['aiEvaluation']
+    aiEvaluation?: StudentRecording['aiEvaluation'],
+    studentName?: string,
+    studentId?: string,
+    studentCode?: string
   ): Promise<StudentRecording> {
     const id = 'rec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     const audioBlobUrl = URL.createObjectURL(audioBlob);
@@ -92,7 +95,10 @@ class RecordingStorageService {
       durationSeconds: Math.round(durationSeconds),
       createdAt: new Date().toISOString(),
       feedback,
-      aiEvaluation
+      aiEvaluation,
+      studentName,
+      studentId,
+      studentCode
     };
 
     // Keep in memory
@@ -152,9 +158,13 @@ class RecordingStorageService {
           durationSeconds: item.durationSeconds || 0,
           createdAt: item.createdAt || new Date().toISOString(),
           feedback: item.feedback,
+          aiEvaluation: item.aiEvaluation,
           teacherComment: item.teacherComment,
           teacherScore: item.teacherScore,
-          reviewedAt: item.reviewedAt
+          reviewedAt: item.reviewedAt,
+          studentName: item.studentName,
+          studentId: item.studentId,
+          studentCode: item.studentCode
         };
       });
 

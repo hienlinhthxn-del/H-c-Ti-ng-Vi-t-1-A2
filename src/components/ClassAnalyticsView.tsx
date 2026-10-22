@@ -10,6 +10,7 @@ import { classAnalyticsService } from '../services/classAnalyticsService';
 import { userProfileService } from '../services/userProfileService';
 import { speechService } from '../services/speechService';
 import { UserAvatar } from './UserAvatar';
+import { SendParentFeedbackModal } from './SendParentFeedbackModal';
 import { 
   Users, 
   BookOpen, 
@@ -42,7 +43,8 @@ import {
   RotateCcw,
   Check,
   CheckSquare,
-  ShieldCheck
+  ShieldCheck,
+  MessageSquare
 } from 'lucide-react';
 
 interface ClassAnalyticsViewProps {
@@ -89,6 +91,8 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
 
   // Modals
   const [selectedStudentDetail, setSelectedStudentDetail] = useState<StudentProfile | null>(null);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState<boolean>(false);
+  const [selectedFeedbackStudent, setSelectedFeedbackStudent] = useState<StudentProfile | null>(null);
   const [isAddStudentOpen, setIsAddStudentOpen] = useState<boolean>(false);
   const [isEditStudentOpen, setIsEditStudentOpen] = useState<boolean>(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
@@ -757,9 +761,21 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
                           <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1.5">
                               <button
+                                id={`send-parent-feedback-${student.id}`}
+                                onClick={() => {
+                                  setSelectedFeedbackStudent(student);
+                                  setIsFeedbackModalOpen(true);
+                                }}
+                                className="p-2 text-rose-500 hover:text-white hover:bg-rose-500 rounded-xl transition-all cursor-pointer"
+                                title="Gửi nhận xét / dặn dò sang Cổng Phụ Huynh"
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                              </button>
+
+                              <button
                                 id={`view-student-detail-${student.id}`}
                                 onClick={() => setSelectedStudentDetail(student)}
-                                className="p-2 text-slate-500 hover:text-amber-700 hover:bg-amber-100 rounded-xl transition-all"
+                                className="p-2 text-slate-500 hover:text-amber-700 hover:bg-amber-100 rounded-xl transition-all cursor-pointer"
                                 title="Xem hồ sơ chi tiết"
                               >
                                 <Eye className="w-4 h-4" />
@@ -1139,6 +1155,16 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
 
                   <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                     <button
+                      onClick={() => {
+                        setSelectedFeedbackStudent(student);
+                        setIsFeedbackModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Dặn Dò Phụ Huynh</span>
+                    </button>
+                    <button
                       onClick={() => setSelectedStudentDetail(student)}
                       className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
                     >
@@ -1256,6 +1282,20 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
               <p className="text-xs sm:text-sm text-slate-700 italic leading-relaxed">
                 "{selectedStudentDetail.teacherNotes || 'Chưa có ghi chú đặc biệt'}"
               </p>
+            </div>
+
+            {/* Action button to send feedback to parents */}
+            <div className="mb-5">
+              <button
+                onClick={() => {
+                  setSelectedFeedbackStudent(selectedStudentDetail);
+                  setIsFeedbackModalOpen(true);
+                }}
+                className="w-full py-2.5 bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white rounded-2xl text-xs sm:text-sm font-black shadow-md flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Gửi Lời Nhận Xét & Dặn Dò Sang Cổng Phụ Huynh</span>
+              </button>
             </div>
 
             {/* List of completed lessons */}
@@ -1590,6 +1630,19 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
           </div>
         </div>
       )}
+
+      {/* Send Parent Feedback Modal */}
+      <SendParentFeedbackModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => {
+          setIsFeedbackModalOpen(false);
+          setSelectedFeedbackStudent(null);
+        }}
+        student={selectedFeedbackStudent}
+        onSuccess={() => {
+          showToast(`Đã gửi nhận xét tới Phụ huynh bé ${selectedFeedbackStudent?.name}!`);
+        }}
+      />
     </div>
   );
 };

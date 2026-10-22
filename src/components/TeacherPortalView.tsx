@@ -14,6 +14,8 @@ import { userProfileService } from '../services/userProfileService';
 import { UserAvatar } from './UserAvatar';
 import { ClassAnalyticsView } from './ClassAnalyticsView';
 import { AILessonAssistantModal } from './AILessonAssistantModal';
+import { SendParentFeedbackModal } from './SendParentFeedbackModal';
+import { teacherFeedbackService } from '../services/teacherFeedbackService';
 import { 
   BookOpen, 
   Mic, 
@@ -44,7 +46,8 @@ import {
   BarChart2,
   Cloud,
   FileSpreadsheet,
-  Bot
+  Bot,
+  Send
 } from 'lucide-react';
 
 interface TeacherPortalViewProps {
@@ -96,6 +99,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   const [savingReview, setSavingReview] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState<boolean>(false);
+  const [isParentFeedbackModalOpen, setIsParentFeedbackModalOpen] = useState<boolean>(false);
+  const [feedbackTargetStudent, setFeedbackTargetStudent] = useState<{ id: string; name: string; studentCode?: string } | null>(null);
 
   // Curriculum State
   const [selectedTerm, setSelectedTerm] = useState<'term1' | 'term2'>('term1');
@@ -193,12 +198,27 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
     }
   };
 
-  // Review submission
+  // Review submission & sync to Parent Portal
   const handleSaveReview = async (rec: StudentRecording) => {
     setSavingReview(true);
     try {
       await recordingStorageService.updateTeacherReview(rec.id, reviewComment, reviewScore);
-      showToast('Đã lưu nhận xét và gửi điểm cho học sinh!');
+      
+      // Tự động đồng bộ và gửi nhận xét sang Cổng Phụ Huynh của học sinh
+      teacherFeedbackService.sendFeedback({
+        studentId: rec.studentId || 'student_1',
+        studentName: rec.studentName || 'Bé ' + (rec.studentCode || 'Học sinh'),
+        studentCode: rec.studentCode || 'HS01',
+        teacherName: 'Cô Hiền Phan (GVCN Lớp 1A)',
+        category: 'recording_eval',
+        title: `Nhận xét bài đọc: ${rec.lessonTitle}`,
+        content: reviewComment,
+        score: reviewScore,
+        lessonTitle: rec.lessonTitle,
+        recordingId: rec.id
+      });
+
+      showToast('Đã lưu nhận xét và gửi thành công sang Cổng Phụ Huynh!');
       await refreshRecordings();
       setSelectedRecording(null);
       setReviewComment('');
@@ -878,14 +898,32 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
               </p>
             </div>
 
-            <button
-              id="refresh-recordings-btn"
-              onClick={refreshRecordings}
-              className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 border border-amber-200 transition-all cursor-pointer self-start md:self-auto"
-            >
-              <RefreshCw className="w-4 h-4 text-amber-600" />
-              <span>Làm mới danh sách</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+              <button
+                id="open-parent-feedback-direct-btn"
+                onClick={() => {
+                  setFeedbackTargetStudent({
+                    id: 'student_1',
+                    name: 'Tòng Hoài An',
+                    studentCode: 'HS01'
+                  });
+                  setIsParentFeedbackModalOpen(true);
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white rounded-xl text-xs sm:text-sm font-black flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>💌 Soạn Lời Nhắn Gửi Phụ Huynh</span>
+              </button>
+
+              <button
+                id="refresh-recordings-btn"
+                onClick={refreshRecordings}
+                className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 border border-amber-200 transition-all cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4 text-amber-600" />
+                <span>Làm mới</span>
+              </button>
+            </div>
           </div>
 
           {loadingRecordings ? (
@@ -974,26 +1012,45 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                         </div>
                       )}
 
-                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                        <button
-                          id={`review-rec-btn-${rec.id}`}
-                          onClick={() => {
-                            setSelectedRecording(rec);
-                            setReviewComment(rec.teacherComment || '');
-                            setReviewScore(rec.teacherScore || 5);
-                          }}
-                          className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          <span>{rec.teacherComment ? 'Sửa nhận xét' : 'Chấm điểm & Nhận xét'}</span>
-                        </button>
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            id={`review-rec-btn-${rec.id}`}
+                            onClick={() => {
+                              setSelectedRecording(rec);
+                              setReviewComment(rec.teacherComment || '');
+                              setReviewScore(rec.teacherScore || 5);
+                            }}
+                            className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>{rec.teacherComment ? 'Sửa nhận xét' : 'Chấm điểm'}</span>
+                          </button>
+
+                          <button
+                            id={`direct-feedback-btn-${rec.id}`}
+                            onClick={() => {
+                              setFeedbackTargetStudent({
+                                id: rec.studentId || 'student_1',
+                                name: rec.studentName || 'Bé ' + (rec.studentCode || 'Học sinh'),
+                                studentCode: rec.studentCode || 'HS01'
+                              });
+                              setSelectedRecording(rec);
+                              setIsParentFeedbackModalOpen(true);
+                            }}
+                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl flex items-center gap-1 transition-all cursor-pointer"
+                            title="Gửi nhận xét / dặn dò riêng sang Cổng Phụ Huynh"
+                          >
+                            <span>💌 Gửi Phụ Huynh</span>
+                          </button>
+                        </div>
 
                         <button
                           id={`download-rec-${rec.id}`}
                           onClick={() => recordingStorageService.downloadRecording(rec)}
-                          className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1"
+                          className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
                         >
-                          <Download className="w-3.5 h-3.5" /> Tải file ghi âm
+                          <Download className="w-3.5 h-3.5" /> Tải file
                         </button>
                       </div>
                     </div>
@@ -1076,18 +1133,24 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                       />
                     </div>
 
+                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Nhận xét này sẽ tự động chuyển sang Sổ liên lạc Cổng Phụ Huynh của bé</span>
+                    </div>
+
                     <div className="flex items-center gap-2">
                       <button
                         id="save-teacher-review-btn"
                         disabled={savingReview || !reviewComment.trim()}
                         onClick={() => handleSaveReview(selectedRecording)}
-                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-black transition-all shadow-md cursor-pointer disabled:opacity-50"
+                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-black transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                       >
-                        {savingReview ? 'Đang lưu...' : 'Gửi Nhận Xét'}
+                        <Send className="w-4 h-4" />
+                        <span>{savingReview ? 'Đang gửi...' : 'Gửi Sang Phụ Huynh'}</span>
                       </button>
                       <button
                         onClick={() => setSelectedRecording(null)}
-                        className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+                        className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
                       >
                         Đóng
                       </button>
@@ -1315,6 +1378,24 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
       <AILessonAssistantModal
         isOpen={isAIAssistantOpen}
         onClose={() => setIsAIAssistantOpen(false)}
+      />
+
+      {/* Send Parent Feedback Modal */}
+      <SendParentFeedbackModal
+        isOpen={isParentFeedbackModalOpen}
+        onClose={() => {
+          setIsParentFeedbackModalOpen(false);
+          setFeedbackTargetStudent(null);
+        }}
+        student={feedbackTargetStudent}
+        initialLessonTitle={selectedRecording?.lessonTitle}
+        initialComment={selectedRecording?.teacherComment || reviewComment}
+        initialScore={selectedRecording?.teacherScore || reviewScore}
+        recordingId={selectedRecording?.id}
+        onSuccess={() => {
+          showToast('Đã gửi nhận xét thành công sang Cổng Phụ Huynh!');
+          refreshRecordings();
+        }}
       />
 
     </div>
