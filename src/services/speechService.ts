@@ -367,6 +367,17 @@ export interface SpellingModelInput {
   spellingSteps?: string[];
 }
 
+export function getToneSymbol(tone?: string): string {
+  if (!tone) return '';
+  const t = tone.toLowerCase().trim();
+  if (t === 'huyền' || t === 'thanh huyền' || t === '`') return '`';
+  if (t === 'sắc' || t === 'thanh sắc' || t === '´') return '´';
+  if (t === 'hỏi' || t === 'thanh hỏi' || t === '?') return '̉';
+  if (t === 'ngã' || t === 'thanh ngã' || t === '~') return '~';
+  if (t === 'nặng' || t === 'thanh nặng' || t === '.') return '.';
+  return tone;
+}
+
 /**
  * Builds standard Grade 1 phonetic spelling steps from a syllable model.
  * If model.spellingSteps is provided, ensures all steps use phonetic sounds (e.g. 'b' -> 'bờ', 'bê' fix).

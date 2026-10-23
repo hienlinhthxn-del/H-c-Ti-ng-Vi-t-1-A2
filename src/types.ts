@@ -198,6 +198,8 @@ export interface RecordingTargetInfo {
   sectionTitle?: string;
   targetText: string;
   referenceAudioText?: string;
+  syllableModels?: SyllableModel[];
+  lessonLetters?: string[];
 }
 
 export interface TeacherAudioTarget {

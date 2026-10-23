@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordingTargetInfo, StudentRecording, AchievementBadge } from '../types';
-import { speechService } from '../services/speechService';
+import { speechService, getToneSymbol } from '../services/speechService';
+import { renderResultColored } from './Volume1LessonView';
 import { recordingStorageService } from '../services/recordingStorageService';
 import { achievementService } from '../services/achievementService';
 import { userProfileService } from '../services/userProfileService';
@@ -619,17 +620,72 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 
                   {/* Target Text Box */}
                   <div className="bg-white rounded-2xl p-5 sm:p-6 border border-amber-200 shadow-inner">
-                    <p
-                      className={`font-reading text-slate-900 text-center font-bold tracking-wide whitespace-pre-line ${
-                        fontSizeMode === 'huge'
-                          ? 'text-2xl sm:text-3xl md:text-4xl leading-[2.3]'
-                          : fontSizeMode === 'large'
-                          ? 'text-xl sm:text-2xl md:text-3xl leading-[2.2]'
-                          : 'text-lg sm:text-xl md:text-2xl leading-[2.0]'
-                      }`}
-                    >
-                      {targetInfo.targetText}
-                    </p>
+                    {targetInfo.syllableModels && targetInfo.syllableModels.length > 0 ? (
+                      <div className="space-y-4">
+                        {/* SGK Block Models */}
+                        <div className="flex flex-wrap items-end justify-center gap-5 sm:gap-8">
+                          {targetInfo.syllableModels.map((model, idx) => {
+                            const toneSymbol = getToneSymbol(model.tone);
+                            const normLetters = (targetInfo.lessonLetters || []).map(l => l.toLowerCase().trim());
+                            const initialIsHighlight = normLetters.includes((model.initial || '').toLowerCase().trim());
+                            const vowelIsHighlight = normLetters.includes((model.vowel || '').toLowerCase().trim());
+
+                            return (
+                              <div key={idx} className="flex flex-col items-center">
+                                {/* Dấu thanh ở trên nếu có (e.g. dấu huyền ` màu đỏ như SGK) */}
+                                <div className="h-6 sm:h-7 flex items-center justify-center text-xl sm:text-2xl font-bold font-sgk text-[#e11d48]">
+                                  {toneSymbol || '\u00A0'}
+                                </div>
+
+                                {/* Khối mô hình 2 tầng chuẩn SGK (nền xanh ngọc nhạt #daf0ee) */}
+                                <div className="w-28 sm:w-32 md:w-36 bg-[#daf0ee] rounded-md p-0.5 shadow-2xs border border-[#bce3de]">
+                                  {/* Hàng 1: 2 ô (Âm đầu | Âm chính / Vần) */}
+                                  <div className="grid grid-cols-2 gap-[2px]">
+                                    <div className="h-10 sm:h-11 bg-[#daf0ee] flex items-center justify-center text-lg sm:text-xl font-sgk font-bold">
+                                      <span className={initialIsHighlight ? 'text-[#e11d48]' : 'text-slate-900'}>
+                                        {model.initial || '—'}
+                                      </span>
+                                    </div>
+                                    <div className="h-10 sm:h-11 bg-[#daf0ee] flex items-center justify-center text-lg sm:text-xl font-sgk font-bold">
+                                      <span className={vowelIsHighlight ? 'text-[#e11d48]' : 'text-slate-900'}>
+                                        {model.vowel}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Hàng 2: 1 ô trải dài (Tiếng ghép thành) */}
+                                  <div className="mt-[2px] h-10 sm:h-11 bg-[#daf0ee] flex items-center justify-center text-lg sm:text-xl font-sgk font-bold">
+                                    {renderResultColored(model, targetInfo.lessonLetters || [])}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Hướng dẫn đọc to */}
+                        <div className="pt-3 border-t border-amber-100 text-center">
+                          <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wider mb-1">
+                            Bé hãy đọc to theo mô hình:
+                          </p>
+                          <p className="font-reading text-slate-900 text-center font-bold tracking-wide text-lg sm:text-xl md:text-2xl">
+                            {targetInfo.targetText}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p
+                        className={`font-reading text-slate-900 text-center font-bold tracking-wide whitespace-pre-line ${
+                          fontSizeMode === 'huge'
+                            ? 'text-2xl sm:text-3xl md:text-4xl leading-[2.3]'
+                            : fontSizeMode === 'large'
+                            ? 'text-xl sm:text-2xl md:text-3xl leading-[2.2]'
+                            : 'text-lg sm:text-xl md:text-2xl leading-[2.0]'
+                        }`}
+                      >
+                        {targetInfo.targetText}
+                      </p>
+                    )}
                   </div>
 
                   {isRecording && (

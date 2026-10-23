@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Volume1Lesson, RecordingTargetInfo, AchievementBadge } from '../types';
-import { speechService, generateSpellingSteps, getPhoneticSound } from '../services/speechService';
+import { Volume1Lesson, RecordingTargetInfo, AchievementBadge, SyllableModel } from '../types';
+import { speechService, generateSpellingSteps, getPhoneticSound, getToneSymbol } from '../services/speechService';
 import { lessonStorageService } from '../services/lessonStorageService';
 import { teacherAudioService } from '../services/teacherAudioService';
 import { achievementService } from '../services/achievementService';
@@ -29,6 +29,39 @@ import {
   VolumeX,
   HelpCircle
 } from 'lucide-react';
+
+export const renderResultColored = (model: SyllableModel, lessonLetters: string[] = []) => {
+  const normLetters = lessonLetters.map(l => l.toLowerCase().trim());
+  const init = (model.initial || '').trim();
+  const initIsNew = normLetters.includes(init.toLowerCase());
+  const res = model.result || '';
+
+  if (init && initIsNew && res.toLowerCase().startsWith(init.toLowerCase())) {
+    const initPart = res.slice(0, init.length);
+    const restPart = res.slice(init.length);
+    return (
+      <span className="font-sgk font-bold">
+        <span className="text-[#e11d48]">{initPart}</span>
+        <span className="text-slate-900">{restPart}</span>
+      </span>
+    );
+  }
+
+  const vowel = (model.vowel || '').trim();
+  const vowelIsNew = normLetters.includes(vowel.toLowerCase());
+  if (vowel && vowelIsNew && res.toLowerCase().endsWith(vowel.toLowerCase())) {
+    const initPart = res.slice(0, res.length - vowel.length);
+    const vowelPart = res.slice(res.length - vowel.length);
+    return (
+      <span className="font-sgk font-bold">
+        <span className="text-slate-900">{initPart}</span>
+        <span className="text-[#e11d48]">{vowelPart}</span>
+      </span>
+    );
+  }
+
+  return <span className="font-sgk font-bold text-slate-900">{res}</span>;
+};
 
 interface Volume1LessonViewProps {
   lesson: Volume1Lesson;
@@ -558,7 +591,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
               })}
             </div>
 
-            {/* Spelling Model (Mô hình ghép âm - nếu có) */}
+            {/* Spelling Model (Mô hình ghép âm - chuẩn SGK) */}
             {lesson.part2_SyllablesAndWords.models && lesson.part2_SyllablesAndWords.models.length > 0 && (
               <div className="mt-4 pt-2">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
@@ -582,8 +615,10 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                           lessonId: lesson.id,
                           lessonNumber: lesson.lessonNumber,
                           lessonTitle: `Bài ${lesson.lessonNumber}: ${lesson.title}`,
-                          sectionTitle: 'Phần 1: Luyện đọc Mô hình đánh vần',
-                          targetText: allModelsText || lesson.part2_SyllablesAndWords.models.map(m => m.result).join(', ')
+                          sectionTitle: 'Phần 1: Luyện đọc Mô hình tiếng',
+                          targetText: allModelsText || lesson.part2_SyllablesAndWords.models.map(m => m.result).join(', '),
+                          syllableModels: lesson.part2_SyllablesAndWords.models,
+                          lessonLetters: lesson.part1_Letters?.letters || []
                         });
                       }}
                       className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-95 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer"
@@ -595,54 +630,80 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="flex flex-wrap items-end justify-center gap-6 sm:gap-10 py-3 bg-gradient-to-b from-orange-50/40 via-amber-50/20 to-transparent rounded-2xl border border-orange-100/80 p-4 sm:p-5">
                   {lesson.part2_SyllablesAndWords.models.map((model, idx) => {
                     const hasTeacherAudio = teacherAudioService.hasAudioForText(model.result, 'syllable', lesson.id);
+                    const toneSymbol = getToneSymbol(model.tone);
+                    const normLetters = (lesson.part1_Letters?.letters || []).map(l => l.toLowerCase().trim());
+                    const initialIsHighlight = normLetters.includes((model.initial || '').toLowerCase().trim());
+                    const vowelIsHighlight = normLetters.includes((model.vowel || '').toLowerCase().trim());
+                    const steps = generateSpellingSteps(model);
+
                     return (
                       <div
                         key={idx}
                         onClick={() => handleSpellingModel(model, idx, lesson.id)}
-                        className={`cursor-pointer p-3 rounded-xl border transition-all flex items-center justify-between group relative ${
+                        className={`group relative flex flex-col items-center cursor-pointer p-3 sm:p-4 rounded-2xl transition-all duration-200 select-none ${
                           spellingActiveIdx === idx
-                            ? 'bg-amber-100/90 border-amber-400 ring-2 ring-amber-300'
-                            : 'bg-orange-50/40 hover:bg-orange-100/50 border-orange-200/70'
+                            ? 'bg-amber-100/90 ring-4 ring-amber-400 shadow-md scale-105'
+                            : 'bg-white hover:bg-emerald-50/40 hover:shadow-md border border-slate-200/90 hover:border-emerald-300'
                         }`}
+                        title={`Bé bấm để nghe đánh vần: ${steps.join(' - ')}`}
                       >
-                        <div className="flex items-center gap-2 text-base sm:text-lg font-bold text-slate-800 font-sgk">
-                          <span className="px-2 py-0.5 bg-white rounded-lg border border-orange-200 text-orange-700">
-                            {model.initial || '—'}
+                        {/* Teacher Audio Indicator */}
+                        {hasTeacherAudio && (
+                          <span
+                            className="absolute top-2 left-2 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-3xs"
+                            title="Đã có giọng đọc mẫu cô giáo"
+                          >
+                            GV
                           </span>
-                          <span className="text-orange-400">+</span>
-                          <span className="px-2 py-0.5 bg-white rounded-lg border border-amber-200 text-amber-700">
-                            {model.vowel}
-                          </span>
-                          {model.tone && (
-                            <>
-                              <span className="text-orange-400">+</span>
-                              <span className="text-xs text-slate-500 font-normal">({model.tone})</span>
-                            </>
-                          )}
-                          <span className="text-orange-400">=</span>
-                          <span className="text-lg sm:text-xl font-extrabold text-orange-600 px-2.5 py-0.5 bg-white rounded-lg border border-orange-300 flex items-center gap-1">
-                            <span>{model.result}</span>
-                            {hasTeacherAudio && (
-                              <span className="text-[10px] px-1 bg-emerald-100 text-emerald-800 rounded font-bold">GV</span>
-                            )}
-                          </span>
+                        )}
+
+                        {/* Teacher Quick Record Button */}
+                        {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
+                          <button
+                            onClick={(e) => handleTeacherRecordClick(e, model.result, `Mô hình: ${model.result}`, 'syllable')}
+                            className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-xs transition-all active:scale-90 cursor-pointer ${
+                              isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                            } ${hasTeacherAudio ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'}`}
+                            title={`Thu âm giọng mẫu cho tiếng "${model.result}"`}
+                          >
+                            <Mic className="w-3 h-3" />
+                          </button>
+                        )}
+
+                        {/* Dấu thanh ở trên nếu có (e.g. dấu huyền ` màu đỏ như SGK) */}
+                        <div className="h-7 sm:h-8 flex items-center justify-center text-2xl sm:text-3xl font-bold font-sgk text-[#e11d48]">
+                          {toneSymbol || '\u00A0'}
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
-                            <button
-                              onClick={(e) => handleTeacherRecordClick(e, model.result, `Mô hình: ${model.result}`, 'syllable')}
-                              className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                hasTeacherAudio ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-                              } ${isTeacherVoiceEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                              title={`Thu âm giọng mẫu cho tiếng "${model.result}"`}
-                            >
-                              <Mic className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          <Play className="w-3.5 h-3.5 text-orange-600 fill-orange-500" />
+
+                        {/* Khối mô hình 2 tầng chuẩn SGK (nền xanh ngọc nhạt #daf0ee) */}
+                        <div className="w-32 sm:w-36 md:w-40 bg-[#daf0ee] rounded-md p-0.5 shadow-2xs border border-[#bce3de]">
+                          {/* Hàng 1: 2 ô (Âm đầu | Âm chính / Vần) */}
+                          <div className="grid grid-cols-2 gap-[2px]">
+                            <div className="h-11 sm:h-12 bg-[#daf0ee] flex items-center justify-center text-xl sm:text-2xl font-sgk font-bold">
+                              <span className={initialIsHighlight ? 'text-[#e11d48]' : 'text-slate-900'}>
+                                {model.initial || '—'}
+                              </span>
+                            </div>
+                            <div className="h-11 sm:h-12 bg-[#daf0ee] flex items-center justify-center text-xl sm:text-2xl font-sgk font-bold">
+                              <span className={vowelIsHighlight ? 'text-[#e11d48]' : 'text-slate-900'}>
+                                {model.vowel}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Hàng 2: 1 ô trải dài (Tiếng ghép thành) */}
+                          <div className="mt-[2px] h-11 sm:h-12 bg-[#daf0ee] flex items-center justify-center text-xl sm:text-2xl font-sgk font-bold">
+                            {renderResultColored(model, lesson.part1_Letters?.letters || [])}
+                          </div>
+                        </div>
+
+                        {/* Nhãn đánh vần gợi ý bên dưới */}
+                        <div className="mt-2.5 text-xs font-semibold text-slate-500 flex items-center gap-1 group-hover:text-orange-600 transition-colors">
+                          <Play className="w-3 h-3 text-orange-500 fill-orange-500" />
+                          <span>{steps.join(' - ')}</span>
                         </div>
                       </div>
                     );
