@@ -460,13 +460,17 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                   <button
                     id="record-letters-btn"
                     onClick={() => {
+                      const phoneticText = lesson.part1_Letters.letters
+                        .map(l => getPhoneticSound(l))
+                        .filter((v, i, a) => a.indexOf(v) === i)
+                        .join(', ');
                       onOpenVoiceRecorder({
                         volume: 'vol1',
                         lessonId: lesson.id,
                         lessonNumber: lesson.lessonNumber,
                         lessonTitle: `Bài ${lesson.lessonNumber}: ${lesson.title}`,
                         sectionTitle: 'Phần 1: Luyện đọc Phát âm',
-                        targetText: lettersText
+                        targetText: phoneticText || lettersText
                       });
                     }}
                     className="flex items-center gap-1.5 bg-[#ea580c] hover:bg-[#c2410c] active:scale-95 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl shadow-xs transition-all cursor-pointer"
@@ -522,58 +526,31 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
               {lesson.part1_Letters.letters.map((letter, idx) => {
                 const hasTeacherAudio = teacherAudioService.hasAudioForText(letter, 'letter', lesson.id);
                 return (
-                  <div key={idx} className="flex flex-col items-center">
-                    <div className="relative group/card">
-                      <button
-                        id={`letter-card-${idx}`}
-                        onClick={() => speechService.speak(letter, undefined, undefined, 'letter', lesson.id)}
-                        className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white border border-slate-200/90 hover:border-orange-400 shadow-xs hover:shadow flex items-center justify-center text-[#c2410c] hover:text-orange-600 hover:scale-105 transition-all cursor-pointer font-sgk font-black tracking-normal relative ${letterFontSizeClass}`}
-                        title={hasTeacherAudio ? `Giọng đọc mẫu Cô giáo: ${letter}` : `Bấm để nghe phát âm: ${letter}`}
-                      >
-                        {letter}
-                        {hasTeacherAudio && (
-                          <span className="absolute bottom-1 right-1.5 px-1 py-0.2 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-3xs" title="Đã có giọng đọc mẫu cô giáo">
-                            GV
-                          </span>
-                        )}
-                      </button>
-
-                      {/* Teacher Quick Record Button */}
-                      {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
-                        <button
-                          onClick={(e) => handleTeacherRecordClick(e, letter, `Âm / Vần: ${letter}`, 'letter')}
-                          className={`absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-md transition-all active:scale-90 cursor-pointer ${
-                            isTeacherVoiceEditMode ? 'opacity-100 scale-100' : 'opacity-0 group-hover/card:opacity-100 scale-90 group-hover/card:scale-100'
-                          } ${hasTeacherAudio ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'}`}
-                          title={hasTeacherAudio ? `Thu lại giọng mẫu cho "${letter}"` : `Thu âm giọng mẫu cô giáo cho "${letter}"`}
-                        >
-                          <Mic className="w-3 h-3" />
-                        </button>
+                  <div key={idx} className="relative group/card">
+                    <button
+                      id={`letter-card-${idx}`}
+                      onClick={() => speechService.speak(letter, undefined, undefined, 'letter', lesson.id)}
+                      className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white border border-slate-200/90 hover:border-orange-400 shadow-xs hover:shadow flex items-center justify-center text-[#c2410c] hover:text-orange-600 hover:scale-105 transition-all cursor-pointer font-sgk font-black tracking-normal relative ${letterFontSizeClass}`}
+                      title={hasTeacherAudio ? `Giọng đọc mẫu Cô giáo: ${letter}` : `Bấm để nghe phát âm: ${letter}`}
+                    >
+                      {letter}
+                      {hasTeacherAudio && (
+                        <span className="absolute bottom-1 right-1.5 px-1 py-0.2 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-3xs" title="Đã có giọng đọc mẫu cô giáo">
+                          GV
+                        </span>
                       )}
-                    </div>
+                    </button>
 
-                    {/* Student Quick Record Button */}
-                    {onOpenVoiceRecorder && (
+                    {/* Teacher Quick Record Button */}
+                    {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                       <button
-                        id={`student-record-letter-${idx}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const phonetic = getPhoneticSound(letter);
-                          onOpenVoiceRecorder({
-                            volume: 'vol1',
-                            lessonId: lesson.id,
-                            lessonNumber: lesson.lessonNumber,
-                            lessonTitle: `Bài ${lesson.lessonNumber}: ${lesson.title}`,
-                            sectionTitle: `Phần 1: Luyện phát âm "${letter}"`,
-                            targetText: phonetic || letter,
-                            referenceAudioText: letter
-                          });
-                        }}
-                        className="mt-1.5 flex items-center justify-center gap-1 px-2.5 py-1 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold transition-all shadow-3xs active:scale-95 cursor-pointer w-full"
-                        title={`Bé luyện phát âm chữ "${letter}"`}
+                        onClick={(e) => handleTeacherRecordClick(e, letter, `Âm / Vần: ${letter}`, 'letter')}
+                        className={`absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-white shadow-md transition-all active:scale-90 cursor-pointer ${
+                          isTeacherVoiceEditMode ? 'opacity-100 scale-100' : 'opacity-0 group-hover/card:opacity-100 scale-90 group-hover/card:scale-100'
+                        } ${hasTeacherAudio ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'}`}
+                        title={hasTeacherAudio ? `Thu lại giọng mẫu cho "${letter}"` : `Thu âm giọng mẫu cô giáo cho "${letter}"`}
                       >
-                        <Mic className="w-3 h-3 text-orange-600" />
-                        <span>Luyện đọc</span>
+                        <Mic className="w-3 h-3" />
                       </button>
                     )}
                   </div>
@@ -654,31 +631,6 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          {/* Student Practice Record Button for this model */}
-                          {onOpenVoiceRecorder && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const steps = generateSpellingSteps(model);
-                                const spellingText = steps.join(' - ');
-                                onOpenVoiceRecorder({
-                                  volume: 'vol1',
-                                  lessonId: lesson.id,
-                                  lessonNumber: lesson.lessonNumber,
-                                  lessonTitle: `Bài ${lesson.lessonNumber}: ${lesson.title}`,
-                                  sectionTitle: `Luyện đánh vần tiếng: ${model.result}`,
-                                  targetText: spellingText,
-                                  referenceAudioText: model.result
-                                });
-                              }}
-                              className="px-2.5 py-1 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1 active:scale-95 shadow-xs"
-                              title={`Bé thu âm luyện đánh vần tiếng "${model.result}"`}
-                            >
-                              <Mic className="w-3 h-3" />
-                              <span>Luyện đọc</span>
-                            </button>
-                          )}
-
                           {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                             <button
                               onClick={(e) => handleTeacherRecordClick(e, model.result, `Mô hình: ${model.result}`, 'syllable')}
@@ -708,7 +660,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                       <span>Các tiếng luyện đọc:</span>
                     </div>
                     <div className="text-[11px] text-slate-500">
-                      Bé bấm vào từng tiếng để nghe đọc hoặc bấm Luyện đọc
+                      Bé bấm vào từng tiếng để nghe đọc hoặc bấm Luyện đọc các tiếng
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -747,37 +699,15 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                     const hasTeacherAudio = teacherAudioService.hasAudioForText(syl, 'syllable', lesson.id);
                     return (
                       <div key={i} className="relative group/syl">
-                        <div className="flex items-center bg-slate-50 hover:bg-amber-100/80 rounded-xl border border-slate-200/80 transition-all shadow-2xs">
-                          <button
-                            onClick={() => speechService.speak(syl, undefined, undefined, 'syllable', lesson.id)}
-                            className="px-3 py-1.5 text-slate-800 hover:text-amber-950 font-bold font-sgk cursor-pointer active:scale-95 text-base sm:text-lg flex items-center gap-1.5"
-                          >
-                            <span>{syl}</span>
-                            {hasTeacherAudio && (
-                              <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">GV</span>
-                            )}
-                          </button>
-                          {onOpenVoiceRecorder && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenVoiceRecorder({
-                                  volume: 'vol1',
-                                  lessonId: lesson.id,
-                                  lessonNumber: lesson.lessonNumber,
-                                  lessonTitle: `Bài ${lesson.lessonNumber}: ${lesson.title}`,
-                                  sectionTitle: `Luyện đọc tiếng: ${syl}`,
-                                  targetText: syl,
-                                  referenceAudioText: syl
-                                });
-                              }}
-                              className="mr-1.5 p-1 rounded-lg bg-orange-100 hover:bg-orange-500 text-orange-700 hover:text-white transition-all cursor-pointer shadow-3xs"
-                              title={`Bé luyện đọc tiếng "${syl}"`}
-                            >
-                              <Mic className="w-3 h-3" />
-                            </button>
+                        <button
+                          onClick={() => speechService.speak(syl, undefined, undefined, 'syllable', lesson.id)}
+                          className="px-3.5 py-1.5 bg-slate-50 hover:bg-amber-100/80 hover:text-amber-950 text-slate-800 font-bold rounded-xl border border-slate-200/80 transition-all shadow-2xs font-sgk cursor-pointer active:scale-95 text-base sm:text-lg flex items-center gap-1.5"
+                        >
+                          <span>{syl}</span>
+                          {hasTeacherAudio && (
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">GV</span>
                           )}
-                        </div>
+                        </button>
                         {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                           <button
                             onClick={(e) => handleTeacherRecordClick(e, syl, `Tiếng: ${syl}`, 'syllable')}
@@ -864,42 +794,20 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 const hasTeacherAudio = teacherAudioService.hasAudioForText(item.word, 'word', lesson.id);
                 return (
                   <div key={idx} className="relative group/word">
-                    <div className="flex items-center rounded-xl bg-slate-50/70 hover:bg-blue-50/90 border-b-2 border-blue-200 hover:border-blue-500 transition-all shadow-2xs hover:shadow-xs">
-                      <button
-                        id={`word-item-${idx}`}
-                        onClick={() => speechService.speak(item.word, undefined, undefined, 'word', lesson.id)}
-                        className={`px-4 py-2.5 sm:px-5 sm:py-3 text-blue-700 font-bold transition-all active:scale-95 cursor-pointer font-sgk flex items-center gap-2 ${wordFontSizeClass}`}
-                        title={item.meaning ? `${item.word}: ${item.meaning}` : `Bấm để nghe: ${item.word}`}
-                      >
-                        {item.illustrationIcon && (
-                          <span className="text-base sm:text-lg">{item.illustrationIcon}</span>
-                        )}
-                        <span>{item.word}</span>
-                        {hasTeacherAudio && (
-                          <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">GV</span>
-                        )}
-                      </button>
-                      {onOpenVoiceRecorder && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenVoiceRecorder({
-                              volume: 'vol1',
-                              lessonId: lesson.id,
-                              lessonNumber: lesson.lessonNumber,
-                              lessonTitle: `Bài ${lesson.lessonNumber}: ${lesson.title}`,
-                              sectionTitle: `Luyện đọc từ: ${item.word}`,
-                              targetText: item.word,
-                              referenceAudioText: item.word
-                            });
-                          }}
-                          className="mr-2 p-1.5 rounded-lg bg-blue-100 hover:bg-blue-600 text-blue-700 hover:text-white transition-all cursor-pointer shadow-3xs"
-                          title={`Bé luyện đọc từ "${item.word}"`}
-                        >
-                          <Mic className="w-3.5 h-3.5" />
-                        </button>
+                    <button
+                      id={`word-item-${idx}`}
+                      onClick={() => speechService.speak(item.word, undefined, undefined, 'word', lesson.id)}
+                      className={`px-5 py-2.5 sm:px-6 sm:py-3 rounded-xl bg-slate-50/70 hover:bg-blue-50/90 border-b-2 border-blue-200 hover:border-blue-500 text-blue-700 font-bold transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer font-sgk flex items-center gap-2 ${wordFontSizeClass}`}
+                      title={item.meaning ? `${item.word}: ${item.meaning}` : `Bấm để nghe: ${item.word}`}
+                    >
+                      {item.illustrationIcon && (
+                        <span className="text-base sm:text-lg">{item.illustrationIcon}</span>
                       )}
-                    </div>
+                      <span>{item.word}</span>
+                      {hasTeacherAudio && (
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">GV</span>
+                      )}
+                    </button>
                     {(isTeacherVoiceEditMode || onOpenTeacherRecorder) && (
                       <button
                         onClick={(e) => handleTeacherRecordClick(e, item.word, `Từ ngữ: ${item.word}`, 'word')}
