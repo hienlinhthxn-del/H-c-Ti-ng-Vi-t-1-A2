@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, 
   BookCheck, 
@@ -222,8 +222,8 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
-                <span className="font-extrabold text-base sm:text-xl bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 bg-clip-text text-transparent font-serif truncate">
-                  Tiếng Việt 1
+                <span className="font-extrabold text-sm sm:text-lg bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 bg-clip-text text-transparent font-serif truncate">
+                  CÙNG EM HỌC TIẾNG VIỆT - AI
                 </span>
                 <span className="text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
                   KNTT

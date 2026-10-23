@@ -13,8 +13,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectRole }) => {
         <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-3xl bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 flex items-center justify-center text-white shadow-xl mb-6">
           <BookOpen className="w-12 h-12 sm:w-16 sm:h-16" />
         </div>
-        <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 bg-clip-text text-transparent font-serif mb-3">
-          Tiếng Việt 1
+        <h1 className="text-3xl sm:text-5xl font-extrabold bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 bg-clip-text text-transparent font-serif mb-3">
+          CÙNG EM HỌC TIẾNG VIỆT - AI
         </h1>
         <p className="text-amber-800 text-lg font-medium">Bạn muốn vào trang của ai?</p>
       </div>
