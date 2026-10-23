@@ -249,6 +249,50 @@ class RecordingStorageService {
     }
   }
 
+  // Update recording student assignment
+  async updateRecordingStudent(
+    id: string,
+    studentId: string,
+    studentName: string,
+    studentCode?: string
+  ): Promise<boolean> {
+    const item = this.memoryRecordings.find(r => r.id === id);
+    if (item) {
+      item.studentId = studentId;
+      item.studentName = studentName;
+      item.studentCode = studentCode;
+    }
+
+    try {
+      const db = await this.initDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const getReq = store.get(id);
+        getReq.onsuccess = () => {
+          const record = getReq.result;
+          if (record) {
+            record.studentId = studentId;
+            record.studentName = studentName;
+            record.studentCode = studentCode;
+            const putReq = store.put(record);
+            putReq.onsuccess = () => resolve();
+            putReq.onerror = () => reject(putReq.error);
+          } else {
+            resolve();
+          }
+        };
+        getReq.onerror = () => reject(getReq.error);
+      });
+      this.notify();
+      return true;
+    } catch (err) {
+      console.warn('Failed to update recording student in IndexedDB:', err);
+      this.notify();
+      return true;
+    }
+  }
+
   // Clear all recordings
   async clearAllRecordings(): Promise<boolean> {
     this.memoryRecordings = [];

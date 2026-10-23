@@ -102,6 +102,118 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState<boolean>(false);
   const [isParentFeedbackModalOpen, setIsParentFeedbackModalOpen] = useState<boolean>(false);
   const [feedbackTargetStudent, setFeedbackTargetStudent] = useState<{ id: string; name: string; studentCode?: string } | null>(null);
+  const [selectedStudentFilter, setSelectedStudentFilter] = useState<string>('all');
+
+  const allStudentProfiles = userProfileService.getAllProfiles().filter(p => p.role === 'student');
+
+  const getRecordingStudent = (rec: StudentRecording) => {
+    if (rec.studentId) {
+      const found = allStudentProfiles.find(p => p.id === rec.studentId);
+      if (found) return found;
+    }
+    if (rec.studentCode) {
+      const found = allStudentProfiles.find(p => p.studentCode === rec.studentCode);
+      if (found) return found;
+    }
+    if (rec.studentName) {
+      const found = allStudentProfiles.find(p => p.name.toLowerCase() === rec.studentName?.toLowerCase());
+      if (found) return found;
+    }
+    if (rec.studentName && rec.studentName !== 'Cô Hiền Phan') {
+      return {
+        id: rec.studentId || 'unassigned',
+        name: rec.studentName,
+        studentCode: rec.studentCode || 'HS',
+        avatar: '🐰',
+        classroom: 'Lớp 1'
+      };
+    }
+    // Default to the first student profile in the roster
+    return allStudentProfiles[0] || {
+      id: 'student_1',
+      name: 'Tòng Hoài An',
+      studentCode: 'HS01',
+      avatar: '🐰',
+      classroom: 'Lớp 1'
+    };
+  };
+
+  const generateAiTeacherComment = (rec: StudentRecording, studentName: string) => {
+    const evalRes = rec.aiEvaluation;
+    const score = evalRes?.score ?? (rec.teacherScore ? rec.teacherScore * 20 : 75);
+    const mistakes = evalRes?.mistakesList || [];
+
+    // Điểm thấp (< 50 điểm): Chỉ rõ từng lỗi cụ thể để học sinh sửa
+    if (score < 50) {
+      let mistakesText = '';
+      if (mistakes.length > 0) {
+        const mistakeItems = mistakes.map((m, idx) => {
+          if (m.errorType === 'missing') {
+            return `• Lỗi ${idx + 1} (Đọc sót từ): Con chưa đọc từ "${m.word}". Chú ý nhìn kỹ chữ và phát âm to rõ ràng.`;
+          } else {
+            return `• Lỗi ${idx + 1} (Phát âm sai): Con đọc từ "${m.word}" nhầm thành "${m.spokenWord || 'âm khác'}". Cách sửa: ${m.suggestion}.`;
+          }
+        }).join('\n');
+        mistakesText = `\nCác lỗi cụ thể con cần sửa ngay:\n${mistakeItems}\n\n`;
+      } else {
+        mistakesText = '\nCon chú ý phát âm to, rõ ràng và đọc đúng theo từng chữ trong bài học nhé.\n\n';
+      }
+
+      return `Cô nhận xét bài đọc của ${studentName}: Bài này con đạt ${score}/100 điểm, con cần cố gắng luyện đọc lại nhiều hơn nhé.${mistakesText}👉 Hướng dẫn con sửa: Con hãy bấm nút "Nghe cô đọc mẫu", lắng nghe thật kỹ cách cô phát âm rồi bấm thu âm lại to, rõ từng tiếng nhé. Cô tin lần sau con sẽ đạt điểm cao hơn! Cố lên con! ❤️`;
+    }
+
+    // Điểm trung bình (50 - 74 điểm): Đạt yêu cầu nhưng còn lỗi cần lưu ý
+    if (score < 75) {
+      let mistakesText = '';
+      if (mistakes.length > 0) {
+        const mistakeItems = mistakes.map(m => {
+          if (m.errorType === 'missing') {
+            return `• Từ "${m.word}": chú ý đọc đủ tiếng, không đọc lướt qua.`;
+          } else {
+            return `• Từ "${m.word}": tránh đọc nhầm thành "${m.spokenWord || ''}" (${m.suggestion}).`;
+          }
+        }).join('\n');
+        mistakesText = `\nCon chú ý rèn sửa các lỗi sau để bài đọc hay hơn:\n${mistakeItems}\n\n`;
+      }
+
+      return `Cô khen ${studentName} đã cố gắng hoàn thành bài đọc, giọng đọc khá to (đạt ${score}/100 điểm).${mistakesText}Con hãy nghe cô đọc mẫu và luyện đọc lại các từ trên nhé, cô tin con sẽ tiến bộ vượt bậc! 👏`;
+    }
+
+    // Điểm khá tốt (75 - 89 điểm)
+    if (score < 90) {
+      let minorNote = '';
+      if (mistakes.length > 0) {
+        minorNote = ` Con chỉ cần lưu ý hoàn thiện thêm từ "${mistakes[0].word}": ${mistakes[0].suggestion}.`;
+      }
+      return `Cô khen ${studentName} đọc bài to, rõ ràng, ngắt nghỉ đúng nhịp và giọng đọc rất tự tin (đạt ${score}/100 điểm)!${minorNote} Chúc mừng con đã hoàn thành tốt bài học, tiếp tục phát huy nhé! ⭐`;
+    }
+
+    // Điểm xuất sắc (90 - 100 điểm)
+    return `Cô khen ${studentName} đọc bài rất xuất sắc! Giọng đọc to, tròn vành rõ chữ, phát âm chuẩn xác từng tiếng theo sách giáo khoa (đạt ${score}/100 điểm tuyệt đối). Con đọc rất lưu loát và tự tin, xứng đáng nhận trọn 5 sao của cô! 🌟🌟🌟`;
+  };
+
+  const handleOpenReview = (rec: StudentRecording) => {
+    setSelectedRecording(rec);
+    const student = getRecordingStudent(rec);
+    const evalScore = rec.aiEvaluation?.score ?? (rec.teacherScore ? rec.teacherScore * 20 : 80);
+    
+    // Gợi ý số sao tương ứng với điểm số thực tế
+    let suggestedStars = 5;
+    if (evalScore >= 90) suggestedStars = 5;
+    else if (evalScore >= 75) suggestedStars = 4;
+    else if (evalScore >= 50) suggestedStars = 3;
+    else if (evalScore >= 30) suggestedStars = 2;
+    else suggestedStars = 1;
+
+    setReviewScore(rec.teacherScore || suggestedStars);
+
+    // Tự động gợi ý nhận xét nếu giáo viên chưa viết nhận xét trước đó
+    if (!rec.teacherComment) {
+      setReviewComment(generateAiTeacherComment(rec, student.name));
+    } else {
+      setReviewComment(rec.teacherComment);
+    }
+  };
 
   // Curriculum State
   const [selectedTerm, setSelectedTerm] = useState<'term1' | 'term2'>('term1');
@@ -203,13 +315,19 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   const handleSaveReview = async (rec: StudentRecording) => {
     setSavingReview(true);
     try {
+      const student = getRecordingStudent(rec);
       await recordingStorageService.updateTeacherReview(rec.id, reviewComment, reviewScore);
       
+      // Đảm bảo thông tin học sinh được lưu chính xác vào bản thu âm
+      if (!rec.studentId || !rec.studentName || rec.studentName === 'Cô Hiền Phan') {
+        await recordingStorageService.updateRecordingStudent(rec.id, student.id, student.name, student.studentCode);
+      }
+
       // Tự động đồng bộ và gửi nhận xét sang Cổng Phụ Huynh của học sinh
       teacherFeedbackService.sendFeedback({
-        studentId: rec.studentId || 'student_1',
-        studentName: rec.studentName || 'Bé ' + (rec.studentCode || 'Học sinh'),
-        studentCode: rec.studentCode || 'HS01',
+        studentId: student.id || rec.studentId || 'student_1',
+        studentName: student.name || rec.studentName || 'Bé ' + (student.studentCode || 'Học sinh'),
+        studentCode: student.studentCode || rec.studentCode || 'HS01',
         teacherName: 'Cô Hiền Phan (GVCN Lớp 1A)',
         category: 'recording_eval',
         title: `Nhận xét bài đọc: ${rec.lessonTitle}`,
@@ -943,8 +1061,38 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Recordings List (Left 2 cols) */}
               <div className="lg:col-span-2 space-y-4">
-                {recordings.map(rec => {
+                {/* Filter by Student Bar */}
+                <div className="bg-white p-3.5 rounded-2xl border border-indigo-100 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span className="text-xs font-bold text-slate-700 shrink-0">Lọc theo học sinh:</span>
+                    <select
+                      value={selectedStudentFilter}
+                      onChange={(e) => setSelectedStudentFilter(e.target.value)}
+                      className="px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/50 text-indigo-950 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    >
+                      <option value="all">Tất cả học sinh ({recordings.length} bài đã nộp)</option>
+                      {allStudentProfiles.map(s => {
+                        const count = recordings.filter(r => {
+                          const stu = getRecordingStudent(r);
+                          return stu.id === s.id;
+                        }).length;
+                        return (
+                          <option key={s.id} value={s.id}>
+                            {s.avatar} {s.studentCode} - {s.name} ({count} bài)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                  <span className="text-xs text-slate-500 font-medium">
+                    Hiển thị <strong>{filteredRecordings.length}</strong> / {recordings.length} bài nộp
+                  </span>
+                </div>
+
+                {filteredRecordings.map(rec => {
                   const isSelected = selectedRecording?.id === rec.id;
+                  const studentInfo = getRecordingStudent(rec);
                   return (
                     <div 
                       key={rec.id} 
@@ -952,6 +1100,49 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                         isSelected ? 'border-amber-500 ring-2 ring-amber-400 bg-amber-50/10' : 'border-slate-200'
                       }`}
                     >
+                      {/* Top Header with Student Info */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <span className="w-8 h-8 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-lg shadow-xs">
+                            {studentInfo.avatar || '🐰'}
+                          </span>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-slate-500 font-medium">Học sinh:</span>
+                              <strong className="text-sm font-black text-indigo-950">{studentInfo.name}</strong>
+                              <span className="px-1.5 py-0.2 rounded-md bg-indigo-100 text-indigo-900 font-mono text-[10px] font-bold">
+                                {studentInfo.studentCode || 'HS01'}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-slate-400">{studentInfo.classroom || 'Lớp 1'}</span>
+                          </div>
+                        </div>
+
+                        {/* Inline student selector if teacher wants to reassign */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] text-slate-400">Đổi HS:</span>
+                          <select
+                            value={studentInfo.id}
+                            onChange={async (e) => {
+                              const newStu = allStudentProfiles.find(p => p.id === e.target.value);
+                              if (newStu) {
+                                await recordingStorageService.updateRecordingStudent(rec.id, newStu.id, newStu.name, newStu.studentCode);
+                                await refreshRecordings();
+                                showToast(`Đã gán bài nộp cho học sinh ${newStu.name}!`);
+                              }
+                            }}
+                            className="px-2 py-1 text-[11px] rounded-lg border border-slate-200 bg-slate-50 hover:bg-white text-slate-700 font-medium cursor-pointer shadow-xs focus:ring-1 focus:ring-indigo-500"
+                            title="Chọn lại học sinh cho bài nộp này nếu cần"
+                          >
+                            {allStudentProfiles.map(s => (
+                              <option key={s.id} value={s.id}>
+                                {s.avatar} {s.studentCode} - {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2">
@@ -990,12 +1181,18 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                               <Bot className="w-4 h-4 text-purple-600" />
                               <span>Trợ lý AI Đánh Giá: <strong className="text-purple-700 font-black">{rec.aiEvaluation.score} điểm</strong> (Độ chính xác: {rec.aiEvaluation.accuracy}%)</span>
                             </span>
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-200 text-purple-950 self-start sm:self-auto">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black self-start sm:self-auto ${
+                              rec.aiEvaluation.score >= 80 
+                                ? 'bg-emerald-100 text-emerald-950 border border-emerald-300' 
+                                : rec.aiEvaluation.score >= 50
+                                ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                                : 'bg-rose-100 text-rose-950 border border-rose-300'
+                            }`}>
                               {rec.aiEvaluation.cheeringTitle}
                             </span>
                           </div>
 
-                          <p className="text-[11px] text-purple-900 italic bg-white/70 p-2 rounded-xl border border-purple-100">
+                          <p className="text-[11px] text-purple-900 italic bg-white/70 p-2 rounded-xl border border-purple-100 leading-relaxed">
                             "{rec.aiEvaluation.detailedFeedback}"
                           </p>
 
@@ -1069,7 +1266,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                             <span>👩‍🏫 Lời nhận xét của Cô giáo:</span>
                             <span className="text-amber-600 font-black">{rec.teacherScore || 5} ⭐</span>
                           </div>
-                          <p className="text-emerald-950 italic">"{rec.teacherComment}"</p>
+                          <p className="text-emerald-950 italic whitespace-pre-line">"{rec.teacherComment}"</p>
                         </div>
                       )}
 
@@ -1077,12 +1274,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                         <div className="flex items-center gap-1.5">
                           <button
                             id={`review-rec-btn-${rec.id}`}
-                            onClick={() => {
-                              setSelectedRecording(rec);
-                              setReviewComment(rec.teacherComment || '');
-                              setReviewScore(rec.teacherScore || 5);
-                            }}
-                            className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                            onClick={() => handleOpenReview(rec)}
+                            className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                           >
                             <MessageSquare className="w-3.5 h-3.5" />
                             <span>{rec.teacherComment ? 'Sửa nhận xét' : 'Chấm điểm'}</span>
@@ -1092,9 +1285,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                             id={`direct-feedback-btn-${rec.id}`}
                             onClick={() => {
                               setFeedbackTargetStudent({
-                                id: rec.studentId || 'student_1',
-                                name: rec.studentName || 'Bé ' + (rec.studentCode || 'Học sinh'),
-                                studentCode: rec.studentCode || 'HS01'
+                                id: studentInfo.id,
+                                name: studentInfo.name,
+                                studentCode: studentInfo.studentCode
                               });
                               setSelectedRecording(rec);
                               setIsParentFeedbackModalOpen(true);
@@ -1128,6 +1321,32 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
                 {selectedRecording ? (
                   <div className="space-y-4">
+                    {/* Student Info Card in Sidebar */}
+                    {(() => {
+                      const selStudent = getRecordingStudent(selectedRecording);
+                      return (
+                        <div className="p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl border border-indigo-200/80 flex items-center justify-between shadow-xs">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-9 h-9 rounded-full bg-white border border-indigo-200 flex items-center justify-center text-xl shadow-xs">
+                              {selStudent.avatar || '🐰'}
+                            </span>
+                            <div>
+                              <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider block">Học sinh:</span>
+                              <span className="text-sm font-black text-indigo-950">{selStudent.name}</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-900 font-mono text-xs font-bold block">
+                              {selStudent.studentCode || 'HS01'}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              {selStudent.classroom || 'Lớp 1'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     <div className="p-3 bg-amber-50 rounded-2xl border border-amber-100 text-xs space-y-1.5">
                       <div className="font-bold text-amber-900">{selectedRecording.lessonTitle}</div>
                       <div className="text-slate-700 italic">"{selectedRecording.targetText}"</div>
@@ -1145,16 +1364,21 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-slate-700 block mb-1">
-                        Chấm điểm / Đánh giá sao:
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-slate-700">
+                          Chấm điểm / Đánh giá sao:
+                        </label>
+                        <span className="text-[11px] font-semibold text-amber-700">
+                          {reviewScore === 5 ? '🌟 Xuất sắc (5 sao)' : reviewScore === 4 ? '⭐ Khá tốt (4 sao)' : reviewScore === 3 ? '⭐ Đạt yêu cầu (3 sao)' : reviewScore === 2 ? 'Cần rèn thêm (2 sao)' : 'Cần cố gắng (1 sao)'}
+                        </span>
+                      </div>
                       <div className="flex items-center gap-2">
                         {[1, 2, 3, 4, 5].map(num => (
                           <button
                             key={num}
                             type="button"
                             onClick={() => setReviewScore(num)}
-                            className={`p-2 rounded-xl border text-base transition-all ${
+                            className={`p-2 rounded-xl border text-base transition-all cursor-pointer ${
                               reviewScore >= num 
                                 ? 'bg-amber-400 border-amber-500 text-amber-950 scale-105' 
                                 : 'bg-slate-100 border-slate-200 text-slate-400'
@@ -1176,36 +1400,23 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                           id="ai-suggest-comment-btn"
                           onClick={() => {
                             if (!selectedRecording) return;
-                            const studentName = selectedRecording.studentName || 'Con';
-                            const evalRes = selectedRecording.aiEvaluation;
-                            const score = evalRes?.score ?? 85;
-                            const mistakes = evalRes?.mistakesList || [];
-                            
-                            let suggestion = '';
-                            if (mistakes.length > 0) {
-                              const firstMistake = mistakes[0];
-                              suggestion = `Cô khen ${studentName} đọc to, tự tin. Con chú ý rèn lại từ "${firstMistake.word}" (tránh đọc nhầm thành "${firstMistake.spokenWord || 'âm khác'}"): ${firstMistake.suggestion}. Chúc con đọc ngày càng hay! 👏`;
-                            } else if (score >= 85) {
-                              suggestion = `Cô khen ${studentName} đọc bài rất to, rõ ràng và phát âm chuẩn xác từng tiếng trong bài (${score}/100 điểm AI). Con ngắt nghỉ câu rất tự nhiên, tiếp tục phát huy nhé! ⭐`;
-                            } else if (score >= 60) {
-                              suggestion = `Cô khen ${studentName} đã cố gắng hoàn thành bài đọc. Con chú ý rèn thêm các âm dấu thanh để giọng đọc tròn vành rõ chữ hơn nhé, cô tin con sẽ làm rất tốt! 👏`;
-                            } else {
-                              suggestion = `Cô khen tinh thần tự giác luyện đọc của ${studentName}. Con hãy lắng nghe mẫu của Cô giáo và bấm máy đọc lại từng câu ngắn cho quen tai nhé! ❤️`;
-                            }
+                            const student = getRecordingStudent(selectedRecording);
+                            const suggestion = generateAiTeacherComment(selectedRecording, student.name);
                             setReviewComment(suggestion);
                           }}
                           className="text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+                          title="Tự động tạo nhận xét sư phạm chi tiết theo số điểm và lỗi sai của bé"
                         >
                           <Bot className="w-3 h-3 text-purple-600" />
                           <span>AI Gợi ý nhận xét</span>
                         </button>
                       </div>
                       <textarea
-                        rows={4}
+                        rows={5}
                         value={reviewComment}
                         onChange={(e) => setReviewComment(e.target.value)}
                         placeholder="VD: Cô khen con đọc rất to, rõ ràng, ngắt nghỉ đúng dấu chấm. Chăm chỉ phát huy nhé!..."
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed"
                       />
                     </div>
 

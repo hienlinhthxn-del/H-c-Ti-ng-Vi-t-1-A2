@@ -541,7 +541,7 @@ export class AISpeechService {
     let score = Math.round(
       (correctCount * 100 + mismatchedCount * 45) / targetWords.length
     );
-    score = Math.max(35, Math.min(100, score));
+    score = Math.max(20, Math.min(100, score));
 
     let rating: 'excellent' | 'great' | 'good' | 'practice_more';
     let cheeringTitle = '';
@@ -558,20 +558,36 @@ export class AISpeechService {
       phoneticTips.push('Bé hãy giữ vững phong độ này khi đọc bài cùng Cô giáo trên lớp nhé!');
     } else if (accuracy >= 70) {
       rating = 'great';
-      cheeringTitle = '👏 Rất Tốt! Đọc Khá Lưu Loát';
-      detailedFeedback = `Bé đọc rất to và tự tin! AI phát hiện bé cần rèn thêm ${totalMistakes} từ để bài đọc đạt điểm 10 tuyệt đối.`;
+      cheeringTitle = `👏 Khá Tốt! Đạt ${score} Điểm`;
+      const mistakeSummary = mistakesList.map(m => m.errorType === 'missing' ? `sót từ "${m.word}"` : `từ "${m.word}" đọc thành "${m.spokenWord || ''}"`).join(', ');
+      detailedFeedback = `Bé đọc khá to và tự tin (${score}/100đ). Cần lưu ý hoàn thiện ${totalMistakes} lỗi: ${mistakeSummary}. Hãy nghe cô đọc mẫu để sửa nhé!`;
       phoneticTips.push('Bé hãy bấm vào các từ màu đỏ bên dưới để nghe cô đọc mẫu và sửa phát âm nhé.');
     } else if (accuracy >= 50) {
       rating = 'good';
-      cheeringTitle = '👍 Đạt Yêu Cầu! Cố Gắng Thêm Chút Nữa';
-      detailedFeedback = `Bé đã đọc được ${correctCount}/${targetWords.length} từ chuẩn. Bé hãy chú ý phát âm rõ hơn dấu thanh và các âm đầu khó.`;
+      cheeringTitle = `👍 Đạt ${score} Điểm - Cần Cố Gắng`;
+      const mistakeSummary = mistakesList.map(m => m.errorType === 'missing' ? `sót từ "${m.word}"` : `từ "${m.word}" đọc thành "${m.spokenWord || ''}"`).join('; ');
+      detailedFeedback = `Bé đọc được ${correctCount}/${targetWords.length} từ chuẩn (${score}/100đ). Bé chú ý sửa ${totalMistakes} lỗi: ${mistakeSummary}. Luyện đọc chậm lại và phát âm rõ từng tiếng nhé!`;
       phoneticTips.push('Luyện phát âm chậm từng tiếng một, không cần đọc quá nhanh.');
     } else {
       rating = 'practice_more';
-      cheeringTitle = '💪 Bé Cố Gắng Luyện Thêm Nhé!';
-      detailedFeedback =
-        'Bé hãy bấm nút "Nghe cô đọc mẫu" trước, sau đó bấm nút thu âm và đọc theo từng câu ngắn nhé.';
+      cheeringTitle = `💪 Bé Cần Luyện Thêm (${score}/100đ)`;
+      
+      const missingWords = mistakesList.filter(m => m.errorType === 'missing');
+      const mismatchedWords = mistakesList.filter(m => m.errorType !== 'missing');
+      let errorDetails = '';
+      if (missingWords.length > 0 && mismatchedWords.length > 0) {
+        errorDetails = `Bé bị đọc sót ${missingWords.length} từ (${missingWords.map(m => `"${m.word}"`).join(', ')}) và đọc sai ${mismatchedWords.length} từ (${mismatchedWords.map(m => `"${m.word}" nhầm thành "${m.spokenWord || ''}"`).join(', ')}).`;
+      } else if (missingWords.length > 0) {
+        errorDetails = `Bé bị đọc sót ${missingWords.length} từ: ${missingWords.map(m => `"${m.word}"`).join(', ')}.`;
+      } else if (mismatchedWords.length > 0) {
+        errorDetails = `Bé đọc sai ${mismatchedWords.length} từ: ${mismatchedWords.map(m => `từ "${m.word}" đọc nhầm thành "${m.spokenWord || ''}"`).join(', ')}.`;
+      } else {
+        errorDetails = 'Bé chưa phát âm rõ các tiếng trong bài.';
+      }
+
+      detailedFeedback = `Bài đọc đạt ${score}/100 điểm (độ chính xác ${accuracy}%). ${errorDetails} Bé hãy nhìn kỹ chữ, bấm nút "Nghe cô đọc mẫu" rồi bấm thu âm và đọc to rõ từng tiếng nhé!`;
       phoneticTips.push('Chỉ tay vào từng chữ khi đọc để không bị bỏ sót tiếng.');
+      phoneticTips.push('Nghe cô đọc mẫu 2-3 lần trước khi bấm thu âm lại.');
     }
 
     // Chắt lọc lời khuyên sư phạm theo lỗi thực tế (Công văn 4786)
