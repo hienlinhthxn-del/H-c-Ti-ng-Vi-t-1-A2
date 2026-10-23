@@ -138,6 +138,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
     };
   };
 
+  const filteredRecordings = recordings.filter(rec => {
+    if (selectedStudentFilter === 'all') return true;
+    const student = getRecordingStudent(rec);
+    return student.id === selectedStudentFilter || rec.studentId === selectedStudentFilter;
+  });
+
   const generateAiTeacherComment = (rec: StudentRecording, studentName: string) => {
     const evalRes = rec.aiEvaluation;
     const score = evalRes?.score ?? (rec.teacherScore ? rec.teacherScore * 20 : 75);
@@ -1090,10 +1096,21 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                   </span>
                 </div>
 
-                {filteredRecordings.map(rec => {
-                  const isSelected = selectedRecording?.id === rec.id;
-                  const studentInfo = getRecordingStudent(rec);
-                  return (
+                {filteredRecordings.length === 0 ? (
+                  <div className="bg-white rounded-3xl p-8 text-center border border-dashed border-indigo-200 text-xs text-slate-500 space-y-2">
+                    <p className="font-bold text-slate-700">Chưa tìm thấy bài nộp nào của học sinh này</p>
+                    <button
+                      onClick={() => setSelectedStudentFilter('all')}
+                      className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl transition cursor-pointer"
+                    >
+                      Xem tất cả học sinh
+                    </button>
+                  </div>
+                ) : (
+                  filteredRecordings.map(rec => {
+                    const isSelected = selectedRecording?.id === rec.id;
+                    const studentInfo = getRecordingStudent(rec);
+                    return (
                     <div 
                       key={rec.id} 
                       className={`bg-white rounded-3xl p-5 border transition-all hover:shadow-md ${
@@ -1309,7 +1326,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                       </div>
                     </div>
                   );
-                })}
+                }))}
               </div>
 
               {/* Review Sidebar Form (Right 1 col) */}
