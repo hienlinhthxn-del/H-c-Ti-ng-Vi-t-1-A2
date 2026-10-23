@@ -666,7 +666,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                         {/* Hướng dẫn đọc to */}
                         <div className="pt-3 border-t border-amber-100 text-center">
                           <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wider mb-1">
-                            Bé hãy đọc to theo mô hình:
+                            {targetInfo.sectionTitle?.includes('Đầu bài') ? 'Bé hãy đọc to phần đầu bài theo mô hình:' : 'Bé hãy đọc to theo mô hình:'}
                           </p>
                           <p className="font-reading text-slate-900 text-center font-bold tracking-wide text-lg sm:text-xl md:text-2xl">
                             {targetInfo.targetText}
