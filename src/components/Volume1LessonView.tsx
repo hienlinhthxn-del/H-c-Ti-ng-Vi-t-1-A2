@@ -493,12 +493,10 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                   <button
                     id="record-letters-btn"
                     onClick={() => {
-                      const phoneticText = lesson.part1_Letters.letters
+                      const lettersList = lesson.part1_Letters.letters || [];
+                      const phoneticText = lettersList
                         .map(l => getPhoneticSound(l))
                         .filter((v, i, a) => a.indexOf(v) === i)
-                        .join(', ');
-                      const allModelsText = (lesson.part2_SyllablesAndWords.models || [])
-                        .map(m => generateSpellingSteps(m).join(' - '))
                         .join(', ');
                       onOpenVoiceRecorder({
                         volume: 'vol1',
@@ -506,15 +504,12 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                         lessonNumber: lesson.lessonNumber,
                         lessonTitle: `Bài ${lesson.lessonNumber}: ${lesson.title}`,
                         sectionTitle: 'Phần 1: Luyện đọc Đầu bài',
-                        targetText: allModelsText || phoneticText || lettersText,
-                        syllableModels: (lesson.part2_SyllablesAndWords.models && lesson.part2_SyllablesAndWords.models.length > 0)
-                          ? lesson.part2_SyllablesAndWords.models
-                          : undefined,
-                        lessonLetters: lesson.part1_Letters?.letters || []
+                        targetText: lettersList.join('   '),
+                        referenceAudioText: phoneticText
                       });
                     }}
                     className="flex items-center gap-1.5 bg-[#ea580c] hover:bg-[#c2410c] active:scale-95 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl shadow-xs transition-all cursor-pointer"
-                    title="Ghi âm và nộp bài luyện đọc đầu bài"
+                    title="Ghi âm và nộp bài luyện đọc chữ cái và dấu thanh ở đầu bài"
                   >
                     <Mic className="w-3.5 h-3.5" />
                     <span>Luyện đọc đầu bài</span>
@@ -614,22 +609,22 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                     <button
                       id="record-all-spelling-models-btn"
                       onClick={() => {
-                        const modelsResults = (lesson.part2_SyllablesAndWords.models || []).map(m => m.result);
-                        const readingSyllables = lesson.part2_SyllablesAndWords.readingSyllables || [];
-                        const targetSyllables = modelsResults.length > 0
-                          ? modelsResults.join(', ')
-                          : readingSyllables.join(', ');
+                        const allModelsText = (lesson.part2_SyllablesAndWords.models || [])
+                          .map(m => generateSpellingSteps(m).join(' - '))
+                          .join(', ');
                         onOpenVoiceRecorder({
                           volume: 'vol1',
                           lessonId: lesson.id,
                           lessonNumber: lesson.lessonNumber,
                           lessonTitle: `Bài ${lesson.lessonNumber}: ${lesson.title}`,
                           sectionTitle: 'Phần 1: Luyện đọc Mô hình tiếng',
-                          targetText: targetSyllables
+                          targetText: allModelsText || lesson.part2_SyllablesAndWords.models.map(m => m.result).join(', '),
+                          syllableModels: lesson.part2_SyllablesAndWords.models,
+                          lessonLetters: lesson.part1_Letters?.letters || []
                         });
                       }}
                       className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-95 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer"
-                      title="Bé luyện đọc các tiếng theo mô hình"
+                      title="Bé luyện đọc và đánh vần các mô hình tiếng trong bài"
                     >
                       <Mic className="w-3.5 h-3.5" />
                       <span>Luyện đọc mô hình tiếng</span>
