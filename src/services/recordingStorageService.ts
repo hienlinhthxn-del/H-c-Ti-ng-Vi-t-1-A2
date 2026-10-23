@@ -1,18 +1,97 @@
 import { StudentRecording, RecordingTargetInfo } from '../types';
+import { db } from './firebaseConfig';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query } from 'firebase/firestore';
 
 const DB_NAME = 'tieng_viet_1_recordings_db';
 const DB_VERSION = 1;
 const STORE_NAME = 'student_recordings';
+const CLOUD_COLLECTION = 'student_recordings';
 
 class RecordingStorageService {
   private dbPromise: Promise<IDBDatabase> | null = null;
   private memoryRecordings: StudentRecording[] = [];
+  private cloudRecordingsMap: Map<string, StudentRecording> = new Map();
   private listeners: (() => void)[] = [];
 
   constructor() {
-    if (typeof window !== 'undefined' && 'indexedDB' in window) {
-      this.initDB();
+    if (typeof window !== 'undefined') {
+      if ('indexedDB' in window) {
+        this.initDB();
+      }
+      this.initFirebaseSync();
     }
+  }
+
+  private initFirebaseSync() {
+    try {
+      const q = query(collection(db, CLOUD_COLLECTION));
+      onSnapshot(
+        q,
+        (snapshot) => {
+          snapshot.docChanges().forEach((change) => {
+            const data = change.doc.data() as StudentRecording;
+            if (change.type === 'removed') {
+              this.cloudRecordingsMap.delete(change.doc.id);
+              this.memoryRecordings = this.memoryRecordings.filter((r) => r.id !== change.doc.id);
+            } else if (data && data.id) {
+              const hydrated: StudentRecording = {
+                ...data,
+                audioBlobUrl: data.audioBase64 || data.audioBlobUrl
+              };
+              this.cloudRecordingsMap.set(data.id, hydrated);
+            }
+          });
+          this.mergeCloudIntoMemory();
+          this.notify();
+        },
+        (err) => {
+          console.warn('Firebase sync warning for student recordings:', err);
+        }
+      );
+    } catch (err) {
+      console.warn('Could not initialize Firebase sync for student recordings:', err);
+    }
+  }
+
+  private mergeCloudIntoMemory() {
+    const mergedMap = new Map<string, StudentRecording>();
+    this.memoryRecordings.forEach((rec) => {
+      mergedMap.set(rec.id, rec);
+    });
+    this.cloudRecordingsMap.forEach((cloudRec, id) => {
+      const existing = mergedMap.get(id);
+      if (existing) {
+        mergedMap.set(id, {
+          ...existing,
+          ...cloudRec,
+          audioBlobUrl: existing.audioBlobUrl || cloudRec.audioBase64 || cloudRec.audioBlobUrl
+        });
+      } else {
+        mergedMap.set(id, cloudRec);
+      }
+    });
+    const list = Array.from(mergedMap.values());
+    list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    this.memoryRecordings = list;
+  }
+
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Failed to convert blob to base64'));
+        }
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  private sanitizeForFirestore<T>(obj: T): T {
+    return JSON.parse(JSON.stringify(obj));
   }
 
   private initDB(): Promise<IDBDatabase> {
@@ -27,9 +106,9 @@ class RecordingStorageService {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        const idb = (event.target as IDBOpenDBRequest).result;
+        if (!idb.objectStoreNames.contains(STORE_NAME)) {
+          const store = idb.createObjectStore(STORE_NAME, { keyPath: 'id' });
           store.createIndex('lessonId', 'lessonId', { unique: false });
           store.createIndex('volume', 'volume', { unique: false });
           store.createIndex('createdAt', 'createdAt', { unique: false });
@@ -78,6 +157,12 @@ class RecordingStorageService {
   ): Promise<StudentRecording> {
     const id = 'rec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     const audioBlobUrl = URL.createObjectURL(audioBlob);
+    let audioBase64: string | undefined;
+    try {
+      audioBase64 = await this.blobToBase64(audioBlob);
+    } catch (e) {
+      console.warn('Could not encode audioBlob to base64:', e);
+    }
     
     // Generate feedback for 1st grader
     const feedback = this.generateCheeringFeedback(target.targetText, durationSeconds);
@@ -91,6 +176,7 @@ class RecordingStorageService {
       sectionTitle: target.sectionTitle,
       targetText: target.targetText,
       audioBlobUrl,
+      audioBase64,
       mimeType: audioBlob.type || 'audio/webm',
       durationSeconds: Math.round(durationSeconds),
       createdAt: new Date().toISOString(),
@@ -103,17 +189,17 @@ class RecordingStorageService {
 
     // Keep in memory
     this.memoryRecordings.unshift(recording);
+    this.cloudRecordingsMap.set(id, recording);
 
     // Save to IndexedDB with Blob
     try {
-      const db = await this.initDB();
+      const idb = await this.initDB();
       await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const tx = idb.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
-        // We store with blob data directly in IndexedDB
         const itemToStore = {
           ...recording,
-          audioBlob // Raw blob persists perfectly in IndexedDB
+          audioBlob
         };
         const req = store.put(itemToStore);
         req.onsuccess = () => resolve();
@@ -123,6 +209,16 @@ class RecordingStorageService {
       console.warn('Failed to save recording to IndexedDB, fallback to memory:', err);
     }
 
+    // Sync to Firebase Cloud for multi-user / multi-device access
+    try {
+      const cloudDoc: StudentRecording = { ...recording };
+      delete cloudDoc.audioBlobUrl; // Do not store temporary local blob:// URL in cloud
+      const cleanDoc = this.sanitizeForFirestore(cloudDoc);
+      await setDoc(doc(db, CLOUD_COLLECTION, id), cleanDoc);
+    } catch (err) {
+      console.warn('Failed to sync recording to Firebase Cloud:', err);
+    }
+
     this.notify();
     return recording;
   }
@@ -130,9 +226,9 @@ class RecordingStorageService {
   // Fetch all recordings
   async getAllRecordings(): Promise<StudentRecording[]> {
     try {
-      const db = await this.initDB();
+      const idb = await this.initDB();
       const items = await new Promise<any[]>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly');
+        const tx = idb.transaction(STORE_NAME, 'readonly');
         const store = tx.objectStore(STORE_NAME);
         const req = store.getAll();
         req.onsuccess = () => resolve(req.result || []);
@@ -140,10 +236,12 @@ class RecordingStorageService {
       });
 
       // Map back to StudentRecording with object URLs
-      const results: StudentRecording[] = items.map(item => {
+      const localResults: StudentRecording[] = items.map(item => {
         let audioBlobUrl = item.audioBlobUrl;
         if (item.audioBlob instanceof Blob) {
           audioBlobUrl = URL.createObjectURL(item.audioBlob);
+        } else if (item.audioBase64) {
+          audioBlobUrl = item.audioBase64;
         }
         return {
           id: item.id,
@@ -154,6 +252,7 @@ class RecordingStorageService {
           sectionTitle: item.sectionTitle,
           targetText: item.targetText,
           audioBlobUrl,
+          audioBase64: item.audioBase64,
           mimeType: item.mimeType || 'audio/webm',
           durationSeconds: item.durationSeconds || 0,
           createdAt: item.createdAt || new Date().toISOString(),
@@ -168,12 +267,29 @@ class RecordingStorageService {
         };
       });
 
-      // Sort newest first
+      // Merge local IndexedDB recordings and Cloud Firestore recordings
+      const mergedMap = new Map<string, StudentRecording>();
+      localResults.forEach((r) => mergedMap.set(r.id, r));
+      this.cloudRecordingsMap.forEach((cloudRec, id) => {
+        const local = mergedMap.get(id);
+        if (local) {
+          mergedMap.set(id, {
+            ...local,
+            ...cloudRec,
+            audioBlobUrl: local.audioBlobUrl || cloudRec.audioBase64 || cloudRec.audioBlobUrl
+          });
+        } else {
+          mergedMap.set(id, cloudRec);
+        }
+      });
+
+      const results = Array.from(mergedMap.values());
       results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       this.memoryRecordings = results;
       return results;
     } catch (err) {
       console.warn('Failed to get recordings from IndexedDB, returning memory:', err);
+      this.mergeCloudIntoMemory();
       return this.memoryRecordings;
     }
   }
@@ -187,23 +303,29 @@ class RecordingStorageService {
   // Delete a recording
   async deleteRecording(id: string): Promise<boolean> {
     this.memoryRecordings = this.memoryRecordings.filter(r => r.id !== id);
+    this.cloudRecordingsMap.delete(id);
 
     try {
-      const db = await this.initDB();
+      const idb = await this.initDB();
       await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const tx = idb.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
         const req = store.delete(id);
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);
       });
-      this.notify();
-      return true;
     } catch (err) {
       console.warn('Failed to delete recording from IndexedDB:', err);
-      this.notify();
-      return true;
     }
+
+    try {
+      await deleteDoc(doc(db, CLOUD_COLLECTION, id));
+    } catch (err) {
+      console.warn('Failed to delete recording from Firebase Cloud:', err);
+    }
+
+    this.notify();
+    return true;
   }
 
   // Update teacher review & comment
@@ -212,17 +334,24 @@ class RecordingStorageService {
     comment: string,
     score: number = 5
   ): Promise<boolean> {
+    const reviewedAt = new Date().toISOString();
     const item = this.memoryRecordings.find(r => r.id === id);
     if (item) {
       item.teacherComment = comment;
       item.teacherScore = score;
-      item.reviewedAt = new Date().toISOString();
+      item.reviewedAt = reviewedAt;
+    }
+    const cloudItem = this.cloudRecordingsMap.get(id);
+    if (cloudItem) {
+      cloudItem.teacherComment = comment;
+      cloudItem.teacherScore = score;
+      cloudItem.reviewedAt = reviewedAt;
     }
 
     try {
-      const db = await this.initDB();
+      const idb = await this.initDB();
       await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const tx = idb.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
         const getReq = store.get(id);
         getReq.onsuccess = () => {
@@ -230,7 +359,7 @@ class RecordingStorageService {
           if (record) {
             record.teacherComment = comment;
             record.teacherScore = score;
-            record.reviewedAt = new Date().toISOString();
+            record.reviewedAt = reviewedAt;
             const putReq = store.put(record);
             putReq.onsuccess = () => resolve();
             putReq.onerror = () => reject(putReq.error);
@@ -240,13 +369,23 @@ class RecordingStorageService {
         };
         getReq.onerror = () => reject(getReq.error);
       });
-      this.notify();
-      return true;
     } catch (err) {
       console.warn('Failed to update teacher review in IndexedDB:', err);
-      this.notify();
-      return true;
     }
+
+    try {
+      const targetRec = item || cloudItem;
+      if (targetRec) {
+        const copy = { ...targetRec };
+        delete copy.audioBlobUrl;
+        await setDoc(doc(db, CLOUD_COLLECTION, id), this.sanitizeForFirestore(copy), { merge: true });
+      }
+    } catch (err) {
+      console.warn('Failed to update teacher review in Firebase Cloud:', err);
+    }
+
+    this.notify();
+    return true;
   }
 
   // Update recording student assignment
@@ -262,11 +401,17 @@ class RecordingStorageService {
       item.studentName = studentName;
       item.studentCode = studentCode;
     }
+    const cloudItem = this.cloudRecordingsMap.get(id);
+    if (cloudItem) {
+      cloudItem.studentId = studentId;
+      cloudItem.studentName = studentName;
+      cloudItem.studentCode = studentCode;
+    }
 
     try {
-      const db = await this.initDB();
+      const idb = await this.initDB();
       await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const tx = idb.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
         const getReq = store.get(id);
         getReq.onsuccess = () => {
@@ -284,34 +429,54 @@ class RecordingStorageService {
         };
         getReq.onerror = () => reject(getReq.error);
       });
-      this.notify();
-      return true;
     } catch (err) {
       console.warn('Failed to update recording student in IndexedDB:', err);
-      this.notify();
-      return true;
     }
+
+    try {
+      const targetRec = item || cloudItem;
+      if (targetRec) {
+        const copy = { ...targetRec };
+        delete copy.audioBlobUrl;
+        await setDoc(doc(db, CLOUD_COLLECTION, id), this.sanitizeForFirestore(copy), { merge: true });
+      }
+    } catch (err) {
+      console.warn('Failed to update recording student in Firebase Cloud:', err);
+    }
+
+    this.notify();
+    return true;
   }
 
   // Clear all recordings
   async clearAllRecordings(): Promise<boolean> {
+    const idsToDelete = Array.from(new Set([
+      ...this.memoryRecordings.map(r => r.id),
+      ...Array.from(this.cloudRecordingsMap.keys())
+    ]));
     this.memoryRecordings = [];
+    this.cloudRecordingsMap.clear();
     try {
-      const db = await this.initDB();
+      const idb = await this.initDB();
       await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const tx = idb.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
         const req = store.clear();
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);
       });
-      this.notify();
-      return true;
     } catch (err) {
       console.warn('Failed to clear recordings:', err);
-      this.notify();
-      return true;
     }
+
+    try {
+      await Promise.all(idsToDelete.map(id => deleteDoc(doc(db, CLOUD_COLLECTION, id))));
+    } catch (err) {
+      console.warn('Failed to clear recordings in Firebase Cloud:', err);
+    }
+
+    this.notify();
+    return true;
   }
 
   // Generate encouraging pedagogical feedback
@@ -340,9 +505,10 @@ class RecordingStorageService {
 
   // Download recording audio file
   downloadRecording(recording: StudentRecording) {
-    if (!recording.audioBlobUrl) return;
+    const href = recording.audioBlobUrl || recording.audioBase64;
+    if (!href) return;
     const a = document.createElement('a');
-    a.href = recording.audioBlobUrl;
+    a.href = href;
     const dateStr = new Date(recording.createdAt).toLocaleDateString('vi-VN').replace(/\//g, '-');
     const safeTitle = (recording.lessonTitle || 'bai_doc').replace(/\s+/g, '_').toLowerCase();
     a.download = `Ghi_am_${safeTitle}_${dateStr}.webm`;

@@ -5,10 +5,13 @@ import {
   StudentCompletedLesson,
   StudentStatus 
 } from '../types';
+import { db } from './firebaseConfig';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const CLASSES_STORAGE_KEY = 'tiengviet1_classes_list_v4';
 const STUDENTS_STORAGE_KEY = 'tiengviet1_students_roster_v4';
 const CURRENT_CLASS_KEY = 'tiengviet1_current_class_id_v4';
+const CLOUD_ANALYTICS_DOC = 'class_analytics_v4';
 
 // Initial Sample Classes
 const DEFAULT_CLASSES: ClassRoom[] = [
@@ -87,6 +90,107 @@ class ClassAnalyticsService {
     this.classes = this.loadClasses();
     this.students = this.loadStudents();
     this.currentClassId = this.loadCurrentClassId();
+    if (typeof window !== 'undefined') {
+      this.initFirebaseSync();
+    }
+  }
+
+  private initFirebaseSync() {
+    try {
+      onSnapshot(
+        doc(db, 'app_state', CLOUD_ANALYTICS_DOC),
+        (docSnap) => {
+          if (!docSnap.exists()) return;
+          const data = docSnap.data();
+          let changed = false;
+
+          if (Array.isArray(data.classes) && data.classes.length > 0) {
+            const classMap = new Map<string, ClassRoom>();
+            this.classes.forEach((c) => classMap.set(c.id, c));
+            data.classes.forEach((c: ClassRoom) => {
+              if (c && c.id) classMap.set(c.id, c);
+            });
+            if (classMap.size !== this.classes.length) changed = true;
+            this.classes = Array.from(classMap.values());
+            try {
+              localStorage.setItem(CLASSES_STORAGE_KEY, JSON.stringify(this.classes));
+            } catch (e) {}
+          }
+
+          if (Array.isArray(data.students) && data.students.length > 0) {
+            const studentMap = new Map<string, StudentProfile>();
+            this.students.forEach((s) => studentMap.set(s.id, s));
+            data.students.forEach((cloudSt: StudentProfile) => {
+              if (!cloudSt || !cloudSt.id) return;
+              const localSt = studentMap.get(cloudSt.id);
+              if (!localSt) {
+                studentMap.set(cloudSt.id, cloudSt);
+                changed = true;
+              } else {
+                // Merge completed lessons & max stats
+                const lessonMap = new Map<string, StudentCompletedLesson>();
+                (localSt.completedLessons || []).forEach((l) => lessonMap.set(l.lessonKey, l));
+                (cloudSt.completedLessons || []).forEach((l) => lessonMap.set(l.lessonKey, l));
+                const mergedLessons = Array.from(lessonMap.values());
+                const mergedRecs = Math.max(localSt.recordingsCount || 0, cloudSt.recordingsCount || 0);
+                const mergedWriting = Math.max(localSt.writingCount || 0, cloudSt.writingCount || 0);
+                const mergedStars = Math.max(localSt.starsCount || 0, cloudSt.starsCount || 0);
+
+                if (
+                  mergedLessons.length !== (localSt.completedLessons || []).length ||
+                  mergedRecs !== (localSt.recordingsCount || 0) ||
+                  mergedStars !== (localSt.starsCount || 0) ||
+                  cloudSt.teacherNotes !== localSt.teacherNotes ||
+                  cloudSt.name !== localSt.name
+                ) {
+                  studentMap.set(cloudSt.id, {
+                    ...localSt,
+                    ...cloudSt,
+                    completedLessons: mergedLessons,
+                    recordingsCount: mergedRecs,
+                    writingCount: mergedWriting,
+                    starsCount: mergedStars,
+                    status: this.computeStatusFromProgress(mergedLessons.length)
+                  });
+                  changed = true;
+                }
+              }
+            });
+
+            if (changed) {
+              this.students = Array.from(studentMap.values());
+              try {
+                localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(this.students));
+              } catch (e) {}
+              this.notify();
+            }
+          }
+        },
+        (err) => {
+          console.warn('Firebase sync warning for class analytics:', err);
+        }
+      );
+    } catch (err) {
+      console.warn('Could not initialize Firebase sync for class analytics:', err);
+    }
+  }
+
+  private syncToCloud() {
+    if (typeof window === 'undefined') return;
+    try {
+      const payload = JSON.parse(
+        JSON.stringify({
+          classes: this.classes,
+          students: this.students,
+          updatedAt: new Date().toISOString()
+        })
+      );
+      setDoc(doc(db, 'app_state', CLOUD_ANALYTICS_DOC), payload, { merge: true }).catch((err) => {
+        console.warn('Failed to sync class analytics to cloud:', err);
+      });
+    } catch (e) {
+      console.warn('Error syncing class analytics to cloud:', e);
+    }
   }
 
   private loadClasses(): ClassRoom[] {
@@ -134,6 +238,7 @@ class ClassAnalyticsService {
     } catch (e) {
       console.error('Failed to save classes:', e);
     }
+    this.syncToCloud();
     this.notify();
   }
 
@@ -143,6 +248,7 @@ class ClassAnalyticsService {
     } catch (e) {
       console.error('Failed to save students:', e);
     }
+    this.syncToCloud();
     this.notify();
   }
 

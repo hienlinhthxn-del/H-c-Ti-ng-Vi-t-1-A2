@@ -2,9 +2,12 @@ import { AppUserProfile, UserRole } from '../types';
 import { achievementService } from './achievementService';
 import { classAnalyticsService } from './classAnalyticsService';
 import { TEACHER_HIEN_PHAN_AVATAR_SVG } from '../components/UserAvatar';
+import { db } from './firebaseConfig';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query } from 'firebase/firestore';
 
 const USERS_STORAGE_KEY = 'tiengviet1_multi_users_v4';
 const ACTIVE_USER_ID_KEY = 'tiengviet1_active_user_id_v4';
+const CLOUD_USERS_COLLECTION = 'app_users';
 
 export const AVATAR_OPTIONS = {
   student: ['🐰', '🐻', '🐱', '🐼', '🦁', '🚀', '🦄', '🐯', '🦊', '🐶', '🐸', '🐨', '🐥', '🦖', '🌟', '🌸', '💎', '🌿', '🎀', '🌻', '🐲', '📚'],
@@ -98,6 +101,93 @@ class UserProfileService {
 
   constructor() {
     this.init();
+    if (typeof window !== 'undefined') {
+      this.initFirebaseSync();
+    }
+  }
+
+  private initFirebaseSync() {
+    try {
+      const q = query(collection(db, CLOUD_USERS_COLLECTION));
+      onSnapshot(
+        q,
+        (snapshot) => {
+          let changed = false;
+          const userMap = new Map<string, AppUserProfile>();
+          this.users.forEach((u) => userMap.set(u.id, u));
+
+          snapshot.docChanges().forEach((change) => {
+            const cloudUser = change.doc.data() as AppUserProfile;
+            if (change.type === 'removed') {
+              if (userMap.has(change.doc.id) && userMap.size > 1) {
+                userMap.delete(change.doc.id);
+                changed = true;
+              }
+            } else if (cloudUser && cloudUser.id && cloudUser.name) {
+              const local = userMap.get(cloudUser.id);
+              if (!local) {
+                userMap.set(cloudUser.id, cloudUser);
+                changed = true;
+              } else {
+                // Merge progress across devices so no student progress is lost
+                const mergedCompleted = Array.from(
+                  new Set([...(local.completedLessonKeys || []), ...(cloudUser.completedLessonKeys || [])])
+                );
+                const mergedBadges = Array.from(
+                  new Set([...(local.unlockedBadgeIds || []), ...(cloudUser.unlockedBadgeIds || [])])
+                );
+                const mergedStars = Math.max(local.starsCount || 0, cloudUser.starsCount || 0);
+                const mergedRecs = Math.max(local.totalRecordingsCount || 0, cloudUser.totalRecordingsCount || 0);
+
+                if (
+                  mergedCompleted.length !== (local.completedLessonKeys || []).length ||
+                  mergedStars !== (local.starsCount || 0) ||
+                  mergedRecs !== (local.totalRecordingsCount || 0) ||
+                  cloudUser.name !== local.name ||
+                  cloudUser.classroom !== local.classroom ||
+                  cloudUser.avatar !== local.avatar
+                ) {
+                  userMap.set(cloudUser.id, {
+                    ...local,
+                    ...cloudUser,
+                    completedLessonKeys: mergedCompleted,
+                    unlockedBadgeIds: mergedBadges,
+                    starsCount: mergedStars,
+                    totalRecordingsCount: mergedRecs
+                  });
+                  changed = true;
+                }
+              }
+            }
+          });
+
+          if (changed) {
+            this.users = Array.from(userMap.values());
+            try {
+              localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(this.users));
+            } catch (e) {}
+            this.notify();
+          }
+        },
+        (err) => {
+          console.warn('Firebase sync warning for app_users:', err);
+        }
+      );
+    } catch (err) {
+      console.warn('Could not initialize Firebase sync for app_users:', err);
+    }
+  }
+
+  private syncUserToCloud(user: AppUserProfile) {
+    if (typeof window === 'undefined') return;
+    try {
+      const cleanUser = JSON.parse(JSON.stringify(user));
+      setDoc(doc(db, CLOUD_USERS_COLLECTION, user.id), cleanUser, { merge: true }).catch((err) => {
+        console.warn('Failed to sync user to cloud:', err);
+      });
+    } catch (e) {
+      console.warn('Error syncing user to cloud:', e);
+    }
   }
 
   private init() {
@@ -263,6 +353,32 @@ class UserProfileService {
 
     this.users.push(newUser);
     this.saveUsers();
+    this.syncUserToCloud(newUser);
+
+    // Also ensure new student exists in ClassAnalyticsService roster
+    if (newUser.role === 'student') {
+      try {
+        const existingInClass = classAnalyticsService.findStudent({
+          id: newUser.id,
+          code: newUser.studentCode,
+          name: newUser.name
+        });
+        if (!existingInClass) {
+          classAnalyticsService.addStudent({
+            studentCode: newUser.studentCode || 'HS99',
+            name: newUser.name,
+            gender: newUser.gender || 'male',
+            classId: classAnalyticsService.getCurrentClassId() || 'lop-1a1',
+            avatar: newUser.avatar,
+            status: 'average',
+            teacherNotes: ''
+          });
+        }
+      } catch (e) {
+        console.warn('Could not sync new student to ClassAnalyticsService:', e);
+      }
+    }
+
     this.switchUser(newUser.id);
     return newUser;
   }
@@ -278,6 +394,7 @@ class UserProfileService {
     };
 
     this.saveUsers();
+    this.syncUserToCloud(this.users[index]);
     this.notify();
     return this.users[index];
   }
@@ -294,6 +411,9 @@ class UserProfileService {
     }
 
     this.saveUsers();
+    try {
+      deleteDoc(doc(db, CLOUD_USERS_COLLECTION, id)).catch(() => {});
+    } catch (e) {}
     this.notify();
     return true;
   }
@@ -323,6 +443,7 @@ class UserProfileService {
     active.starsCount = Math.max(active.starsCount || 0, active.completedLessonKeys.length);
     active.lastActiveAt = new Date().toISOString();
     this.saveUsers();
+    this.syncUserToCloud(active);
     this.notify();
 
     // Sync to Class Analytics Service for real-time gradebook and stats
@@ -362,6 +483,7 @@ class UserProfileService {
     active.starsCount = (active.starsCount || 0) + 1;
     active.lastActiveAt = new Date().toISOString();
     this.saveUsers();
+    this.syncUserToCloud(active);
     this.notify();
 
     // Sync to Class Analytics
