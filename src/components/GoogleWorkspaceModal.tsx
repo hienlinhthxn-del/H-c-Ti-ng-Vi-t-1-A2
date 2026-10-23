@@ -17,7 +17,13 @@ import {
   BookOpen, 
   Send,
   AlertCircle,
-  Users
+  Users,
+  Download,
+  Copy,
+  Check,
+  Settings,
+  HelpCircle,
+  Info
 } from 'lucide-react';
 import { googleWorkspaceService } from '../services/googleWorkspaceService';
 import { userProfileService } from '../services/userProfileService';
@@ -47,6 +53,11 @@ export const GoogleWorkspaceModal: React.FC<GoogleWorkspaceModalProps> = ({ isOp
   const [isBackingUpAudio, setIsBackingUpAudio] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Origin mismatch & Client ID settings
+  const [showConfigGuide, setShowConfigGuide] = useState<boolean>(false);
+  const [customClientIdInput, setCustomClientIdInput] = useState<string>(googleWorkspaceService.getActiveClientId());
+  const [isCopiedDomain, setIsCopiedDomain] = useState<boolean>(false);
 
   // Classroom state
   const [courses, setCourses] = useState<GoogleClassroomCourse[]>([]);
@@ -106,6 +117,105 @@ export const GoogleWorkspaceModal: React.FC<GoogleWorkspaceModalProps> = ({ isOp
 
   const isConnected = !!(account && account.accessToken);
 
+  const currentOrigin = typeof window !== 'undefined' && window.location?.origin 
+    ? window.location.origin 
+    : 'https://h-c-ti-ng-vi-t-1-a2.vercel.app';
+
+  const handleCopyDomain = () => {
+    navigator.clipboard.writeText(currentOrigin).then(() => {
+      setIsCopiedDomain(true);
+      setTimeout(() => setIsCopiedDomain(false), 2500);
+    }).catch(() => {
+      // Fallback
+    });
+  };
+
+  const handleSaveCustomClientId = () => {
+    googleWorkspaceService.setCustomClientId(customClientIdInput);
+    setSyncSuccessMsg('Đã lưu cấu hình Google Client ID mới!');
+    setTimeout(() => setSyncSuccessMsg(null), 3000);
+  };
+
+  const handleResetClientId = () => {
+    googleWorkspaceService.resetCustomClientId();
+    setCustomClientIdInput(googleWorkspaceService.getDefaultClientId());
+    setSyncSuccessMsg('Đã khôi phục Client ID mặc định!');
+    setTimeout(() => setSyncSuccessMsg(null), 3000);
+  };
+
+  // Handle Instant Gradebook Export to CSV
+  const handleExportCSV = () => {
+    try {
+      const studentProfiles = userProfileService.getAllProfiles().filter(p => p.role === 'student');
+      if (studentProfiles.length === 0) {
+        setErrorMsg('Không tìm thấy dữ liệu học sinh để xuất file');
+        return;
+      }
+
+      const rows: string[] = [];
+      const header = [
+        'STT',
+        'Mã Học Sinh',
+        'Họ Và Tên Học Sinh',
+        'Lớp Học',
+        'Biểu Tượng Avatar',
+        'Số Sao Tích Lũy ⭐',
+        'Số Bài Hoàn Thành 📖',
+        'Số Bài Đã Thu Âm 🎙️',
+        'Tiến Độ SGK (%)',
+        'Đánh Giá Xếp Loại',
+        'Ngày Giờ Xuất Báo Cáo',
+        'Danh Sách Mã Bài Đã Học'
+      ];
+      rows.push(header.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','));
+
+      studentProfiles.forEach((student, index) => {
+        const studentRecs = recordings.filter(r => r.studentId === student.id);
+        const totalSGKLessons = 70;
+        const progressPercent = Math.min(100, Math.round(((student.completedLessonKeys?.length || 0) / totalSGKLessons) * 100));
+        const rating = progressPercent >= 50 ? 'Xuất sắc ⭐⭐⭐' : progressPercent >= 25 ? 'Tiến bộ tốt ⭐⭐' : 'Đang rèn luyện ⭐';
+        const recCount = student.totalRecordingsCount || studentRecs.length;
+        const completedKeys = (student.completedLessonKeys || []).join('; ');
+        const exportTime = new Date().toLocaleString('vi-VN');
+
+        const row = [
+          index + 1,
+          student.studentCode || `HS0${index + 1}`,
+          student.name,
+          student.classroom || 'Lớp 1A',
+          student.avatar || '🐰',
+          student.starsCount || 0,
+          student.completedLessonKeys?.length || 0,
+          recCount,
+          `${progressPercent}%`,
+          rating,
+          exportTime,
+          completedKeys
+        ];
+        rows.push(row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','));
+      });
+
+      // Prepend UTF-8 BOM so Microsoft Excel & Google Sheets display Vietnamese characters properly
+      const csvContent = '\uFEFF' + rows.join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const now = new Date();
+      const dateString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      link.href = url;
+      link.download = `Bang_Diem_Lop_1A_Tieng_Viet_1_${dateString}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setSyncSuccessMsg(`Đã tải về máy thành công bảng điểm ${studentProfiles.length} học sinh (.CSV). Bạn có thể mở trực tiếp bằng Excel hoặc tải lên Google Sheets!`);
+      setTimeout(() => setSyncSuccessMsg(null), 6000);
+    } catch (err: any) {
+      setErrorMsg('Không thể xuất tệp CSV: ' + (err?.message || 'Lỗi không xác định'));
+    }
+  };
+
   // Handle Google Sign In
   const handleSignIn = async () => {
     setIsAuthenticating(true);
@@ -113,9 +223,14 @@ export const GoogleWorkspaceModal: React.FC<GoogleWorkspaceModalProps> = ({ isOp
     try {
       await googleWorkspaceService.signIn();
       setSyncSuccessMsg('Đăng nhập Google thành công! Bạn có thể bắt đầu đồng bộ.');
+      setShowConfigGuide(false);
       setTimeout(() => setSyncSuccessMsg(null), 4000);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Đăng nhập Google thất bại');
+      const msg = err.message || 'Đăng nhập Google thất bại';
+      setErrorMsg(msg);
+      if (msg.includes('origin_mismatch') || msg.includes('400') || msg.includes('45s') || msg.includes('đóng')) {
+        setShowConfigGuide(true);
+      }
     } finally {
       setIsAuthenticating(false);
     }
@@ -287,6 +402,19 @@ export const GoogleWorkspaceModal: React.FC<GoogleWorkspaceModalProps> = ({ isOp
           )}
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowConfigGuide(!showConfigGuide)}
+              className={`px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border ${
+                showConfigGuide
+                  ? 'bg-amber-100 text-amber-900 border-amber-300 shadow-sm'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'
+              }`}
+              title="Cấu hình Google Cloud hoặc sửa Lỗi 400 origin_mismatch"
+            >
+              <Settings className="w-3.5 h-3.5 text-amber-600" />
+              <span>{showConfigGuide ? 'Đóng cấu hình' : 'Sửa Lỗi 400'}</span>
+            </button>
+
             {isConnected ? (
               <button
                 onClick={handleSignOut}
@@ -325,9 +453,170 @@ export const GoogleWorkspaceModal: React.FC<GoogleWorkspaceModalProps> = ({ isOp
         )}
 
         {errorMsg && (
-          <div className="mx-4 sm:mx-6 mt-3 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-center gap-2 shrink-0">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{errorMsg}</span>
+          <div className="mx-4 sm:mx-6 mt-3 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-start justify-between gap-3 shrink-0">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-semibold block">{errorMsg}</span>
+                {(errorMsg.includes('origin_mismatch') || errorMsg.includes('400') || errorMsg.includes('45s')) && (
+                  <p className="text-[11px] text-rose-700">
+                    💡 Nguyên nhân: Tên miền <code className="font-mono font-bold bg-white/80 px-1.5 py-0.5 rounded border border-rose-200">{currentOrigin}</code> chưa được thêm vào mục <strong>Authorized JavaScript origins</strong> trong Google Cloud Console.
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setShowConfigGuide(true)}
+              className="px-2.5 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-900 font-bold text-xs shrink-0 cursor-pointer transition border border-rose-300"
+            >
+              Xem cách sửa
+            </button>
+          </div>
+        )}
+
+        {/* Guide & Fix for Lỗi 400 origin_mismatch */}
+        {showConfigGuide && (
+          <div className="mx-4 sm:mx-6 mt-3 p-4 sm:p-5 rounded-2xl bg-amber-50/90 border border-amber-200 text-slate-800 text-xs sm:text-sm space-y-3 shrink-0 shadow-sm animate-fadeIn">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                <h4 className="font-bold text-amber-950 text-sm sm:text-base">
+                  Hướng Dẫn Khắc Phục "Lỗi 400: origin_mismatch"
+                </h4>
+              </div>
+              <button
+                onClick={() => setShowConfigGuide(false)}
+                className="text-amber-700 hover:text-amber-950 p-1 rounded-lg hover:bg-amber-100 transition cursor-pointer"
+                aria-label="Đóng hướng dẫn"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-amber-900 leading-relaxed">
+              Google OAuth 2.0 yêu cầu tên miền đang chạy ứng dụng phải được thêm vào danh sách <strong className="font-bold">"Mã nguồn JavaScript được ủy quyền" (Authorized JavaScript origins)</strong> trong Google Cloud Console để đảm bảo an toàn.
+            </p>
+
+            {/* Domain Box with 1-Click Copy */}
+            <div className="p-3 bg-white rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-inner">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-bold text-slate-700 shrink-0 text-xs uppercase tracking-wide">Domain ứng dụng:</span>
+                <code className="px-2.5 py-1 bg-amber-50 text-amber-900 rounded font-mono font-bold text-xs truncate border border-amber-200">
+                  {currentOrigin}
+                </code>
+              </div>
+              <button
+                onClick={handleCopyDomain}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer shadow-sm"
+              >
+                {isCopiedDomain ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Đã sao chép!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Sao chép Domain</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Steps Guide */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+              <div className="p-3 bg-white/80 rounded-xl border border-amber-200/80">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="w-5 h-5 rounded-full bg-amber-200 text-amber-900 font-bold inline-flex items-center justify-center text-xs">1</span>
+                  <strong className="font-bold text-slate-800">Mở Google Cloud:</strong>
+                </div>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Truy cập trang cấu hình Google Cloud của bạn:{' '}
+                  <a
+                    href="https://console.cloud.google.com/apis/credentials"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-amber-700 hover:underline font-bold inline-flex items-center gap-0.5"
+                  >
+                    Google Cloud Credentials <ExternalLink className="w-3 h-3 inline" />
+                  </a>
+                </p>
+              </div>
+
+              <div className="p-3 bg-white/80 rounded-xl border border-amber-200/80">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="w-5 h-5 rounded-full bg-amber-200 text-amber-900 font-bold inline-flex items-center justify-center text-xs">2</span>
+                  <strong className="font-bold text-slate-800">Thêm Authorized Origin:</strong>
+                </div>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Nhấn vào tên <em>OAuth 2.0 Client ID</em> của bạn. Tại mục <strong>"Mã nguồn JavaScript được ủy quyền"</strong>, bấm <strong>+ THÊM URI</strong> và dán URL vừa sao chép ở trên vào, sau đó bấm <strong>LƯU (SAVE)</strong>.
+                </p>
+              </div>
+
+              <div className="p-3 bg-white/80 rounded-xl border border-amber-200/80">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="w-5 h-5 rounded-full bg-amber-200 text-amber-900 font-bold inline-flex items-center justify-center text-xs">3</span>
+                  <strong className="font-bold text-slate-800">Hoàn tất & Đăng nhập:</strong>
+                </div>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Chờ khoảng 1 - 3 phút để máy chủ Google áp dụng tên miền mới, sau đó quay lại đây và nhấn nút <strong>"Đăng nhập bằng Google"</strong>.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Export Advice */}
+            <div className="p-2.5 bg-emerald-100/70 border border-emerald-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-emerald-900">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span className="text-xs">
+                  <strong>Khuyên dùng:</strong> Giáo viên có thể bấm <strong>"Xuất Excel / CSV (28 bé)"</strong> để tải toàn bộ bảng điểm ngay lập tức mà không cần cài đặt Google Cloud!
+                </span>
+              </div>
+              <button
+                onClick={handleExportCSV}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 flex items-center justify-center gap-1 transition cursor-pointer shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Tải CSV Bảng Điểm Ngay</span>
+              </button>
+            </div>
+
+            {/* Custom Client ID Settings */}
+            <div className="pt-1 border-t border-amber-200">
+              <details className="group">
+                <summary className="text-xs font-bold text-amber-800 hover:text-amber-950 cursor-pointer flex items-center gap-1">
+                  <span>⚙️ Cài đặt Google Client ID riêng (Dành cho Quản Trị Viên)</span>
+                </summary>
+                <div className="mt-2.5 p-3 bg-white rounded-xl border border-amber-200 space-y-2">
+                  <label className="block text-xs text-slate-600">
+                    Nhập Client ID Google Cloud OAuth của bạn nếu muốn sử dụng dự án GCP cá nhân:
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={customClientIdInput}
+                      onChange={(e) => setCustomClientIdInput(e.target.value)}
+                      placeholder="VD: 123456789-xxx.apps.googleusercontent.com"
+                      className="grow p-2 text-xs rounded-lg border border-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <button
+                      onClick={handleSaveCustomClientId}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition cursor-pointer shrink-0"
+                    >
+                      Lưu Client ID
+                    </button>
+                    {googleWorkspaceService.isUsingCustomClientId() && (
+                      <button
+                        onClick={handleResetClientId}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer shrink-0"
+                      >
+                        Khôi phục mặc định
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </details>
+            </div>
           </div>
         )}
 
@@ -405,6 +694,15 @@ export const GoogleWorkspaceModal: React.FC<GoogleWorkspaceModalProps> = ({ isOp
                       <span>Mở Google Sheet</span>
                     </a>
                   )}
+
+                  <button
+                    onClick={handleExportCSV}
+                    className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-emerald-800 border-2 border-emerald-300 hover:bg-emerald-50 flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                    title="Tải về file bảng điểm để mở bằng Excel hoặc Google Sheets ngay mà không cần tài khoản Google Cloud"
+                  >
+                    <Download className="w-4 h-4 text-emerald-600" />
+                    <span>Xuất Excel / CSV ({allProfiles.length} bé)</span>
+                  </button>
 
                   <button
                     onClick={handleSyncSheets}

@@ -1,6 +1,7 @@
 import { GoogleAccountInfo, GoogleSheetsSyncStatus, GoogleDriveSyncStatus, GoogleClassroomCourse, GoogleClassroomAssignment, AppUserProfile, StudentRecording } from '../types';
 
-const OAUTH_CLIENT_ID = '343701045130-g7ue5ftn96vs1m52daa7747if66g0dti.apps.googleusercontent.com';
+const DEFAULT_OAUTH_CLIENT_ID = '343701045130-g7ue5ftn96vs1m52daa7747if66g0dti.apps.googleusercontent.com';
+const STORAGE_KEY_CUSTOM_CLIENT_ID = 'tiengviet1_google_custom_client_id_v1';
 const SCOPES = [
   'openid',
   'email',
@@ -111,6 +112,56 @@ class GoogleWorkspaceService {
     return this.driveStatus;
   }
 
+  // Client ID Management
+  getActiveClientId(): string {
+    try {
+      const custom = localStorage.getItem(STORAGE_KEY_CUSTOM_CLIENT_ID);
+      if (custom && custom.trim()) {
+        return custom.trim();
+      }
+    } catch (e) {
+      // ignore
+    }
+    return DEFAULT_OAUTH_CLIENT_ID;
+  }
+
+  setCustomClientId(id: string): void {
+    try {
+      if (id && id.trim()) {
+        localStorage.setItem(STORAGE_KEY_CUSTOM_CLIENT_ID, id.trim());
+      } else {
+        localStorage.removeItem(STORAGE_KEY_CUSTOM_CLIENT_ID);
+      }
+      this.tokenClient = null;
+      this.notify();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  resetCustomClientId(): void {
+    try {
+      localStorage.removeItem(STORAGE_KEY_CUSTOM_CLIENT_ID);
+      this.tokenClient = null;
+      this.notify();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  isUsingCustomClientId(): boolean {
+    try {
+      const custom = localStorage.getItem(STORAGE_KEY_CUSTOM_CLIENT_ID);
+      return !!(custom && custom.trim());
+    } catch (e) {
+      return false;
+    }
+  }
+
+  getDefaultClientId(): string {
+    return DEFAULT_OAUTH_CLIENT_ID;
+  }
+
   // Initialize Token Client
   private initTokenClientPromise(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -144,11 +195,15 @@ class GoogleWorkspaceService {
 
   private setupClient() {
     if (!window.google?.accounts?.oauth2) return;
-    this.tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: OAUTH_CLIENT_ID,
-      scope: SCOPES,
-      callback: () => {} // Overridden on request
-    });
+    try {
+      this.tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: this.getActiveClientId(),
+        scope: SCOPES,
+        callback: () => {} // Overridden on request
+      });
+    } catch (err) {
+      console.warn('setupClient error', err);
+    }
   }
 
   // Connect / Sign In
@@ -156,84 +211,121 @@ class GoogleWorkspaceService {
     await this.initTokenClientPromise();
 
     return new Promise((resolve, reject) => {
-      if (!this.tokenClient) {
-        reject(new Error('Token Client chưa được khởi tạo'));
+      if (!window.google?.accounts?.oauth2) {
+        reject(new Error('Thư viện Google Identity Services chưa sẵn sàng. Vui lòng thử tải lại trang web.'));
         return;
       }
 
-      this.tokenClient.callback = async (response: any) => {
-        if (response.error) {
-          reject(new Error(`Lỗi xác thực Google: ${response.error}`));
-          return;
+      let isFinished = false;
+      // 45s safety timeout to prevent infinite spinning in case popup hangs on Google 400 error page or is closed silently
+      const timeoutTimer = setTimeout(() => {
+        if (!isFinished) {
+          isFinished = true;
+          reject(new Error(
+            'Quá thời gian chờ phản hồi từ Google (45s). ' +
+            'Nếu bạn gặp màn hình "Lỗi 400: origin_mismatch", hãy xem mục "Khắc phục Lỗi 400: origin_mismatch" bên dưới để ủy quyền tên miền trên Google Cloud Console.'
+          ));
         }
+      }, 45000);
 
-        if (response.access_token) {
-          const accessToken = response.access_token;
-          const expiresIn = response.expires_in || 3599;
-          const expiresAt = Date.now() + expiresIn * 1000;
-
-          let email = 'user@gmail.com';
-          let name = 'Tài khoản Google';
-          let picture = '';
-
-          try {
-            // Attempt 1: Fetch from oauth2 userinfo
-            const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-              headers: { Authorization: `Bearer ${accessToken}` }
-            });
-
-            if (userInfoRes.ok) {
-              const userInfo = await userInfoRes.json();
-              email = userInfo.email || email;
-              name = userInfo.name || userInfo.given_name || name;
-              picture = userInfo.picture || picture;
-            } else {
-              // Attempt 2: Fallback to Drive API user info
-              try {
-                const driveAboutRes = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
-                  headers: { Authorization: `Bearer ${accessToken}` }
-                });
-                if (driveAboutRes.ok) {
-                  const driveData = await driveAboutRes.json();
-                  if (driveData.user) {
-                    email = driveData.user.emailAddress || email;
-                    name = driveData.user.displayName || name;
-                    picture = driveData.user.photoLink || picture;
-                  }
-                }
-              } catch (driveErr) {
-                console.warn('Drive about fallback error', driveErr);
-              }
-            }
-          } catch (fetchErr) {
-            console.warn('Could not fetch user profile details, using default placeholder', fetchErr);
-          }
-
-          const account: GoogleAccountInfo = {
-            email,
-            name,
-            picture,
-            accessToken,
-            expiresAt
-          };
-
-          this.currentAccount = account;
-          localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(account));
-          this.notify();
-          resolve(account);
-        } else {
-          reject(new Error('Không nhận được mã truy cập (Access Token) từ Google'));
-        }
+      const finishOnce = () => {
+        clearTimeout(timeoutTimer);
+        isFinished = true;
       };
 
-      if (this.tokenClient.error_callback) {
-        this.tokenClient.error_callback = (err: any) => {
-          console.error('Google token error', err);
-          reject(new Error(err?.message || 'Cửa sổ đăng nhập Google bị đóng hoặc bị chặn bởi trình duyệt'));
-        };
-      }
+      try {
+        const activeClientId = this.getActiveClientId();
+        const client = window.google.accounts.oauth2.initTokenClient({
+          client_id: activeClientId,
+          scope: SCOPES,
+          error_callback: (err: any) => {
+            if (isFinished) return;
+            finishOnce();
+            console.error('Google token error', err);
+            const errType = err?.type || '';
+            if (errType === 'popup_closed') {
+              reject(new Error('Cửa sổ đăng nhập Google đã bị đóng trước khi hoàn tất xác thực.'));
+            } else if (errType === 'popup_failed_to_open') {
+              reject(new Error('Trình duyệt đã chặn cửa sổ Popup. Vui lòng cho phép Pop-up trên trình duyệt để tiếp tục.'));
+            } else {
+              reject(new Error(err?.message || 'Cửa sổ đăng nhập Google bị đóng hoặc bị chặn.'));
+            }
+          },
+          callback: async (response: any) => {
+            if (isFinished) return;
+            finishOnce();
 
-      this.tokenClient.requestAccessToken({ prompt: '' });
+            if (response.error) {
+              reject(new Error(`Lỗi xác thực Google: ${response.error}`));
+              return;
+            }
+
+            if (response.access_token) {
+              const accessToken = response.access_token;
+              const expiresIn = response.expires_in || 3599;
+              const expiresAt = Date.now() + expiresIn * 1000;
+
+              let email = 'user@gmail.com';
+              let name = 'Tài khoản Google';
+              let picture = '';
+
+              try {
+                // Attempt 1: Fetch from oauth2 userinfo
+                const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { Authorization: `Bearer ${accessToken}` }
+                });
+
+                if (userInfoRes.ok) {
+                  const userInfo = await userInfoRes.json();
+                  email = userInfo.email || email;
+                  name = userInfo.name || userInfo.given_name || name;
+                  picture = userInfo.picture || picture;
+                } else {
+                  // Attempt 2: Fallback to Drive API user info
+                  try {
+                    const driveAboutRes = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+                      headers: { Authorization: `Bearer ${accessToken}` }
+                    });
+                    if (driveAboutRes.ok) {
+                      const driveData = await driveAboutRes.json();
+                      if (driveData.user) {
+                        email = driveData.user.emailAddress || email;
+                        name = driveData.user.displayName || name;
+                        picture = driveData.user.photoLink || picture;
+                      }
+                    }
+                  } catch (driveErr) {
+                    console.warn('Drive about fallback error', driveErr);
+                  }
+                }
+              } catch (fetchErr) {
+                console.warn('Could not fetch user profile details, using default placeholder', fetchErr);
+              }
+
+              const account: GoogleAccountInfo = {
+                email,
+                name,
+                picture,
+                accessToken,
+                expiresAt
+              };
+
+              this.currentAccount = account;
+              localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(account));
+              this.notify();
+              resolve(account);
+            } else {
+              reject(new Error('Không nhận được mã truy cập (Access Token) từ Google.'));
+            }
+          }
+        });
+
+        this.tokenClient = client;
+        client.requestAccessToken({ prompt: '' });
+      } catch (err: any) {
+        finishOnce();
+        reject(err);
+      }
     });
   }
 
