@@ -379,11 +379,12 @@ class UserProfileService {
           name: newUser.name
         });
         if (!existingInClass) {
+          const targetClassRoom = classAnalyticsService.findOrCreateClassByName(newUser.classroom || 'Lớp 1A2');
           classAnalyticsService.addStudent({
             studentCode: newUser.studentCode || 'HS99',
             name: newUser.name,
             gender: newUser.gender || 'male',
-            classId: classAnalyticsService.getCurrentClassId() || 'lop-1a1',
+            classId: targetClassRoom.id,
             avatar: newUser.avatar,
             status: 'average',
             teacherNotes: ''

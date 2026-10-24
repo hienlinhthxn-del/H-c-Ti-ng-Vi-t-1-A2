@@ -182,7 +182,7 @@ export const GoogleWorkspaceModal: React.FC<GoogleWorkspaceModalProps> = ({ isOp
           index + 1,
           student.studentCode || `HS0${index + 1}`,
           student.name,
-          student.classroom || 'Lớp 1A',
+          student.classroom || 'Lớp 1A2',
           student.avatar || '🐰',
           student.starsCount || 0,
           student.completedLessonKeys?.length || 0,
@@ -203,7 +203,7 @@ export const GoogleWorkspaceModal: React.FC<GoogleWorkspaceModalProps> = ({ isOp
       const now = new Date();
       const dateString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       link.href = url;
-      link.download = `Bang_Diem_Lop_1A_Tieng_Viet_1_${dateString}.csv`;
+      link.download = `Bang_Diem_Lop_1A2_Tieng_Viet_1_${dateString}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

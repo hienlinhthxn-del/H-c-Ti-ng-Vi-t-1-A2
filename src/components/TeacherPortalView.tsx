@@ -103,8 +103,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   const [isParentFeedbackModalOpen, setIsParentFeedbackModalOpen] = useState<boolean>(false);
   const [feedbackTargetStudent, setFeedbackTargetStudent] = useState<{ id: string; name: string; studentCode?: string } | null>(null);
   const [selectedStudentFilter, setSelectedStudentFilter] = useState<string>('all');
+  const [selectedClassroomFilter, setSelectedClassroomFilter] = useState<string>('all');
 
   const allStudentProfiles = userProfileService.getAllProfiles().filter(p => p.role === 'student');
+  const availableClassrooms = Array.from(
+    new Set(allStudentProfiles.map(p => (p.classroom || 'Lớp 1A2').trim()).filter(Boolean))
+  );
 
   const getRecordingStudent = (rec: StudentRecording) => {
     if (rec.studentId) {
@@ -138,11 +142,67 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
     };
   };
 
+  const studentsInSelectedClass = allStudentProfiles.filter(
+    s => selectedClassroomFilter === 'all' || (s.classroom || 'Lớp 1A2').trim() === selectedClassroomFilter
+  );
+
   const filteredRecordings = recordings.filter(rec => {
-    if (selectedStudentFilter === 'all') return true;
     const student = getRecordingStudent(rec);
-    return student.id === selectedStudentFilter || rec.studentId === selectedStudentFilter;
+    const stuClass = (student.classroom || 'Lớp 1A2').trim();
+    if (selectedClassroomFilter !== 'all' && stuClass !== selectedClassroomFilter) {
+      return false;
+    }
+    if (selectedStudentFilter !== 'all') {
+      return student.id === selectedStudentFilter || rec.studentId === selectedStudentFilter;
+    }
+    return true;
   });
+
+  const handleExportGradebookCsv = () => {
+    const headers = [
+      'STT',
+      'Mã Học Sinh',
+      'Họ và Tên Học Sinh',
+      'Lớp',
+      'Bài Học',
+      'Nội Dung Luyện Đọc',
+      'Điểm AI (/100)',
+      'Sao Giáo Viên Chấm (/5)',
+      'Nhận Xét Của Giáo Viên / AI',
+      'Ngày Giờ Nộp Bài'
+    ];
+    const rows = filteredRecordings.map((rec, idx) => {
+      const st = getRecordingStudent(rec);
+      const aiScore = rec.aiEvaluation?.score ?? '';
+      const teacherStars = rec.teacherScore ?? '';
+      const comment = (rec.teacherComment || rec.aiEvaluation?.detailedFeedback || '').replace(/"/g, '""');
+      const createdDate = new Date(rec.createdAt).toLocaleString('vi-VN');
+      return [
+        idx + 1,
+        `"${st.studentCode || 'HS'}"`,
+        `"${st.name}"`,
+        `"${st.classroom || 'Lớp 1A2'}"`,
+        `"${(rec.lessonTitle || '').replace(/"/g, '""')}"`,
+        `"${(rec.targetText || '').replace(/"/g, '""')}"`,
+        aiScore,
+        teacherStars,
+        `"${comment}"`,
+        `"${createdDate}"`
+      ].join(',');
+    });
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const classLabel = selectedClassroomFilter === 'all' ? 'Tat_Ca_Lop' : selectedClassroomFilter.replace(/\s+/g, '_');
+    link.href = url;
+    link.download = `So_Cham_Bai_Doc_${classLabel}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Đã xuất file Excel (.CSV) danh sách ${filteredRecordings.length} bài đọc (${selectedClassroomFilter === 'all' ? 'Tất cả lớp' : selectedClassroomFilter})!`);
+  };
 
   const generateAiTeacherComment = (rec: StudentRecording, studentName: string) => {
     const evalRes = rec.aiEvaluation;
@@ -1067,18 +1127,33 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Recordings List (Left 2 cols) */}
               <div className="lg:col-span-2 space-y-4">
-                {/* Filter by Student Bar */}
+                {/* Filter by Class & Student Bar */}
                 <div className="bg-white p-3.5 rounded-2xl border border-indigo-100 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Users className="w-4 h-4 text-indigo-600 shrink-0" />
-                    <span className="text-xs font-bold text-slate-700 shrink-0">Lọc theo học sinh:</span>
+                    <span className="text-xs font-bold text-slate-700 shrink-0">Lọc lớp:</span>
+                    <select
+                      value={selectedClassroomFilter}
+                      onChange={(e) => {
+                        setSelectedClassroomFilter(e.target.value);
+                        setSelectedStudentFilter('all');
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/50 text-indigo-950 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    >
+                      <option value="all">Tất cả lớp ({availableClassrooms.length} lớp)</option>
+                      {availableClassrooms.map(cls => (
+                        <option key={cls} value={cls}>{cls}</option>
+                      ))}
+                    </select>
+
+                    <span className="text-xs font-bold text-slate-700 shrink-0 ml-1">Học sinh:</span>
                     <select
                       value={selectedStudentFilter}
                       onChange={(e) => setSelectedStudentFilter(e.target.value)}
                       className="px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/50 text-indigo-950 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                     >
-                      <option value="all">Tất cả học sinh ({recordings.length} bài đã nộp)</option>
-                      {allStudentProfiles.map(s => {
+                      <option value="all">Tất cả HS ({studentsInSelectedClass.length} HS)</option>
+                      {studentsInSelectedClass.map(s => {
                         const count = recordings.filter(r => {
                           const stu = getRecordingStudent(r);
                           return stu.id === s.id;
@@ -1091,9 +1166,20 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                       })}
                     </select>
                   </div>
-                  <span className="text-xs text-slate-500 font-medium">
-                    Hiển thị <strong>{filteredRecordings.length}</strong> / {recordings.length} bài nộp
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium">
+                      Hiển thị <strong>{filteredRecordings.length}</strong> bài
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleExportGradebookCsv}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer"
+                      title="Xuất bảng chấm điểm của lớp đang chọn ra file Excel (.CSV)"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Xuất Excel (.CSV)</span>
+                    </button>
+                  </div>
                 </div>
 
                 {filteredRecordings.length === 0 ? (

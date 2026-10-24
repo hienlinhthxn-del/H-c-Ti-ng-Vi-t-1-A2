@@ -317,6 +317,26 @@ class ClassAnalyticsService {
     return item;
   }
 
+  public findOrCreateClassByName(rawClassName: string, teacherName?: string): ClassRoom {
+    const clean = (rawClassName || 'Lớp 1A2').trim();
+    const norm = clean.toUpperCase().replace(/^LỚP\s*/i, '').replace(/^LOP\s*/i, '').replace(/\s+/g, '');
+    const existing = this.classes.find(c => {
+      const cNorm = c.name.toUpperCase().replace(/^LỚP\s*/i, '').replace(/^LOP\s*/i, '').replace(/\s+/g, '');
+      return cNorm === norm || (norm === '1A2' && c.id === 'lop-1a1');
+    });
+    if (existing) return existing;
+
+    const displayName = clean.toLowerCase().startsWith('lớp') ? clean : `Lớp ${clean}`;
+    return this.addClass({
+      name: displayName,
+      grade: 'Khối 1',
+      schoolYear: '2025 - 2026',
+      homeroomTeacher: teacherName || 'Giáo viên chủ nhiệm',
+      totalStudents: 0,
+      currentTargetLesson: 35
+    });
+  }
+
   public updateClass(id: string, updates: Partial<ClassRoom>) {
     this.classes = this.classes.map(c => c.id === id ? { ...c, ...updates } : c);
     this.saveClasses();

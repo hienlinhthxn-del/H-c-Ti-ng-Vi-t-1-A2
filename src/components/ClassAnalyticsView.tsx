@@ -220,6 +220,22 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
       teacherNotes: formData.teacherNotes
     });
 
+    // Đồng bộ sang danh sách tài khoản Học sinh (Cổng Học Sinh) theo đúng tên lớp hiện tại
+    const existingProfile = userProfileService.getUsersByRole('student').find(
+      u => u.name.toLowerCase().trim() === formData.name.trim().toLowerCase() &&
+           (u.classroom || 'Lớp 1A2').toLowerCase().trim() === (currentClass?.name || 'Lớp 1A2').toLowerCase().trim()
+    );
+    if (!existingProfile) {
+      userProfileService.createUser({
+        name: formData.name.trim(),
+        role: 'student',
+        studentCode: code,
+        classroom: currentClass?.name || 'Lớp 1A2',
+        gender: formData.gender,
+        avatar: formData.gender === 'female' ? '🌸' : '🐰'
+      });
+    }
+
     setIsAddStudentOpen(false);
     setFormData({
       name: '',
