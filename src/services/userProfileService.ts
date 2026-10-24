@@ -53,7 +53,7 @@ const DEFAULT_PROFILES: AppUserProfile[] = [
     role: 'student' as UserRole,
     avatar: st.avatar,
     studentCode: st.code,
-    classroom: 'Lớp 1',
+    classroom: 'Lớp 1A2',
     gender: st.gender,
     starsCount: 0,
     completedLessonKeys: [],
@@ -67,7 +67,7 @@ const DEFAULT_PROFILES: AppUserProfile[] = [
     name: 'Cô Hiền Phan',
     role: 'teacher',
     avatar: TEACHER_HIEN_PHAN_AVATAR_SVG,
-    classroom: 'Lớp 1',
+    classroom: 'Lớp 1A2',
     pinCode: '1234',
     starsCount: 0,
     completedLessonKeys: [],
@@ -81,7 +81,7 @@ const DEFAULT_PROFILES: AppUserProfile[] = [
     name: 'Phụ Huynh Học Sinh',
     role: 'parent',
     avatar: '👨‍👩‍👧',
-    classroom: 'Lớp 1',
+    classroom: 'Lớp 1A2',
     linkedStudentIds: ['student_hs_hs01'],
     starsCount: 0,
     completedLessonKeys: [],
@@ -124,6 +124,9 @@ class UserProfileService {
                 changed = true;
               }
             } else if (cloudUser && cloudUser.id && cloudUser.name) {
+              if (!cloudUser.classroom || cloudUser.classroom === 'Lớp 1' || cloudUser.classroom === 'Lớp 1A') {
+                cloudUser.classroom = 'Lớp 1A2';
+              }
               const local = userMap.get(cloudUser.id);
               if (!local) {
                 userMap.set(cloudUser.id, cloudUser);
@@ -195,9 +198,21 @@ class UserProfileService {
       const storedUsers = localStorage.getItem(USERS_STORAGE_KEY);
       if (storedUsers) {
         this.users = JSON.parse(storedUsers);
+        // Normalize default classroom 'Lớp 1' / 'Lớp 1A' -> 'Lớp 1A2'
+        let migrated = false;
+        this.users = this.users.map(u => {
+          if (!u.classroom || u.classroom === 'Lớp 1' || u.classroom === 'Lớp 1A') {
+            migrated = true;
+            return { ...u, classroom: 'Lớp 1A2' };
+          }
+          return u;
+        });
         // If users list is outdated (doesn't have 28 students), merge/seed default roster
         if (this.users.filter(u => u.role === 'student').length < 10) {
           this.users = DEFAULT_PROFILES;
+          migrated = true;
+        }
+        if (migrated) {
           this.saveUsers();
         }
       } else {
@@ -339,7 +354,7 @@ class UserProfileService {
       role: data.role,
       avatar: defaultAvatar,
       studentCode: data.studentCode || (data.role === 'student' ? `HS${String(this.getUsersByRole('student').length + 1).padStart(2, '0')}` : undefined),
-      classroom: data.classroom?.trim() || 'Lớp 1A',
+      classroom: data.classroom?.trim() || 'Lớp 1A2',
       gender: data.gender || 'male',
       pinCode: data.pinCode || '',
       linkedStudentIds: data.linkedStudentIds || [],

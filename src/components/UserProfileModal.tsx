@@ -46,7 +46,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('student');
   const [newAvatar, setNewAvatar] = useState('🐰');
-  const [newClassroom, setNewClassroom] = useState('Lớp 1A');
+  const [newClassroom, setNewClassroom] = useState('Lớp 1A2');
   const [newGender, setNewGender] = useState<'male' | 'female'>('male');
   const [newPinCode, setNewPinCode] = useState('');
   
@@ -88,7 +88,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       name: newName.trim(),
       role: newRole,
       avatar: newAvatar,
-      classroom: newClassroom.trim() || 'Lớp 1A',
+      classroom: newClassroom.trim() || 'Lớp 1A2',
       gender: newGender,
       pinCode: newPinCode.trim()
     });

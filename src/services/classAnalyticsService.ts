@@ -17,9 +17,9 @@ const CLOUD_ANALYTICS_DOC = 'class_analytics_v4';
 const DEFAULT_CLASSES: ClassRoom[] = [
   {
     id: 'lop-1a1',
-    name: 'Lớp 1A',
+    name: 'Lớp 1A2',
     grade: 'Khối 1',
-    schoolYear: '2024 - 2025',
+    schoolYear: '2025 - 2026',
     homeroomTeacher: 'Cô Hiền Phan',
     totalStudents: 28,
     currentTargetLesson: 35
@@ -108,7 +108,11 @@ class ClassAnalyticsService {
             const classMap = new Map<string, ClassRoom>();
             this.classes.forEach((c) => classMap.set(c.id, c));
             data.classes.forEach((c: ClassRoom) => {
-              if (c && c.id) classMap.set(c.id, c);
+              if (c && c.id) {
+                const normalizedName =
+                  c.id === 'lop-1a1' && (c.name === 'Lớp 1A' || c.name === 'Lớp 1') ? 'Lớp 1A2' : c.name;
+                classMap.set(c.id, { ...c, name: normalizedName });
+              }
             });
             if (classMap.size !== this.classes.length) changed = true;
             this.classes = Array.from(classMap.values());
@@ -197,7 +201,14 @@ class ClassAnalyticsService {
     try {
       const raw = localStorage.getItem(CLASSES_STORAGE_KEY);
       if (raw) {
-        return JSON.parse(raw);
+        const parsed: ClassRoom[] = JSON.parse(raw);
+        const migrated = parsed.map(c =>
+          c.id === 'lop-1a1' && (c.name === 'Lớp 1A' || c.name === 'Lớp 1')
+            ? { ...c, name: 'Lớp 1A2' }
+            : c
+        );
+        localStorage.setItem(CLASSES_STORAGE_KEY, JSON.stringify(migrated));
+        return migrated;
       }
     } catch (e) {
       console.error('Failed to load classes from storage:', e);

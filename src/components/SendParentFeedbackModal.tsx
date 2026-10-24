@@ -49,7 +49,7 @@ export const SendParentFeedbackModal: React.FC<SendParentFeedbackModalProps> = (
   const [title, setTitle] = useState<string>('Khen ngợi học tập chăm ngoan');
   const [content, setContent] = useState<string>(initialComment);
   const [score, setScore] = useState<number>(initialScore);
-  const [teacherName, setTeacherName] = useState<string>('Cô Hiền Phan (GVCN Lớp 1A)');
+  const [teacherName, setTeacherName] = useState<string>('Cô Hiền Phan (GVCN Lớp 1A2)');
   const [isSending, setIsSending] = useState<boolean>(false);
   const [previousFeedbacks, setPreviousFeedbacks] = useState<TeacherParentFeedback[]>([]);
 

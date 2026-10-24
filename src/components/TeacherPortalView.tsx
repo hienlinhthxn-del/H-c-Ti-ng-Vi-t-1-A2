@@ -125,7 +125,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
         name: rec.studentName,
         studentCode: rec.studentCode || 'HS',
         avatar: '🐰',
-        classroom: 'Lớp 1'
+        classroom: 'Lớp 1A2'
       };
     }
     // Default to the first student profile in the roster
@@ -134,7 +134,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
       name: 'Tòng Hoài An',
       studentCode: 'HS01',
       avatar: '🐰',
-      classroom: 'Lớp 1'
+      classroom: 'Lớp 1A2'
     };
   };
 
@@ -334,7 +334,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
         studentId: student.id || rec.studentId || 'student_1',
         studentName: student.name || rec.studentName || 'Bé ' + (student.studentCode || 'Học sinh'),
         studentCode: student.studentCode || rec.studentCode || 'HS01',
-        teacherName: 'Cô Hiền Phan (GVCN Lớp 1A)',
+        teacherName: 'Cô Hiền Phan (GVCN Lớp 1A2)',
         category: 'recording_eval',
         title: `Nhận xét bài đọc: ${rec.lessonTitle}`,
         content: reviewComment,
@@ -1131,7 +1131,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                                 {studentInfo.studentCode || 'HS01'}
                               </span>
                             </div>
-                            <span className="text-[11px] text-slate-400">{studentInfo.classroom || 'Lớp 1'}</span>
+                            <span className="text-[11px] text-slate-400">{studentInfo.classroom || 'Lớp 1A2'}</span>
                           </div>
                         </div>
 
@@ -1357,7 +1357,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                               {selStudent.studentCode || 'HS01'}
                             </span>
                             <span className="text-[10px] text-slate-500 font-medium">
-                              {selStudent.classroom || 'Lớp 1'}
+                              {selStudent.classroom || 'Lớp 1A2'}
                             </span>
                           </div>
                         </div>

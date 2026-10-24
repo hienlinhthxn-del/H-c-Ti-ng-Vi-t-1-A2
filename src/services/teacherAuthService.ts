@@ -113,7 +113,7 @@ class TeacherAuthService {
         name: 'Cô Hiền Phan',
         role: 'teacher',
         avatar: TEACHER_HIEN_PHAN_AVATAR_SVG,
-        classroom: 'Lớp 1A',
+        classroom: 'Lớp 1A2',
         pinCode: DEFAULT_TEACHER_PIN
       });
     }
