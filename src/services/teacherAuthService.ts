@@ -139,7 +139,7 @@ class TeacherAuthService {
     } else {
       return { 
         success: false, 
-        error: 'Mã PIN không chính xác! (Mã PIN mặc định là: 1234)' 
+        error: 'Mã PIN không chính xác! Vui lòng kiểm tra lại.' 
       };
     }
   }

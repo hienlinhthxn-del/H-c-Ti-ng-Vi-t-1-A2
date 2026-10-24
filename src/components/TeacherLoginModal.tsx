@@ -74,7 +74,7 @@ export const TeacherLoginModal: React.FC<TeacherLoginModalProps> = ({
       onClose();
     } else {
       speechService.playSoundEffect('wrong');
-      setErrorMessage(result.error || 'Mã PIN không chính xác. Mã PIN mặc định là: 1234');
+      setErrorMessage(result.error || 'Mã PIN không chính xác. Vui lòng thử lại!');
     }
   };
 
@@ -93,7 +93,7 @@ export const TeacherLoginModal: React.FC<TeacherLoginModalProps> = ({
       }
     } catch (err: any) {
       console.error('Google Teacher Login Error:', err);
-      setErrorMessage(err?.message || 'Đăng nhập Google chưa thành công. Bạn có thể dùng Mã PIN 1234 để vào ngay.');
+      setErrorMessage(err?.message || 'Đăng nhập Google chưa thành công. Vui lòng nhập Mã PIN Giáo Viên để vào.');
     } finally {
       setIsLoggingInGoogle(false);
     }
@@ -227,9 +227,6 @@ export const TeacherLoginModal: React.FC<TeacherLoginModalProps> = ({
                       <KeyRound className="w-3.5 h-3.5 text-amber-600" />
                       Mã PIN / Mật khẩu Giáo Viên:
                     </label>
-                    <span className="text-[11px] text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                      Mặc định: 1234
-                    </span>
                   </div>
 
                   <div className="relative">
@@ -237,7 +234,7 @@ export const TeacherLoginModal: React.FC<TeacherLoginModalProps> = ({
                       type={showPassword ? 'text' : 'password'}
                       value={pin}
                       onChange={(e) => setPin(e.target.value)}
-                      placeholder="Nhập mã PIN (ví dụ: 1234)"
+                      placeholder="Nhập mã PIN Giáo Viên..."
                       autoFocus
                       maxLength={16}
                       className="w-full pl-10 pr-10 py-3 bg-slate-50 border-2 border-slate-200 focus:border-amber-500 focus:bg-white rounded-2xl text-base font-black tracking-widest text-slate-800 placeholder:text-slate-400 placeholder:font-normal placeholder:tracking-normal focus:outline-hidden transition-all text-center"
@@ -361,7 +358,7 @@ export const TeacherLoginModal: React.FC<TeacherLoginModalProps> = ({
                   type="password"
                   value={oldPin}
                   onChange={(e) => setOldPin(e.target.value)}
-                  placeholder="Mã PIN cũ (mặc định là 1234)"
+                  placeholder="Nhập mã PIN hiện tại"
                   required
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                 />
