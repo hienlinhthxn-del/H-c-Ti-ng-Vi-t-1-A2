@@ -19,7 +19,7 @@ const DEFAULT_CLASSES: ClassRoom[] = [
     id: 'lop-1a1',
     name: 'Lớp 1A2',
     grade: 'Khối 1',
-    schoolYear: '2025 - 2026',
+    schoolYear: '2026 - 2027',
     homeroomTeacher: 'Cô Hiền Phan',
     totalStudents: 28,
     currentTargetLesson: 35
@@ -111,7 +111,11 @@ class ClassAnalyticsService {
               if (c && c.id) {
                 const normalizedName =
                   c.id === 'lop-1a1' && (c.name === 'Lớp 1A' || c.name === 'Lớp 1') ? 'Lớp 1A2' : c.name;
-                classMap.set(c.id, { ...c, name: normalizedName });
+                const normalizedYear =
+                  !c.schoolYear || c.schoolYear === '2024 - 2025' || c.schoolYear === '2025 - 2026'
+                    ? '2026 - 2027'
+                    : c.schoolYear;
+                classMap.set(c.id, { ...c, name: normalizedName, schoolYear: normalizedYear });
               }
             });
             if (classMap.size !== this.classes.length) changed = true;
@@ -202,11 +206,11 @@ class ClassAnalyticsService {
       const raw = localStorage.getItem(CLASSES_STORAGE_KEY);
       if (raw) {
         const parsed: ClassRoom[] = JSON.parse(raw);
-        const migrated = parsed.map(c =>
-          c.id === 'lop-1a1' && (c.name === 'Lớp 1A' || c.name === 'Lớp 1')
-            ? { ...c, name: 'Lớp 1A2' }
-            : c
-        );
+        const migrated = parsed.map(c => ({
+          ...c,
+          name: c.id === 'lop-1a1' && (c.name === 'Lớp 1A' || c.name === 'Lớp 1') ? 'Lớp 1A2' : c.name,
+          schoolYear: !c.schoolYear || c.schoolYear === '2024 - 2025' || c.schoolYear === '2025 - 2026' ? '2026 - 2027' : c.schoolYear
+        }));
         localStorage.setItem(CLASSES_STORAGE_KEY, JSON.stringify(migrated));
         return migrated;
       }
@@ -330,7 +334,7 @@ class ClassAnalyticsService {
     return this.addClass({
       name: displayName,
       grade: 'Khối 1',
-      schoolYear: '2025 - 2026',
+      schoolYear: '2026 - 2027',
       homeroomTeacher: teacherName || 'Giáo viên chủ nhiệm',
       totalStudents: 0,
       currentTargetLesson: 35
