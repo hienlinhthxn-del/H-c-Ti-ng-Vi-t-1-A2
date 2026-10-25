@@ -97,7 +97,20 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
   const [isEditStudentOpen, setIsEditStudentOpen] = useState<boolean>(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [isClassModalOpen, setIsClassModalOpen] = useState<boolean>(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState<boolean>(false);
   const [isBatchLessonModalOpen, setIsBatchLessonModalOpen] = useState<boolean>(false);
+  const [bulkStudentText, setBulkStudentText] = useState<string>('');
+  const [newClassForm, setNewClassForm] = useState<{
+    name: string;
+    homeroomTeacher: string;
+    schoolYear: string;
+    bulkStudents: string;
+  }>({
+    name: '',
+    homeroomTeacher: '',
+    schoolYear: '2026 - 2027',
+    bulkStudents: ''
+  });
 
   // Form states
   const [formData, setFormData] = useState<{
@@ -403,6 +416,24 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
                 {c.name} ({classAnalyticsService.getStudentsByClass(c.id).length} HS)
               </button>
             ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                setNewClassForm({
+                  name: '',
+                  homeroomTeacher: '',
+                  schoolYear: '2026 - 2027',
+                  bulkStudents: ''
+                });
+                setIsClassModalOpen(true);
+              }}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap"
+              title="Dành cho giáo viên lớp khác hoặc trường khác tạo lớp mới và nhập danh sách học sinh của mình"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Tạo Lớp Mới</span>
+            </button>
           </div>
 
           <div className="text-xs text-amber-100 font-medium flex items-center gap-4">
@@ -562,25 +593,40 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
           </button>
         </div>
 
-        {/* Add Student Button */}
-        <button
-          id="analytics-add-student-btn"
-          onClick={() => {
-            setFormData({
-              name: '',
-              studentCode: `HS${students.length + 1 < 10 ? '0' + (students.length + 1) : students.length + 1}`,
-              gender: 'male',
-              status: 'good',
-              teacherNotes: '',
-              dob: '2018-01-01'
-            });
-            setIsAddStudentOpen(true);
-          }}
-          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Thêm Học Sinh</span>
-        </button>
+        {/* Add Student & Bulk Import Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setBulkStudentText('');
+              setIsBulkImportOpen(true);
+            }}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Dán nhanh cả danh sách lớp từ file Excel hoặc Word (mỗi dòng 1 học sinh)"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nhập Nhanh DS (Excel/Word)</span>
+          </button>
+
+          <button
+            id="analytics-add-student-btn"
+            onClick={() => {
+              setFormData({
+                name: '',
+                studentCode: `HS${students.length + 1 < 10 ? '0' + (students.length + 1) : students.length + 1}`,
+                gender: 'male',
+                status: 'good',
+                teacherNotes: '',
+                dob: '2018-01-01'
+              });
+              setIsAddStudentOpen(true);
+            }}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Thêm Học Sinh</span>
+          </button>
+        </div>
       </div>
 
       {/* --- SUBTAB 1: ROSTER & GRADEBOOK TABLE --- */}
@@ -1643,6 +1689,244 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
                 <span>In Phiếu Này</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 5: CREATE NEW CLASS + BULK ROSTER --- */}
+      {isClassModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-emerald-600" />
+                <span>Tạo Lớp Học Mới (Dành Cho Giáo Viên)</span>
+              </h3>
+              <button
+                onClick={() => setIsClassModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-xl"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newClassForm.name.trim()) return;
+                const cleanClassName = newClassForm.name.trim().toLowerCase().startsWith('lớp')
+                  ? newClassForm.name.trim()
+                  : `Lớp ${newClassForm.name.trim()}`;
+                const createdClass = classAnalyticsService.addClass({
+                  name: cleanClassName,
+                  grade: 'Khối 1',
+                  schoolYear: newClassForm.schoolYear.trim() || '2026 - 2027',
+                  homeroomTeacher: newClassForm.homeroomTeacher.trim() || 'Giáo viên chủ nhiệm',
+                  totalStudents: 0,
+                  currentTargetLesson: 35
+                });
+
+                const rawLines = newClassForm.bulkStudents
+                  .split(/\r?\n/)
+                  .map((line) => line.replace(/^\d+[\.\)\-\s]+/, '').trim())
+                  .filter(Boolean);
+
+                rawLines.forEach((stuName, idx) => {
+                  const code = `HS${idx + 1 < 10 ? '0' + (idx + 1) : idx + 1}`;
+                  const isFemale = /\b(thị|ngọc|linh|lan|mai|hương|hà|anh|nhi|trang|thảo|vy|my|diệp|trâm)\b/i.test(stuName);
+                  classAnalyticsService.addStudent({
+                    name: stuName,
+                    studentCode: code,
+                    gender: isFemale ? 'female' : 'male',
+                    classId: createdClass.id,
+                    avatar: isFemale ? '👧' : '👦',
+                    dob: '2020-01-01',
+                    status: 'good',
+                    teacherNotes: ''
+                  });
+                  userProfileService.createUser({
+                    name: stuName,
+                    role: 'student',
+                    studentCode: code,
+                    classroom: cleanClassName,
+                    gender: isFemale ? 'female' : 'male',
+                    avatar: isFemale ? '🌸' : '🐰'
+                  });
+                });
+
+                classAnalyticsService.setCurrentClassId(createdClass.id);
+                refreshData();
+                setIsClassModalOpen(false);
+                showToast(
+                  `Đã tạo ${cleanClassName} thành công${rawLines.length > 0 ? ` cùng ${rawLines.length} học sinh` : ''}!`
+                );
+              }}
+              className="py-4 space-y-4"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-slate-700 mb-1">Tên Lớp Học *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newClassForm.name}
+                    onChange={(e) => setNewClassForm({ ...newClassForm, name: e.target.value })}
+                    placeholder="VD: Lớp 1B hoặc 1A4"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500 focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-700 mb-1">Năm Học</label>
+                  <input
+                    type="text"
+                    value={newClassForm.schoolYear}
+                    onChange={(e) => setNewClassForm({ ...newClassForm, schoolYear: e.target.value })}
+                    placeholder="2026 - 2027"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-700 mb-1">Họ Tên Giáo Viên Chủ Nhiệm</label>
+                <input
+                  type="text"
+                  value={newClassForm.homeroomTeacher}
+                  onChange={(e) => setNewClassForm({ ...newClassForm, homeroomTeacher: e.target.value })}
+                  placeholder="VD: Cô Nguyễn Thị Mai"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:border-emerald-500 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-700 mb-1">
+                  Dán Danh Sách Học Sinh Từ Excel / Word (Mỗi dòng 1 họ tên - Không bắt buộc)
+                </label>
+                <textarea
+                  rows={6}
+                  value={newClassForm.bulkStudents}
+                  onChange={(e) => setNewClassForm({ ...newClassForm, bulkStudents: e.target.value })}
+                  placeholder={"Nguyễn Minh An\nTrần Ngọc Bích\nLê Hoàng Nam\n..."}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:outline-none focus:border-emerald-500 focus:bg-white leading-relaxed"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  💡 Thầy cô có thể copy cột Họ và Tên từ file Excel danh sách lớp và dán thẳng vào đây.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsClassModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-2xl shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Tạo Lớp & Lưu Danh Sách</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 6: BULK IMPORT STUDENTS INTO CURRENT CLASS --- */}
+      {isBulkImportOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-emerald-600" />
+                <span>Nhập Nhanh Danh Sách Học Sinh ({currentClass?.name})</span>
+              </h3>
+              <button
+                onClick={() => setIsBulkImportOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-xl"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const rawLines = bulkStudentText
+                  .split(/\r?\n/)
+                  .map((line) => line.replace(/^\d+[\.\)\-\s]+/, '').trim())
+                  .filter(Boolean);
+                if (rawLines.length === 0) return;
+
+                let startIdx = students.length;
+                rawLines.forEach((stuName) => {
+                  startIdx++;
+                  const code = `HS${startIdx < 10 ? '0' + startIdx : startIdx}`;
+                  const isFemale = /\b(thị|ngọc|linh|lan|mai|hương|hà|anh|nhi|trang|thảo|vy|my|diệp|trâm)\b/i.test(stuName);
+                  classAnalyticsService.addStudent({
+                    name: stuName,
+                    studentCode: code,
+                    gender: isFemale ? 'female' : 'male',
+                    classId: currentClassId,
+                    avatar: isFemale ? '👧' : '👦',
+                    dob: '2020-01-01',
+                    status: 'good',
+                    teacherNotes: ''
+                  });
+                  userProfileService.createUser({
+                    name: stuName,
+                    role: 'student',
+                    studentCode: code,
+                    classroom: currentClass?.name || 'Lớp 1A2',
+                    gender: isFemale ? 'female' : 'male',
+                    avatar: isFemale ? '🌸' : '🐰'
+                  });
+                });
+
+                refreshData();
+                setIsBulkImportOpen(false);
+                setBulkStudentText('');
+                showToast(`Đã thêm thành công ${rawLines.length} học sinh vào ${currentClass?.name}!`);
+              }}
+              className="py-4 space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-black text-slate-700 mb-1">
+                  Dán Danh Sách Họ Tên Học Sinh (Mỗi dòng 1 học sinh):
+                </label>
+                <textarea
+                  rows={8}
+                  required
+                  value={bulkStudentText}
+                  onChange={(e) => setBulkStudentText(e.target.value)}
+                  placeholder={"1. Nguyễn Minh An\n2. Trần Ngọc Bích\n3. Lê Hoàng Nam\n..."}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:border-emerald-500 focus:bg-white leading-relaxed"
+                />
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  💡 Hệ thống sẽ tự động cấp Mã Học Sinh (`HS01`, `HS02`...), tự động tạo tài khoản đăng nhập ở Cổng Học Sinh và đồng bộ lên Đám mây.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkImportOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-2xl shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Thêm Tất Cả Vào Lớp</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
