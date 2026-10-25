@@ -417,16 +417,16 @@ export const WritingBoard: React.FC<WritingBoardProps> = ({
         {/* Sample text watermark overlay */}
         {showSample && sampleText && (
           <div 
-            className="absolute inset-0 pointer-events-none select-none flex flex-col justify-around px-4 sm:px-8 py-4 opacity-30 text-purple-900 font-serif"
-            style={{ fontFamily: '"Comic Sans MS", "Arial Rounded MT Bold", sans-serif', letterSpacing: '0.2em' }}
+            className="absolute inset-0 pointer-events-none select-none flex flex-col justify-around px-4 sm:px-8 py-3 opacity-35 text-purple-900 font-handwriting"
+            style={{ letterSpacing: '0.08em' }}
           >
-            <div className="text-3xl sm:text-5xl font-normal leading-relaxed border-b-2 border-dashed border-purple-300 pb-1 sm:pb-2 truncate">
+            <div className="text-4xl sm:text-6xl font-bold leading-relaxed border-b-2 border-dashed border-purple-300 pb-1 sm:pb-2 truncate">
               {sampleText}
             </div>
-            <div className="text-3xl sm:text-5xl font-normal leading-relaxed border-b-2 border-dashed border-purple-300 pb-1 sm:pb-2 truncate">
+            <div className="text-4xl sm:text-6xl font-bold leading-relaxed border-b-2 border-dashed border-purple-300 pb-1 sm:pb-2 truncate">
               {sampleText}
             </div>
-            <div className="text-3xl sm:text-5xl font-normal leading-relaxed truncate">
+            <div className="text-4xl sm:text-6xl font-bold leading-relaxed truncate">
               {sampleText}
             </div>
           </div>

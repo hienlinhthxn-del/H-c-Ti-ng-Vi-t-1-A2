@@ -1025,7 +1025,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 </button>
                 <div className="flex flex-wrap gap-2">
                   {lesson.part3_SentenceAndPractice.writingSamples.map((w, i) => (
-                    <span key={i} className="px-3 py-1 bg-white font-handwriting text-xl font-bold text-purple-900 rounded-lg border border-purple-200 shadow-2xs">
+                    <span key={i} className="px-3.5 py-1 bg-white font-handwriting text-2xl sm:text-3xl font-bold text-purple-900 rounded-lg border border-purple-200 shadow-2xs">
                       {w}
                     </span>
                   ))}
