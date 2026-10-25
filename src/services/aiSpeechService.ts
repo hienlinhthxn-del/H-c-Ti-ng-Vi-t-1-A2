@@ -923,32 +923,41 @@ export class AISpeechService {
       const targetWords = this.normalizeVietnamese(targetText);
 
       const prompt = `Bạn là Cô giáo dạy Tiếng Việt Lớp 1 (Bộ sách Kết nối tri thức với cuộc sống).
-Hãy lắng nghe thật kỹ file ghi âm giọng đọc của học sinh Lớp 1 đính kèm và nghe xem học sinh thực sự đã phát âm những tiếng nào.
+Hãy lắng nghe thật kỹ file ghi âm giọng đọc của học sinh Lớp 1 đính kèm và chấm từng tiếng trong danh sách đề bài.
 
 Ngữ cảnh phần học: "${sectionContext || 'Luyện đọc Tiếng Việt Lớp 1'}"
 Văn bản đề bài yêu cầu học sinh đọc: "${targetText}"
-Danh sách từng tiếng cần đọc theo thứ tự: ${JSON.stringify(targetWords)}
+Danh sách ${targetWords.length} tiếng cần kiểm tra theo thứ tự: ${JSON.stringify(targetWords)}
 
-LƯU Ý QUAN TRỌNG VỀ NGỮ ÂM LỚP 1:
-1. Nếu đề bài có các chữ cái hoặc âm đứng rời (ví dụ: b, c, d, đ, g, gh, h, k, l, m, n, ng, ngh, nh, p, ph, q, qu, r, s, t, th, tr, v, x, ă, â), học sinh Lớp 1 đọc đúng chuẩn là đọc theo ÂM ("bờ", "cờ", "dờ", "đờ", "gờ", "hờ", "lờ", "mờ", "nờ", "ngờ", "nhờ", "pờ", "phờ", "quờ", "rờ", "sờ", "tờ", "thờ", "trờ", "vờ", "xờ", "á", "ớ"). Nếu bé đọc âm như vậy cho chữ cái tương ứng thì tính là ĐÚNG ("correct").
-2. Hãy nghe kỹ từng tiếng trong file ghi âm:
-   - Nếu bé đọc ĐÚNG tiếng đó -> ghi lại đúng chữ mục tiêu trong đề bài.
-   - Nếu bé đọc SAI / NGỌNG (ví dụ ngọng l/n, tr/ch, s/x, r/d/gi, sai vần, hoặc sai dấu thanh hỏi/ngã/sắc/huyền/nặng) -> ghi lại chính xác âm thực tế mà bé đã phát âm sai (ví dụ đề bài là "nón" mà bé đọc "lón" thì ghi "lón"; đề bài là "múa" mà bé đọc "mua" thì ghi "mua").
-   - Nếu bé KHÔNG ĐỌC (bỏ sót) tiếng nào -> không đưa tiếng đó vào chuỗi transcript.
-   - Nếu file ghi âm hoàn toàn im lặng hoặc chỉ có tiếng ồn không có tiếng người đọc -> trả về spokenTranscript là "".
+QUY TẮC CHẤM PHÁT ÂM LỚP 1:
+1. Nếu đề bài có các chữ cái hoặc âm đứng rời (b, c, d, đ, g, gh, h, k, l, m, n, ng, ngh, nh, p, ph, q, qu, r, s, t, th, tr, v, x, ă, â), học sinh đọc theo ÂM ("bờ", "cờ", "dờ", "đờ", "gờ", "hờ", "lờ", "mờ", "nờ", "ngờ", "nhờ", "pờ", "phờ", "quờ", "rờ", "sờ", "tờ", "thờ", "trờ", "vờ", "xờ", "á", "ớ") hoặc đọc đánh vần đều được tính là ĐÚNG ("correct").
+2. Với các tiếng rời rạc (ví dụ: "khèn", "sen", "nến", "nghển", "chín", "mịn", "cún", "vun"), hãy lắng nghe âm thanh thực tế trong file ghi âm:
+   - Nếu người đọc phát âm rõ tiếng đó (dù giọng vùng miền hơi nhẹ hoặc có tạp âm nhỏ của micro) -> đánh giá status = "correct" và spokenWord = đúng chữ mục tiêu.
+   - Chỉ đánh giá status = "mismatched" khi người đọc phát âm SAI RÕ RÀNG sang một âm/vần/thanh khác (ví dụ: ngọng l/n, tr/ch, s/x, hoặc sai hẳn dấu thanh), khi đó ghi rõ âm nghe được vào spokenWord.
+   - Chỉ đánh giá status = "missing" khi người đọc thực sự BỎ QUA không đọc tiếng đó hoặc file ghi âm hoàn toàn im lặng.
 
 Chỉ trả về DUY NHẤT một đối tượng JSON hợp lệ theo cấu trúc sau (không thêm markdown):
 {
-  "spokenTranscript": "chuỗi tất cả các tiếng thực tế học sinh đã đọc trong file ghi âm, cách nhau bởi dấu cách",
-  "teacherEncourageNote": "1 câu nhận xét ngắn gọn, ấm áp chuẩn Thông tư 27 chỉ rõ ưu điểm và lỗi phát âm cụ thể (nếu có) của học sinh"
+  "words": [
+    {
+      "word": "từ mục tiêu trong đề bài",
+      "status": "correct" | "mismatched" | "missing",
+      "spokenWord": "từ thực tế nghe được (nếu correct thì giữ nguyên bằng word; nếu missing thì để chuỗi rỗng)"
+    }
+  ],
+  "teacherEncourageNote": "Nhận xét sư phạm ấm áp chuẩn Thông tư 27 dành cho học sinh"
 }`;
 
-      const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
-      let geminiData: { spokenTranscript?: string; teacherEncourageNote?: string } | null = null;
+      const models = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+      let geminiData: {
+        words?: Array<{ word: string; status: 'correct' | 'mismatched' | 'missing'; spokenWord?: string }>;
+        spokenTranscript?: string;
+        teacherEncourageNote?: string;
+      } | null = null;
 
       for (const modelName of models) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 9000);
+        const timeoutId = setTimeout(() => controller.abort(), 14000);
         try {
           const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
@@ -994,9 +1003,33 @@ Chỉ trả về DUY NHẤT một đối tượng JSON hợp lệ theo cấu tr�
         }
       }
 
+      if (geminiData && Array.isArray(geminiData.words) && geminiData.words.length > 0) {
+        // Reconstruct the clean spoken transcript from Gemini's direct audio evaluation of each target word
+        const reconstructedTokens: string[] = [];
+        targetWords.forEach((tw, idx) => {
+          const gw =
+            geminiData!.words![idx] ||
+            geminiData!.words!.find((item) => item.word?.toLowerCase().trim() === tw.toLowerCase().trim());
+          if (!gw) return;
+          if (gw.status === 'correct' || this.isPhoneticMatch(tw, gw.spokenWord || '')) {
+            reconstructedTokens.push(tw);
+          } else if (gw.status === 'mismatched' && gw.spokenWord && gw.spokenWord.trim()) {
+            reconstructedTokens.push(gw.spokenWord.trim());
+          }
+          // if 'missing', omit from reconstructedTokens so evaluatePronunciation marks it missing
+        });
+
+        const chosenTranscript = reconstructedTokens.join(' ');
+        const result = this.evaluatePronunciation(targetText, chosenTranscript);
+        result.aiEngine = 'gemini';
+        if (geminiData.teacherEncourageNote && geminiData.teacherEncourageNote.trim() && chosenTranscript) {
+          result.detailedFeedback = `${geminiData.teacherEncourageNote.trim()} (${result.correctCount}/${targetWords.length} tiếng đọc chuẩn - ${result.score}/100 điểm).`;
+        }
+        return result;
+      }
+
       if (geminiData && typeof geminiData.spokenTranscript === 'string') {
         const geminiSpoken = geminiData.spokenTranscript.trim();
-        // Use Gemini's heard transcript if non-empty, or if fallbackTranscript was also empty
         const chosenTranscript = geminiSpoken || fallbackTranscript;
         const result = this.evaluatePronunciation(targetText, chosenTranscript);
         result.aiEngine = 'gemini';

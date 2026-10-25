@@ -894,7 +894,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                           <div className="bg-rose-100/90 border border-rose-300 rounded-2xl p-2.5 shadow-2xs">
                             <div className="text-[10px] font-bold text-rose-800 uppercase">Cần Sửa Phát Âm</div>
                             <div className="text-lg sm:text-xl font-black text-rose-700 mt-0.5">
-                              {aiEvaluation.mistakesCount ?? aiEvaluation.wordAnalysis.filter(w => w.status === 'mismatched').length} từ
+                              {aiEvaluation.wordAnalysis.filter(w => w.status === 'mismatched').length} từ
                             </div>
                           </div>
 
