@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Volume1Lesson, Volume2Lesson } from '../types';
 import { lessonStorageService } from '../services/lessonStorageService';
 import { speechService } from '../services/speechService';
+import { getActiveGeminiApiKey } from '../services/aiSpeechService';
 import { 
   X, 
   Sparkles, 
@@ -30,6 +31,8 @@ export const AILessonAssistantModal: React.FC<AILessonAssistantModalProps> = ({
   const [selectedVol, setSelectedVol] = useState<'vol1' | 'vol2'>('vol1');
   const [selectedLessonId, setSelectedLessonId] = useState<number>(1);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [isGeneratingGemini, setIsGeneratingGemini] = useState<boolean>(false);
+  const [geminiRiddleOverride, setGeminiRiddleOverride] = useState<Record<string, { riddleLines: string[]; answerHintStr: string }>>({});
 
   const vol1Lessons = lessonStorageService.getVolume1Lessons();
   const vol2Lessons = lessonStorageService.getTopicGroups().flatMap(g => g.lessons);
@@ -189,9 +192,70 @@ export const AILessonAssistantModal: React.FC<AILessonAssistantModalProps> = ({
     };
   };
 
-  const activeData = selectedVol === 'vol1'
+  const baseData = selectedVol === 'vol1'
     ? buildVol1AssistantData(currentVol1)
     : buildVol2AssistantData(currentVol2);
+
+  const overrideKey = `${selectedVol}_${selectedLessonId}`;
+  const activeData = {
+    ...baseData,
+    riddleLines: geminiRiddleOverride[overrideKey]?.riddleLines || baseData.riddleLines,
+    answerHintStr: geminiRiddleOverride[overrideKey]?.answerHintStr || baseData.answerHintStr
+  };
+
+  const handleGenerateGeminiRiddle = async () => {
+    const apiKey = getActiveGeminiApiKey();
+    if (!apiKey) return;
+    setIsGeneratingGemini(true);
+    speechService.playSoundEffect('pop');
+
+    try {
+      const lessonDesc = selectedVol === 'vol1'
+        ? `Bài ${currentVol1.lessonNumber}: "${currentVol1.title}", Âm/vần: ${(currentVol1.part1_Letters.letters || []).join(', ')}, Từ ngữ trong bài: ${(currentVol1.part2_SyllablesAndWords.words || []).map(w => w.word).join(', ')}, Câu nhận biết: "${currentVol1.part1_Letters.recognitionSentence || ''}"`
+        : `${currentVol2.title} (Chủ điểm: ${currentVol2.topicTitle}), Từ vựng: ${(currentVol2.reading.vocabulary || []).map(v => v.word).join(', ')}`;
+
+      const prompt = `Bạn là giáo viên Tiếng Việt Lớp 1 sáng tạo. Hãy sáng tác 1 câu đố thơ lục bát hoặc 4 chữ (đúng 4 dòng thơ ngắn gọn, vui tươi, dễ hiểu cho học sinh lớp 1) bám sát nội dung bài học sau:
+${lessonDesc}
+
+Trả về DUY NHẤT JSON hợp lệ:
+{
+  "riddleLines": ["dòng thơ 1", "dòng thơ 2", "dòng thơ 3", "dòng thơ 4"],
+  "answerHintStr": "Đáp án câu đố & các từ khóa trong bài"
+}`;
+
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, responseMimeType: 'application/json' }
+          })
+        }
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const textOut = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (textOut) {
+          const parsed = JSON.parse(textOut.replace(/```json|```/g, '').trim());
+          if (Array.isArray(parsed.riddleLines) && parsed.riddleLines.length > 0) {
+            setGeminiRiddleOverride(prev => ({
+              ...prev,
+              [overrideKey]: {
+                riddleLines: parsed.riddleLines,
+                answerHintStr: parsed.answerHintStr || baseData.answerHintStr
+              }
+            }));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Gemini riddle generation error:', e);
+    } finally {
+      setIsGeneratingGemini(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
@@ -285,21 +349,32 @@ export const AILessonAssistantModal: React.FC<AILessonAssistantModalProps> = ({
           
           {/* Card 1: Câu đố vui tương tác khởi động tiết học số */}
           <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-amber-200 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-orange-700 font-bold">
                 <HelpCircle className="w-4 h-4" />
                 <span className="text-sm font-black uppercase">1. Câu Đố Vui & Khởi Động Theo Đúng Nội Dung Bài Học</span>
               </div>
-              <button
-                onClick={() => handleCopy(
-                  `${activeData.riddleLines.join('\n')}\n➔ Đáp án / Từ khóa trong bài: ${activeData.answerHintStr}`,
-                  'riddle'
-                )}
-                className="px-2.5 py-1 rounded-lg bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
-              >
-                {copiedKey === 'riddle' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedKey === 'riddle' ? 'Đã chép' : 'Sao chép'}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateGeminiRiddle}
+                  disabled={isGeneratingGemini}
+                  className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>{isGeneratingGemini ? 'Gemini đang sáng tác...' : '✨ Gemini sáng tác câu đố mới'}</span>
+                </button>
+                <button
+                  onClick={() => handleCopy(
+                    `${activeData.riddleLines.join('\n')}\n➔ Đáp án / Từ khóa trong bài: ${activeData.answerHintStr}`,
+                    'riddle'
+                  )}
+                  className="px-2.5 py-1 rounded-lg bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
+                >
+                  {copiedKey === 'riddle' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedKey === 'riddle' ? 'Đã chép' : 'Sao chép'}</span>
+                </button>
+              </div>
             </div>
             <div className="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200/80 font-reading font-medium leading-relaxed text-slate-800 space-y-1">
               {activeData.riddleLines.map((line, idx) => (

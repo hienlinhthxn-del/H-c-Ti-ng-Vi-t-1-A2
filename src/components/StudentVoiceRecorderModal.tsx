@@ -66,6 +66,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
   // AI Speech Recognition & Evaluation States
   const [liveTranscript, setLiveTranscript] = useState<string>('');
   const [aiEvaluation, setAiEvaluation] = useState<AIEvaluationResult | null>(null);
+  const [isEvaluatingGemini, setIsEvaluatingGemini] = useState<boolean>(false);
   const [selectedWordDetail, setSelectedWordDetail] = useState<{
     word: string;
     spokenWord?: string;
@@ -261,14 +262,21 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
         }
 
         // AI Speech Evaluation (đợi 450ms để nhận đủ những tiếng cuối cùng bé vừa đọc trước khi bấm Dừng)
+        setIsEvaluatingGemini(true);
         const recognizedSpoken = await aiSpeechService.stopListeningWithGrace(450);
         const finalSpoken = recognizedSpoken || liveTranscript;
 
         let evalResult: AIEvaluationResult | undefined = undefined;
         if (targetInfo) {
-          evalResult = aiSpeechService.evaluatePronunciation(targetInfo.targetText, finalSpoken);
+          evalResult = await aiSpeechService.evaluateWithGeminiAudio(
+            targetInfo.targetText,
+            blob,
+            finalSpoken,
+            targetInfo.sectionTitle || targetInfo.lessonTitle
+          );
           setAiEvaluation(evalResult);
         }
+        setIsEvaluatingGemini(false);
 
         // Save automatically with AI evaluation
         if (targetInfo && blob.size > 0) {
@@ -811,6 +819,21 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                       </div>
                     )}
 
+                    {/* GEMINI AI ANALYZING LOADING CARD */}
+                    {isEvaluatingGemini && !aiEvaluation && (
+                      <div className="rounded-3xl p-6 border-2 border-purple-300 bg-gradient-to-r from-purple-50 via-indigo-50 to-pink-50 text-center shadow-md space-y-2 animate-pulse">
+                        <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md">
+                          <Bot className="w-7 h-7 animate-bounce" />
+                        </div>
+                        <h4 className="text-sm sm:text-base font-black text-purple-950">
+                          Google Gemini AI đang lắng nghe giọng đọc của bé...
+                        </h4>
+                        <p className="text-xs text-purple-700 font-medium">
+                          Đang phân tích từng âm đầu, vần và dấu thanh theo chuẩn SGK Tiếng Việt 1
+                        </p>
+                      </div>
+                    )}
+
                     {/* AI EVALUATION & ERROR DETECTION REPORT CARD */}
                     {aiEvaluation && (
                       <div className="rounded-3xl p-5 sm:p-6 border-2 border-purple-300 bg-gradient-to-br from-purple-50 via-indigo-50/60 to-pink-50 text-left shadow-lg space-y-5">
@@ -823,7 +846,9 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                             <div>
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-[11px] font-black uppercase tracking-wider bg-purple-200 text-purple-950 px-2.5 py-0.5 rounded-md">
-                                  Trợ lý AI chấm & phát hiện lỗi
+                                  {aiEvaluation.aiEngine === 'gemini'
+                                    ? '✨ Google Gemini Audio AI chấm phát âm'
+                                    : 'Trợ lý AI chấm & phát hiện lỗi'}
                                 </span>
                                 <span className="text-xs font-extrabold text-purple-700">
                                   Độ chuẩn xác: {aiEvaluation.accuracy}%
