@@ -1,6 +1,9 @@
 import { TeacherParentFeedback } from '../types';
+import { db } from './firebaseConfig';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const FEEDBACK_STORAGE_KEY = 'tiengviet1_teacher_parent_feedbacks_v1';
+const CLOUD_FEEDBACK_DOC = 'teacher_parent_feedbacks_v1';
 
 // Sample initial feedbacks from Homeroom Teacher
 const DEFAULT_FEEDBACKS: TeacherParentFeedback[] = [
@@ -52,16 +55,68 @@ class TeacherFeedbackService {
         this.feedbacks = DEFAULT_FEEDBACKS;
         this.save();
       }
+      this.initFirebaseSync();
     } catch (e) {
       console.warn('Failed to load teacher feedbacks from localStorage:', e);
       this.feedbacks = DEFAULT_FEEDBACKS;
     }
   }
 
+  private initFirebaseSync() {
+    try {
+      onSnapshot(
+        doc(db, 'app_state', CLOUD_FEEDBACK_DOC),
+        (docSnap) => {
+          if (!docSnap.exists()) return;
+          const data = docSnap.data();
+          if (Array.isArray(data.feedbacks) && data.feedbacks.length > 0) {
+            const map = new Map<string, TeacherParentFeedback>();
+            this.feedbacks.forEach((f) => map.set(f.id, f));
+            let changed = false;
+            data.feedbacks.forEach((cf: TeacherParentFeedback) => {
+              if (!cf || !cf.id) return;
+              const existing = map.get(cf.id);
+              if (!existing || existing.isReadByParent !== cf.isReadByParent || existing.parentReply !== cf.parentReply) {
+                map.set(cf.id, { ...existing, ...cf });
+                changed = true;
+              }
+            });
+            if (changed) {
+              this.feedbacks = Array.from(map.values()).sort(
+                (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+              );
+              try {
+                localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(this.feedbacks));
+              } catch {}
+              this.notify();
+            }
+          }
+        },
+        (err) => console.warn('Firebase sync warning for teacher feedbacks:', err)
+      );
+    } catch (err) {
+      console.warn('Could not initialize Firebase sync for teacher feedbacks:', err);
+    }
+  }
+
+  private syncToCloud() {
+    if (typeof window === 'undefined') return;
+    try {
+      const payload = JSON.parse(
+        JSON.stringify({
+          feedbacks: this.feedbacks.slice(0, 200),
+          updatedAt: new Date().toISOString()
+        })
+      );
+      setDoc(doc(db, 'app_state', CLOUD_FEEDBACK_DOC), payload, { merge: true }).catch(() => {});
+    } catch {}
+  }
+
   private save() {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(this.feedbacks));
+      this.syncToCloud();
       this.notify();
     } catch (e) {
       console.error('Failed to save teacher feedbacks:', e);

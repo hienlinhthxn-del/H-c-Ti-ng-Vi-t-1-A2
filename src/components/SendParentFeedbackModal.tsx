@@ -13,8 +13,9 @@ import {
   MessageSquare,
   Award
 } from 'lucide-react';
-import { FeedbackCategory, TeacherParentFeedback } from '../types';
+import { FeedbackCategory, TeacherParentFeedback, StudentProfile } from '../types';
 import { teacherFeedbackService } from '../services/teacherFeedbackService';
+import { classAnalyticsService } from '../services/classAnalyticsService';
 import { speechService } from '../services/speechService';
 import confetti from 'canvas-confetti';
 
@@ -52,12 +53,39 @@ export const SendParentFeedbackModal: React.FC<SendParentFeedbackModalProps> = (
   const [teacherName, setTeacherName] = useState<string>('Cô Hiền Phan (GVCN Lớp 1A2)');
   const [isSending, setIsSending] = useState<boolean>(false);
   const [previousFeedbacks, setPreviousFeedbacks] = useState<TeacherParentFeedback[]>([]);
+  const [classStudents, setClassStudents] = useState<StudentProfile[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<{
+    id: string;
+    name: string;
+    studentCode?: string;
+    avatar?: string;
+    classId?: string;
+  } | null>(student);
 
   useEffect(() => {
-    if (student) {
-      const history = teacherFeedbackService.getFeedbacksForStudent(student.id, student.name);
+    if (isOpen) {
+      const currentClassId = student?.classId || classAnalyticsService.getCurrentClassId();
+      const roster = classAnalyticsService.getStudentsByClass(currentClassId);
+      const allStudents = roster.length > 0 ? roster : classAnalyticsService.getAllStudents();
+      setClassStudents(allStudents);
+
+      if (student) {
+        // Match with roster if possible so studentCode/avatar are complete
+        const matched = allStudents.find(
+          s => s.id === student.id || s.name.toLowerCase().trim() === student.name.toLowerCase().trim()
+        );
+        setSelectedStudent(matched || student);
+      } else if (allStudents.length > 0) {
+        setSelectedStudent(allStudents[0]);
+      }
+    }
+  }, [student, isOpen]);
+
+  useEffect(() => {
+    if (selectedStudent) {
+      const history = teacherFeedbackService.getFeedbacksForStudent(selectedStudent.id, selectedStudent.name);
       setPreviousFeedbacks(history);
-      
+
       if (initialComment) {
         setContent(initialComment);
       }
@@ -69,9 +97,21 @@ export const SendParentFeedbackModal: React.FC<SendParentFeedbackModalProps> = (
         setCategory('recording_eval');
       }
     }
-  }, [student, isOpen, initialComment, initialScore, initialLessonTitle]);
+  }, [selectedStudent, isOpen, initialComment, initialScore, initialLessonTitle]);
 
-  if (!isOpen || !student) return null;
+  if (!isOpen || !selectedStudent) return null;
+
+  const handleStudentChange = (newStudentId: string) => {
+    const found = classStudents.find(s => s.id === newStudentId);
+    if (found) {
+      const oldName = selectedStudent?.name || '';
+      setSelectedStudent(found);
+      // If content already has the previous student's name, automatically update it to the new student's name
+      if (oldName && content.includes(oldName)) {
+        setContent(content.split(oldName).join(found.name));
+      }
+    }
+  };
 
   const categories: { key: FeedbackCategory; label: string; icon: string; defaultTitle: string }[] = [
     { key: 'praise', label: 'Khen ngợi', icon: '🌟', defaultTitle: 'Khen ngợi con học tập chăm ngoan' },
@@ -91,7 +131,7 @@ export const SendParentFeedbackModal: React.FC<SendParentFeedbackModalProps> = (
 
   const handleGenerateAISuggestion = () => {
     speechService.playSoundEffect('pop');
-    const name = student.name || 'con';
+    const name = selectedStudent.name || 'con';
     let suggestion = '';
 
     switch (category) {
@@ -129,9 +169,9 @@ export const SendParentFeedbackModal: React.FC<SendParentFeedbackModalProps> = (
     setIsSending(true);
     try {
       teacherFeedbackService.sendFeedback({
-        studentId: student.id,
-        studentName: student.name,
-        studentCode: student.studentCode,
+        studentId: selectedStudent.id,
+        studentName: selectedStudent.name,
+        studentCode: selectedStudent.studentCode,
         teacherName: teacherName.trim() || 'Cô Hiền Phan',
         category,
         title: title.trim() || 'Lời nhận xét từ Cô giáo',
@@ -184,30 +224,37 @@ export const SendParentFeedbackModal: React.FC<SendParentFeedbackModalProps> = (
           </button>
         </div>
 
-        {/* Student Mini Profile Info */}
-        <div className="my-4 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200/70 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-xl shadow-2xs border border-amber-200">
-              {student.avatar || '🧒'}
-            </div>
-            <div>
-              <div className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-                <span>{student.name}</span>
-                {student.studentCode && (
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-950 font-bold">
-                    {student.studentCode}
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-amber-900 font-medium">
-                Học sinh Lớp 1 • Nhận xét gửi tới Bố Mẹ bé
-              </div>
-            </div>
-          </div>
-          <div className="text-right hidden sm:block">
-            <span className="text-xs font-bold text-emerald-700 bg-emerald-100/80 px-2.5 py-1 rounded-full">
-              Sổ Liên Lạc Điện Tử
+        {/* Student Selector & Mini Profile Info */}
+        <div className="my-4 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200/70 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <label className="text-xs font-extrabold text-amber-950 flex items-center gap-1.5">
+              <span>👧👦 Chọn học sinh nhận đánh giá:</span>
+            </label>
+            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-full">
+              Sổ Liên Lạc Điện Tử ({classStudents.length} HS)
             </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center text-xl shadow-2xs border border-amber-200 shrink-0">
+              {selectedStudent.avatar || '🧒'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <select
+                value={selectedStudent.id}
+                onChange={(e) => handleStudentChange(e.target.value)}
+                className="w-full px-3 py-2 bg-white border-2 border-amber-300 hover:border-amber-500 focus:border-orange-500 rounded-xl text-sm font-black text-slate-900 shadow-2xs focus:outline-none cursor-pointer transition-colors"
+              >
+                {classStudents.map((s, idx) => (
+                  <option key={s.id} value={s.id}>
+                    {idx + 1}. {s.name} ({s.studentCode || `HS${String(idx + 1).padStart(2, '0')}`})
+                  </option>
+                ))}
+              </select>
+              <div className="text-[11px] text-amber-900 font-medium mt-1 pl-1">
+                Đang chọn: <strong>{selectedStudent.name}</strong> {selectedStudent.studentCode ? `(${selectedStudent.studentCode})` : ''} • Nhận xét gửi trực tiếp tới Bố Mẹ bé
+              </div>
+            </div>
           </div>
         </div>
 
