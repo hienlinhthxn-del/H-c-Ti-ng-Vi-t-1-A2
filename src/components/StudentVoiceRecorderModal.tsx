@@ -860,64 +860,19 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                             </div>
                           </div>
 
-                          {/* Score Gauge & Teacher Quick Override */}
-                          <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-start sm:self-auto">
+                          {/* Score Gauge */}
+                          <div className="flex items-center gap-3 shrink-0 self-start sm:self-auto">
                             <div className="bg-white px-4 py-2 rounded-2xl border-2 border-purple-300 text-center shadow-xs">
                               <span className="text-[10px] block font-black text-slate-500 uppercase tracking-wider">
                                 Điểm Đọc AI
                               </span>
                               <div className="flex items-baseline justify-center gap-0.5">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={100}
-                                  value={aiEvaluation.score}
-                                  onChange={async (e) => {
-                                    const val = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                    const updated = aiSpeechService.recalculateFromTeacherOverride(
-                                      aiEvaluation,
-                                      aiEvaluation.wordAnalysis,
-                                      val
-                                    );
-                                    setAiEvaluation(updated);
-                                    if (currentRecordingSaved) {
-                                      await recordingStorageService.updateAiEvaluation(currentRecordingSaved.id, updated);
-                                    }
-                                  }}
-                                  title="Giáo viên có thể gõ sửa trực tiếp điểm số (0 - 100)"
-                                  className="w-16 text-center text-2xl sm:text-3xl font-black text-purple-700 font-mono bg-transparent border-b border-dashed border-purple-300 focus:outline-none focus:border-purple-600"
-                                />
+                                <span className="text-2xl sm:text-3xl font-black text-purple-700 font-mono">
+                                  {aiEvaluation.score}
+                                </span>
                                 <span className="text-xs font-bold text-slate-400">/100</span>
                               </div>
                             </div>
-
-                            {aiEvaluation.score < 100 && (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  const allCorrectWords = aiEvaluation.wordAnalysis.map((w) => ({
-                                    ...w,
-                                    status: 'correct' as const,
-                                    spokenWord: w.word
-                                  }));
-                                  const updated = aiSpeechService.recalculateFromTeacherOverride(
-                                    aiEvaluation,
-                                    allCorrectWords,
-                                    100
-                                  );
-                                  setAiEvaluation(updated);
-                                  setSelectedWordDetail(null);
-                                  if (currentRecordingSaved) {
-                                    await recordingStorageService.updateAiEvaluation(currentRecordingSaved.id, updated);
-                                  }
-                                }}
-                                className="px-3 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm transition-all cursor-pointer flex items-center gap-1"
-                                title="Giáo viên xác nhận học sinh đã đọc chuẩn tất cả các tiếng (100 điểm)"
-                              >
-                                <Check className="w-4 h-4" />
-                                <span>GV Chấm Đúng Hết (100đ)</span>
-                              </button>
-                            )}
                           </div>
                         </div>
 
@@ -1042,92 +997,14 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                                 )}
                               </div>
 
-                              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                                <div className="flex items-center gap-1 bg-white/90 px-2 py-1 rounded-xl border border-indigo-200">
-                                  <span className="text-[10px] font-bold text-slate-500 mr-1">GV sửa từ:</span>
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      const newWords = aiEvaluation.wordAnalysis.map((w) =>
-                                        w.word === selectedWordDetail.word
-                                          ? { ...w, status: 'correct' as const, spokenWord: w.word }
-                                          : w
-                                      );
-                                      const updated = aiSpeechService.recalculateFromTeacherOverride(aiEvaluation, newWords);
-                                      setAiEvaluation(updated);
-                                      const found = updated.wordAnalysis.find((w) => w.word === selectedWordDetail.word);
-                                      if (found) setSelectedWordDetail(found);
-                                      if (currentRecordingSaved) {
-                                        await recordingStorageService.updateAiEvaluation(currentRecordingSaved.id, updated);
-                                      }
-                                    }}
-                                    className={`px-2 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
-                                      selectedWordDetail.status === 'correct'
-                                        ? 'bg-emerald-600 text-white'
-                                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                    }`}
-                                  >
-                                    ✓ Đúng
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      const newWords = aiEvaluation.wordAnalysis.map((w) =>
-                                        w.word === selectedWordDetail.word
-                                          ? { ...w, status: 'mismatched' as const }
-                                          : w
-                                      );
-                                      const updated = aiSpeechService.recalculateFromTeacherOverride(aiEvaluation, newWords);
-                                      setAiEvaluation(updated);
-                                      const found = updated.wordAnalysis.find((w) => w.word === selectedWordDetail.word);
-                                      if (found) setSelectedWordDetail(found);
-                                      if (currentRecordingSaved) {
-                                        await recordingStorageService.updateAiEvaluation(currentRecordingSaved.id, updated);
-                                      }
-                                    }}
-                                    className={`px-2 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
-                                      selectedWordDetail.status === 'mismatched'
-                                        ? 'bg-rose-600 text-white'
-                                        : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200'
-                                    }`}
-                                  >
-                                    ✗ Sai
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      const newWords = aiEvaluation.wordAnalysis.map((w) =>
-                                        w.word === selectedWordDetail.word
-                                          ? { ...w, status: 'missing' as const }
-                                          : w
-                                      );
-                                      const updated = aiSpeechService.recalculateFromTeacherOverride(aiEvaluation, newWords);
-                                      setAiEvaluation(updated);
-                                      const found = updated.wordAnalysis.find((w) => w.word === selectedWordDetail.word);
-                                      if (found) setSelectedWordDetail(found);
-                                      if (currentRecordingSaved) {
-                                        await recordingStorageService.updateAiEvaluation(currentRecordingSaved.id, updated);
-                                      }
-                                    }}
-                                    className={`px-2 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
-                                      selectedWordDetail.status === 'missing'
-                                        ? 'bg-amber-600 text-white'
-                                        : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
-                                    }`}
-                                  >
-                                    ? Sót
-                                  </button>
-                                </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleSpeakWord(selectedWordDetail.word)}
-                                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
-                                >
-                                  <Volume2 className="w-3.5 h-3.5" />
-                                  <span>Nghe cô phát âm</span>
-                                </button>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleSpeakWord(selectedWordDetail.word)}
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer self-start sm:self-auto"
+                              >
+                                <Volume2 className="w-3.5 h-3.5" />
+                                <span>Nghe cô phát âm</span>
+                              </button>
                             </div>
                           )}
                         </div>

@@ -948,7 +948,12 @@ Chỉ trả về DUY NHẤT một đối tượng JSON hợp lệ theo cấu tr�
   "teacherEncourageNote": "Nhận xét sư phạm ấm áp chuẩn Thông tư 27 dành cho học sinh"
 }`;
 
-      const models = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+      const models = [
+        'gemini-3.5-flash-lite',
+        'gemini-flash-lite-latest',
+        'gemini-3.5-flash',
+        'gemini-flash-latest'
+      ];
       let geminiData: {
         words?: Array<{ word: string; status: 'correct' | 'mismatched' | 'missing'; spokenWord?: string }>;
         spokenTranscript?: string;
