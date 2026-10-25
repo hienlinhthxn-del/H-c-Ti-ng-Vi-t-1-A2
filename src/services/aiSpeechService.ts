@@ -1044,6 +1044,92 @@ Chỉ trả về DUY NHẤT một đối tượng JSON hợp lệ theo cấu tr�
 
     return this.evaluatePronunciation(targetText, fallbackTranscript);
   }
+
+  /**
+   * Cho phép Giáo viên chỉnh sửa trực tiếp kết quả chấm của AI (đổi trạng thái từng từ hoặc sửa điểm số /100)
+   */
+  recalculateFromTeacherOverride(
+    currentEval: AIEvaluationResult,
+    updatedWordAnalysis?: WordMatchResult[],
+    manualScore?: number
+  ): AIEvaluationResult {
+    const wordAnalysis = (updatedWordAnalysis || currentEval.wordAnalysis || []).map((w) => ({ ...w }));
+    const totalWords = Math.max(1, wordAnalysis.length);
+
+    let correctCount = 0;
+    let missingCount = 0;
+    let mismatchedCount = 0;
+    const mistakesList: AIMistakeDetail[] = [];
+
+    for (const item of wordAnalysis) {
+      if (item.status === 'correct') {
+        correctCount++;
+        delete item.errorType;
+        delete item.errorLabel;
+        delete item.phoneticTip;
+      } else if (item.status === 'mismatched') {
+        mismatchedCount++;
+        const spoken = item.spokenWord || 'âm khác';
+        const diag = this.diagnoseWordMistake(item.word, spoken);
+        item.errorType = item.errorType || diag.errorType;
+        item.errorLabel = item.errorLabel || diag.errorLabel;
+        item.phoneticTip = item.phoneticTip || diag.tip;
+        mistakesList.push({
+          word: item.word,
+          spokenWord: item.spokenWord,
+          errorType: item.errorType,
+          errorLabel: item.errorLabel,
+          suggestion: item.phoneticTip
+        });
+      } else {
+        missingCount++;
+        item.errorType = 'missing';
+        item.errorLabel = 'Đọc sót từ';
+        item.phoneticTip = `Bé cần đọc bổ sung tiếng "${item.word}" cho đủ câu.`;
+        mistakesList.push({
+          word: item.word,
+          errorType: 'missing',
+          errorLabel: 'Đọc sót từ',
+          suggestion: item.phoneticTip
+        });
+      }
+    }
+
+    const mistakesCount = mismatchedCount + missingCount;
+    const accuracy = Math.round((correctCount / totalWords) * 100);
+    const weightedPoints = correctCount * 1.0 + mismatchedCount * 0.4;
+    const computedScore = Math.min(100, Math.max(0, Math.round((weightedPoints / totalWords) * 100)));
+    const score = typeof manualScore === 'number' ? Math.min(100, Math.max(0, Math.round(manualScore))) : computedScore;
+
+    let cheeringTitle = '';
+    let detailedFeedback = '';
+    if (score >= 90) {
+      cheeringTitle = '🌟 Xuất sắc! Phát âm chuẩn xác (Cô giáo đã xác nhận)';
+      detailedFeedback = `Cô giáo đánh giá bé đọc rất chuẩn (${correctCount}/${totalWords} tiếng đúng - ${score}/100 điểm). Giọng đọc to, rõ ràng và đáng khen!`;
+    } else if (score >= 75) {
+      cheeringTitle = '👏 Giỏi lắm! Đọc khá tốt (Cô giáo đã điều chỉnh)';
+      detailedFeedback = `Cô giáo ghi nhận bé đọc đúng ${correctCount}/${totalWords} tiếng (${score}/100 điểm). Bé chú ý rèn thêm các từ cô đánh dấu nhé!`;
+    } else if (score >= 50) {
+      cheeringTitle = '💪 Cố gắng lên! Cần rèn thêm (Cô giáo đã chấm lại)';
+      detailedFeedback = `Bé đọc đúng ${correctCount}/${totalWords} tiếng (${score}/100 điểm). Hãy bấm nghe cô đọc mẫu các từ màu đỏ/vàng để luyện lại nhé!`;
+    } else {
+      cheeringTitle = '🌱 Bé hãy luyện đọc lại chậm rãi cùng Cô nhé!';
+      detailedFeedback = `Bài đọc đạt ${score}/100 điểm (${correctCount}/${totalWords} tiếng đúng). Con hãy nghe mẫu từng tiếng và đọc to rõ hơn nhé!`;
+    }
+
+    return {
+      ...currentEval,
+      score,
+      accuracy: typeof manualScore === 'number' && manualScore === 100 ? 100 : accuracy,
+      correctCount,
+      missingCount,
+      mistakesCount,
+      wordAnalysis,
+      mistakesList,
+      cheeringTitle,
+      detailedFeedback
+    };
+  }
 }
 
 export const aiSpeechService = new AISpeechService();

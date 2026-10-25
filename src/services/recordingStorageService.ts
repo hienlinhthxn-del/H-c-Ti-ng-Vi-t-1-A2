@@ -328,11 +328,12 @@ class RecordingStorageService {
     return true;
   }
 
-  // Update teacher review & comment
+  // Update teacher review & comment (and optionally adjusted AI evaluation)
   async updateTeacherReview(
     id: string,
     comment: string,
-    score: number = 5
+    score: number = 5,
+    updatedAiEvaluation?: StudentRecording['aiEvaluation']
   ): Promise<boolean> {
     const reviewedAt = new Date().toISOString();
     const item = this.memoryRecordings.find(r => r.id === id);
@@ -340,12 +341,18 @@ class RecordingStorageService {
       item.teacherComment = comment;
       item.teacherScore = score;
       item.reviewedAt = reviewedAt;
+      if (updatedAiEvaluation) {
+        item.aiEvaluation = updatedAiEvaluation;
+      }
     }
     const cloudItem = this.cloudRecordingsMap.get(id);
     if (cloudItem) {
       cloudItem.teacherComment = comment;
       cloudItem.teacherScore = score;
       cloudItem.reviewedAt = reviewedAt;
+      if (updatedAiEvaluation) {
+        cloudItem.aiEvaluation = updatedAiEvaluation;
+      }
     }
 
     try {
@@ -360,6 +367,9 @@ class RecordingStorageService {
             record.teacherComment = comment;
             record.teacherScore = score;
             record.reviewedAt = reviewedAt;
+            if (updatedAiEvaluation) {
+              record.aiEvaluation = updatedAiEvaluation;
+            }
             const putReq = store.put(record);
             putReq.onsuccess = () => resolve();
             putReq.onerror = () => reject(putReq.error);
@@ -382,6 +392,59 @@ class RecordingStorageService {
       }
     } catch (err) {
       console.warn('Failed to update teacher review in Firebase Cloud:', err);
+    }
+
+    this.notify();
+    return true;
+  }
+
+  // Update AI evaluation directly (e.g. when teacher overrides word status or score)
+  async updateAiEvaluation(
+    id: string,
+    aiEvaluation: StudentRecording['aiEvaluation']
+  ): Promise<boolean> {
+    if (!aiEvaluation) return false;
+    const item = this.memoryRecordings.find(r => r.id === id);
+    if (item) {
+      item.aiEvaluation = aiEvaluation;
+    }
+    const cloudItem = this.cloudRecordingsMap.get(id);
+    if (cloudItem) {
+      cloudItem.aiEvaluation = aiEvaluation;
+    }
+
+    try {
+      const idb = await this.initDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = idb.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const getReq = store.get(id);
+        getReq.onsuccess = () => {
+          const record = getReq.result;
+          if (record) {
+            record.aiEvaluation = aiEvaluation;
+            const putReq = store.put(record);
+            putReq.onsuccess = () => resolve();
+            putReq.onerror = () => reject(putReq.error);
+          } else {
+            resolve();
+          }
+        };
+        getReq.onerror = () => reject(getReq.error);
+      });
+    } catch (err) {
+      console.warn('Failed to update AI evaluation in IndexedDB:', err);
+    }
+
+    try {
+      const targetRec = item || cloudItem;
+      if (targetRec) {
+        const copy = { ...targetRec };
+        delete copy.audioBlobUrl;
+        await setDoc(doc(db, CLOUD_COLLECTION, id), this.sanitizeForFirestore(copy), { merge: true });
+      }
+    } catch (err) {
+      console.warn('Failed to update AI evaluation in Firebase Cloud:', err);
     }
 
     this.notify();

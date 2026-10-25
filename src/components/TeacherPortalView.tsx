@@ -16,6 +16,7 @@ import { ClassAnalyticsView } from './ClassAnalyticsView';
 import { AILessonAssistantModal } from './AILessonAssistantModal';
 import { SendParentFeedbackModal } from './SendParentFeedbackModal';
 import { teacherFeedbackService } from '../services/teacherFeedbackService';
+import { aiSpeechService } from '../services/aiSpeechService';
 import { 
   BookOpen, 
   Mic, 
@@ -1299,30 +1300,86 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                             "{rec.aiEvaluation.detailedFeedback}"
                           </p>
 
-                          {/* Word-by-word Analysis Badges */}
+                          {/* Word-by-word Analysis Badges (Clickable by Teacher to Override) */}
                           {rec.aiEvaluation.wordAnalysis && rec.aiEvaluation.wordAnalysis.length > 0 && (
-                            <div className="space-y-1 pt-1 border-t border-purple-100">
-                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                                Kết quả nhận diện từng từ:
-                              </span>
+                            <div className="space-y-1.5 pt-1.5 border-t border-purple-100">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  Kết quả từng từ (Bấm vào từ để sửa Đúng / Sai / Sót):
+                                </span>
+                                {rec.aiEvaluation.score < 100 && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!rec.aiEvaluation) return;
+                                      const allCorrect = rec.aiEvaluation.wordAnalysis.map((w) => ({
+                                        ...w,
+                                        status: 'correct' as const,
+                                        spokenWord: w.word
+                                      }));
+                                      const updatedEval = aiSpeechService.recalculateFromTeacherOverride(
+                                        rec.aiEvaluation,
+                                        allCorrect,
+                                        100
+                                      );
+                                      await recordingStorageService.updateAiEvaluation(rec.id, updatedEval);
+                                      await refreshRecordings();
+                                      if (selectedRecording?.id === rec.id) {
+                                        const updatedRec = { ...rec, aiEvaluation: updatedEval };
+                                        setSelectedRecording(updatedRec);
+                                        setReviewScore(5);
+                                        setReviewComment(generateAiTeacherComment(updatedRec, studentInfo.name));
+                                      }
+                                      showToast(`Đã chấm 100 điểm (Đọc đúng tất cả các từ) cho ${studentInfo.name}!`);
+                                    }}
+                                    className="px-2.5 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black transition-all cursor-pointer shadow-2xs"
+                                  >
+                                    ✓ Chấm Đúng Hết (100đ)
+                                  </button>
+                                )}
+                              </div>
                               <div className="flex flex-wrap gap-1.5">
                                 {rec.aiEvaluation.wordAnalysis.map((item, wIdx) => (
-                                  <span
+                                  <button
                                     key={wIdx}
-                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!rec.aiEvaluation) return;
+                                      const nextStatus: 'correct' | 'mismatched' | 'missing' =
+                                        item.status === 'correct'
+                                          ? 'mismatched'
+                                          : item.status === 'mismatched'
+                                          ? 'missing'
+                                          : 'correct';
+                                      const updatedWords = rec.aiEvaluation.wordAnalysis.map((w, idx) =>
+                                        idx === wIdx
+                                          ? {
+                                              ...w,
+                                              status: nextStatus,
+                                              spokenWord: nextStatus === 'correct' ? w.word : w.spokenWord
+                                            }
+                                          : w
+                                      );
+                                      const updatedEval = aiSpeechService.recalculateFromTeacherOverride(
+                                        rec.aiEvaluation,
+                                        updatedWords
+                                      );
+                                      await recordingStorageService.updateAiEvaluation(rec.id, updatedEval);
+                                      await refreshRecordings();
+                                      if (selectedRecording?.id === rec.id) {
+                                        const updatedRec = { ...rec, aiEvaluation: updatedEval };
+                                        setSelectedRecording(updatedRec);
+                                        setReviewComment(generateAiTeacherComment(updatedRec, studentInfo.name));
+                                      }
+                                    }}
+                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer active:scale-95 ${
                                       item.status === 'correct'
-                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                        ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300'
                                         : item.status === 'mismatched'
-                                        ? 'bg-rose-100 text-rose-900 border border-rose-300'
-                                        : 'bg-amber-100 text-amber-900 border border-amber-300'
+                                        ? 'bg-rose-100 hover:bg-rose-200 text-rose-900 border border-rose-300'
+                                        : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
                                     }`}
-                                    title={
-                                      item.status === 'correct'
-                                        ? 'Đọc chuẩn'
-                                        : item.status === 'mismatched'
-                                        ? `Đọc thành "${item.spokenWord || ''}" (${item.errorLabel || 'Cần sửa'})`
-                                        : 'Đọc sót'
-                                    }
+                                    title="Bấm để chuyển đổi trạng thái: Đọc đúng (Xanh) ↔ Đọc sai (Đỏ) ↔ Đọc sót (Vàng)"
                                   >
                                     <span>{item.word}</span>
                                     {item.status === 'mismatched' && item.spokenWord && (
@@ -1330,7 +1387,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                                         ({item.spokenWord})
                                       </span>
                                     )}
-                                  </span>
+                                  </button>
                                 ))}
                               </div>
                             </div>
@@ -1454,13 +1511,35 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                       <div className="font-bold text-amber-900">{selectedRecording.lessonTitle}</div>
                       <div className="text-slate-700 italic">"{selectedRecording.targetText}"</div>
                       {selectedRecording.aiEvaluation && (
-                        <div className="pt-1.5 border-t border-amber-200/60 flex items-center justify-between text-[11px]">
-                          <span className="font-bold text-purple-900 flex items-center gap-1">
+                        <div className="pt-2 border-t border-amber-200/60 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                          <div className="flex items-center gap-1.5">
                             <Bot className="w-3.5 h-3.5 text-purple-600" />
-                            <span>AI Chấm: {selectedRecording.aiEvaluation.score}/100đ</span>
-                          </span>
+                            <span className="font-bold text-purple-900">Điểm (/100):</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={selectedRecording.aiEvaluation.score}
+                              onChange={async (e) => {
+                                if (!selectedRecording.aiEvaluation) return;
+                                const newScore = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                const updatedEval = aiSpeechService.recalculateFromTeacherOverride(
+                                  selectedRecording.aiEvaluation,
+                                  selectedRecording.aiEvaluation.wordAnalysis,
+                                  newScore
+                                );
+                                const updatedRec = { ...selectedRecording, aiEvaluation: updatedEval };
+                                setSelectedRecording(updatedRec);
+                                await recordingStorageService.updateAiEvaluation(selectedRecording.id, updatedEval);
+                                await refreshRecordings();
+                              }}
+                              className="w-14 px-1.5 py-0.5 rounded-lg border border-purple-300 bg-white font-black text-purple-800 text-center focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              title="Giáo viên có thể sửa trực tiếp điểm số thang 100 tại đây"
+                            />
+                            <span className="text-slate-500 font-bold">/100đ</span>
+                          </div>
                           <span className="font-semibold text-rose-700">
-                            {selectedRecording.aiEvaluation.mistakesCount ?? selectedRecording.aiEvaluation.wordAnalysis?.filter(w => w.status !== 'correct').length ?? 0} lỗi phát âm
+                            {selectedRecording.aiEvaluation.wordAnalysis?.filter(w => w.status !== 'correct').length ?? 0} lỗi
                           </span>
                         </div>
                       )}
