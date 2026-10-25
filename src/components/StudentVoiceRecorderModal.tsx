@@ -260,8 +260,8 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
           animFrameRef.current = null;
         }
 
-        // AI Speech Evaluation
-        const recognizedSpoken = aiSpeechService.stopListening();
+        // AI Speech Evaluation (đợi 450ms để nhận đủ những tiếng cuối cùng bé vừa đọc trước khi bấm Dừng)
+        const recognizedSpoken = await aiSpeechService.stopListeningWithGrace(450);
         const finalSpoken = recognizedSpoken || liveTranscript;
 
         let evalResult: AIEvaluationResult | undefined = undefined;

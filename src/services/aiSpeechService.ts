@@ -48,6 +48,8 @@ export class AISpeechService {
   private recognition: any = null;
   private isListening: boolean = false;
   private transcript: string = '';
+  private finalizedTranscript: string = '';
+  private alternativeTranscripts: string[][] = [];
 
   constructor() {
     this.initRecognition();
@@ -66,7 +68,7 @@ export class AISpeechService {
         recognition.lang = 'vi-VN';
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
+        recognition.maxAlternatives = 5;
         this.recognition = recognition;
       } catch (err) {
         console.warn('SpeechRecognition initialization error:', err);
@@ -96,16 +98,48 @@ export class AISpeechService {
 
     try {
       this.transcript = '';
+      this.finalizedTranscript = '';
+      this.alternativeTranscripts = [];
       this.isListening = true;
 
       this.recognition.onresult = (event: any) => {
-        let currentTranscript = '';
+        let sessionFinal = '';
+        let sessionInterim = '';
+        const currentAlts: string[][] = [];
+
         for (let i = 0; i < event.results.length; i++) {
-          currentTranscript += event.results[i][0].transcript + ' ';
+          const res = event.results[i];
+          const primaryText = (res[0]?.transcript || '').trim();
+          if (res.isFinal) {
+            sessionFinal += primaryText + ' ';
+          } else {
+            sessionInterim += primaryText + ' ';
+          }
+
+          // Collect all alternative hypotheses for each segment
+          const segAlts: string[] = [];
+          for (let k = 0; k < res.length; k++) {
+            const altText = (res[k]?.transcript || '').trim();
+            if (altText) segAlts.push(altText);
+          }
+          if (segAlts.length > 0) {
+            currentAlts.push(segAlts);
+          }
         }
-        this.transcript = currentTranscript.trim();
+
+        const combined = (this.finalizedTranscript + ' ' + sessionFinal + ' ' + sessionInterim).replace(/\s+/g, ' ').trim();
+        this.transcript = combined;
+        if (currentAlts.length > 0) {
+          this.alternativeTranscripts = currentAlts;
+        }
+
         if (onInterim) {
           onInterim(this.transcript);
+        }
+
+        // Keep track of finalized segments in case recognition auto-restarts on silence
+        if (sessionFinal.trim()) {
+          this._latestSessionFinal = sessionFinal.trim();
         }
       };
 
@@ -117,6 +151,11 @@ export class AISpeechService {
       };
 
       this.recognition.onend = () => {
+        // Stop stream and analyser
+        if (this._latestSessionFinal) {
+          this.finalizedTranscript = (this.finalizedTranscript + ' ' + this._latestSessionFinal).replace(/\s+/g, ' ').trim();
+          this._latestSessionFinal = '';
+        }
         if (this.isListening) {
           try {
             this.recognition.start();
@@ -126,6 +165,7 @@ export class AISpeechService {
         }
       };
 
+      this._latestSessionFinal = '';
       this.recognition.start();
       return true;
     } catch (err: any) {
@@ -133,6 +173,8 @@ export class AISpeechService {
       return false;
     }
   }
+
+  private _latestSessionFinal: string = '';
 
   public stopListening(): string {
     this.isListening = false;
@@ -146,8 +188,139 @@ export class AISpeechService {
     return this.transcript.trim();
   }
 
+  public async stopListeningWithGrace(waitMs: number = 450): Promise<string> {
+    this.isListening = false;
+    if (!this.recognition) {
+      return this.transcript.trim();
+    }
+
+    return new Promise<string>((resolve) => {
+      let resolved = false;
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        resolve(this.transcript.trim());
+      };
+
+      const timeoutId = setTimeout(finish, waitMs);
+
+      const prevOnEnd = this.recognition.onend;
+      this.recognition.onend = (ev: any) => {
+        if (prevOnEnd) {
+          try {
+            prevOnEnd(ev);
+          } catch {}
+        }
+        clearTimeout(timeoutId);
+        // Wait 60ms after onend to ensure onresult has processed
+        setTimeout(finish, 60);
+      };
+
+      try {
+        this.recognition.stop();
+      } catch {
+        clearTimeout(timeoutId);
+        finish();
+      }
+    });
+  }
+
   public getFinalTranscript(): string {
     return this.transcript.trim();
+  }
+
+  // Kiểm tra 2 âm tiết/chữ có tương đương ngữ âm Lớp 1 không
+  // (Ví dụ: Đề bài ghi chữ cái "b" nhưng bé đọc đúng âm "bờ"; hoặc khác cách bỏ dấu oà/òa, uỷ/ủy, i/y)
+  public isPhoneticMatch(targetToken: string, spokenToken: string, allSpokenWords?: string[], spokenIdx?: number): boolean {
+    const t = targetToken.toLowerCase().trim();
+    const s = spokenToken.toLowerCase().trim();
+    if (!t || !s) return false;
+    if (t === s) return true;
+
+    // 1. Chuẩn hóa quy tắc đặt dấu thanh kiểu cũ/mới (oà <-> òa, oé <-> óe, uỷ <-> ủy, uý <-> úy, v.v.)
+    const normalizeTonePlacement = (str: string) =>
+      str
+        .replace(/oà/g, 'òa').replace(/oá/g, 'óa').replace(/oả/g, 'ỏa').replace(/oã/g, 'õa').replace(/oạ/g, 'ọa')
+        .replace(/oè/g, 'òe').replace(/oé/g, 'óe').replace(/oẻ/g, 'ỏe').replace(/oẽ/g, 'õe').replace(/oẹ/g, 'ọe')
+        .replace(/uỳ/g, 'ùy').replace(/uý/g, 'úy').replace(/uỷ/g, 'ủy').replace(/uỹ/g, 'ũy').replace(/uỵ/g, 'ụy');
+
+    if (normalizeTonePlacement(t) === normalizeTonePlacement(s)) return true;
+
+    // 2. Chữ số khi Google STT chuyển âm đọc thành số ("1" <-> "một", "2" <-> "hai"...)
+    const numberMap: Record<string, string> = {
+      '0': 'không', '1': 'một', '2': 'hai', '3': 'ba', '4': 'bốn',
+      '5': 'năm', '6': 'sáu', '7': 'bảy', '8': 'tám', '9': 'chín', '10': 'mười'
+    };
+    if (numberMap[s] === t || numberMap[t] === s) return true;
+
+    // 3. Khi đề bài là chữ cái/âm đầu/dấu thanh Lớp 1 (ví dụ: "b", "c", "đ", "ch", "ă", "â")
+    // Học sinh đọc chuẩn Lớp 1 là "bờ", "cờ", "đờ", "chờ", "á", "ớ" (hoặc tên chữ "bê", "xê"...)
+    const letterSounds: Record<string, string[]> = {
+      'a': ['a'],
+      'ă': ['á', 'ă', 'a'],
+      'â': ['ớ', 'â', 'ơ'],
+      'b': ['bờ', 'bê', 'bơ', 'bà', 'ba'],
+      'c': ['cờ', 'xê', 'cơ', 'ca', 'kờ'],
+      'd': ['dờ', 'dê', 'dơ', 'giờ'],
+      'đ': ['đờ', 'đê', 'đơ'],
+      'e': ['e'],
+      'ê': ['ê'],
+      'g': ['gờ', 'gơ', 'ghờ'],
+      'gh': ['gờ', 'ghờ', 'gơ'],
+      'gi': ['gi', 'di', 'dờ', 'giờ'],
+      'h': ['hờ', 'hát', 'hơ'],
+      'i': ['i', 'y'],
+      'y': ['i', 'y', 'i dài', 'y dài'],
+      'k': ['cờ', 'ca', 'kờ', 'cơ'],
+      'kh': ['khờ', 'khơ', 'kha'],
+      'l': ['lờ', 'lơ', 'ờ lờ'],
+      'm': ['mờ', 'mơ', 'em mờ'],
+      'n': ['nờ', 'nơ', 'en nờ'],
+      'ng': ['ngờ', 'ngơ'],
+      'ngh': ['ngờ', 'nghờ', 'ngơ'],
+      'nh': ['nhờ', 'nhơ'],
+      'o': ['o'],
+      'ô': ['ô'],
+      'ơ': ['ơ'],
+      'p': ['pờ', 'pơ', 'pê', 'bờ'],
+      'ph': ['phờ', 'phơ', 'phở'],
+      'q': ['cu', 'quờ', 'quy', 'quơ'],
+      'qu': ['quờ', 'quơ', 'cu', 'quy'],
+      'r': ['rờ', 'rơ'],
+      's': ['sờ', 'sơ'],
+      't': ['tờ', 'tơ', 'tê'],
+      'th': ['thờ', 'thơ'],
+      'tr': ['trờ', 'trơ'],
+      'u': ['u'],
+      'ư': ['ư'],
+      'v': ['vờ', 'vơ', 'vê'],
+      'x': ['xờ', 'xơ', 'ích xì'],
+      '`': ['huyền', 'dấu'],
+      '´': ['sắc', 'dấu'],
+      '?': ['hỏi', 'dấu'],
+      '~': ['ngã', 'dấu'],
+      '.': ['nặng', 'dấu']
+    };
+
+    if (letterSounds[t] && letterSounds[t].includes(s)) {
+      return true;
+    }
+    // Ngược lại nếu targetText đã biến thành "bờ" nhưng Google STT nghe thành "b" hoặc "bơ"
+    for (const [letter, variants] of Object.entries(letterSounds)) {
+      if (variants[0] === t && (s === letter || variants.includes(s))) {
+        return true;
+      }
+    }
+
+    // 4. Các vần rời (ví dụ: "on", "ôn", "ơn", "an", "ăn", "ân", "en", "ên", "in", "un"...)
+    // Khi bé đọc vần rời một mình, Google STT tiếng Việt đôi khi thêm âm đệm hoặc nghe thành từ đồng âm sát nhất
+    // Chỉ áp dụng khi targetToken là vần (bắt đầu bằng nguyên âm, dài 2-4 ký tự)
+    if (/^[aăâeêioôơuưy][a-zA-Zăâđêôơư]{1,3}$/.test(t) && this.detectTone(t).tone === 'ngang') {
+      // Nếu Google STT nghe đúng vần nhưng thêm dấu nhẹ hoặc nghe thành "vần on"
+      if (this.stripTone(s) === t) return true;
+    }
+
+    return false;
   }
 
   // Chuẩn hóa chuỗi tiếng Việt để so sánh ngữ âm
@@ -401,6 +574,15 @@ export class AISpeechService {
     }
 
     // ALIGNMENT USING DYNAMIC PROGRAMMING (Needleman-Wunsch inspired for Grade 1 words)
+    // Kèm bộ lọc thông minh đối chiếu 5 phương án nhận diện (maxAlternatives = 5) của Google Speech AI
+    // để nếu phương án 1 nghe nhầm từ đơn nhưng phương án 2-5 nghe đúng tiếng trong bài học thì lấy từ chuẩn.
+    const allAltWordsSet = new Set<string>();
+    this.alternativeTranscripts.forEach((segAlts) => {
+      segAlts.forEach((altStr) => {
+        this.normalizeVietnamese(altStr).forEach((w) => allAltWordsSet.add(w));
+      });
+    });
+
     const n = targetWords.length;
     const m = spokenWords.length;
 
@@ -410,35 +592,58 @@ export class AISpeechService {
       Array(m + 1).fill('diag')
     );
 
+    // Penalty nhẹ cho từ đọc sót (up: -0.9) hoặc đọc lặp/thừa (left: -0.7)
+    // để một từ đọc sót hoặc đọc lặp không bao giờ làm lệch hàng các từ đọc đúng phía sau!
     for (let i = 1; i <= n; i++) {
-      dp[i][0] = -i * 1.5;
+      dp[i][0] = -i * 0.9;
       path[i][0] = 'up';
     }
     for (let j = 1; j <= m; j++) {
-      dp[0][j] = -j * 1.2;
+      dp[0][j] = -j * 0.7;
       path[0][j] = 'left';
     }
+
+    const computePairSimilarity = (tw: string, sw: string): { isExactOrPhonetic: boolean; score: number } => {
+      if (this.isPhoneticMatch(tw, sw)) {
+        return { isExactOrPhonetic: true, score: 4.0 };
+      }
+      const twBase = this.stripTone(tw);
+      const swBase = this.stripTone(sw);
+      if (twBase === swBase) {
+        return { isExactOrPhonetic: false, score: 2.2 }; // Cùng chữ gốc, chỉ lệch dấu thanh
+      }
+      const twInit = this.extractInitialConsonant(tw);
+      const swInit = this.extractInitialConsonant(sw);
+      const twFin = this.extractFinalConsonant(tw);
+      const swFin = this.extractFinalConsonant(sw);
+      const twRhyme = twBase.slice(twInit.length);
+      const swRhyme = swBase.slice(swInit.length);
+
+      // Ngọng âm đầu (ví dụ: l/n, tr/ch, s/x, r/d/gi) nhưng cùng vần
+      if (twRhyme && twRhyme === swRhyme) {
+        return { isExactOrPhonetic: false, score: 1.8 };
+      }
+      // Cùng âm đầu và âm cuối (chỉ lệch nguyên âm chính)
+      if (twInit && twInit === swInit && twFin === swFin) {
+        return { isExactOrPhonetic: false, score: 1.4 };
+      }
+      // Cùng âm đầu hoặc cùng âm cuối
+      if ((twInit && twInit === swInit) || (twFin && twFin === swFin && tw.length >= 2)) {
+        return { isExactOrPhonetic: false, score: 0.5 };
+      }
+      // Hai từ hoàn toàn khác nhau: phạt nặng hơn tổng (up + left = -1.6) để tránh ghép bừa làm lệch chuỗi
+      return { isExactOrPhonetic: false, score: -1.5 };
+    };
 
     for (let i = 1; i <= n; i++) {
       for (let j = 1; j <= m; j++) {
         const tw = targetWords[i - 1];
         const sw = spokenWords[j - 1];
+        const sim = computePairSimilarity(tw, sw);
 
-        let matchScore = -2.0;
-        if (tw === sw) {
-          matchScore = 3.0; // exact match
-        } else if (this.stripTone(tw) === this.stripTone(sw)) {
-          matchScore = 1.6; // same base, tone slip
-        } else if (
-          this.extractInitialConsonant(tw) === this.extractInitialConsonant(sw) &&
-          this.extractInitialConsonant(tw) !== ''
-        ) {
-          matchScore = 0.8; // same initial
-        }
-
-        const scoreDiag = dp[i - 1][j - 1] + matchScore;
-        const scoreUp = dp[i - 1][j] - 1.5; // target word missing
-        const scoreLeft = dp[i][j - 1] - 1.2; // spoken extra word
+        const scoreDiag = dp[i - 1][j - 1] + sim.score;
+        const scoreUp = dp[i - 1][j] - 0.9; // target word missing
+        const scoreLeft = dp[i][j - 1] - 0.7; // spoken extra/repeated word
 
         if (scoreDiag >= scoreUp && scoreDiag >= scoreLeft) {
           dp[i][j] = scoreDiag;
@@ -466,18 +671,34 @@ export class AISpeechService {
       if (i > 0 && j > 0 && path[i][j] === 'diag') {
         const tw = targetWords[i - 1];
         const sw = spokenWords[j - 1];
-        if (tw === sw) {
+        if (this.isPhoneticMatch(tw, sw)) {
           alignedTarget.unshift({ word: tw, status: 'correct', spokenWord: sw });
+        } else if (
+          allAltWordsSet.has(tw) &&
+          (this.stripTone(tw) === this.stripTone(sw) ||
+            this.extractInitialConsonant(tw) === this.extractInitialConsonant(sw))
+        ) {
+          // Phương án dự phòng của Google Speech AI xác nhận bé có phát âm đúng từ này
+          alignedTarget.unshift({ word: tw, status: 'correct', spokenWord: tw });
         } else {
           alignedTarget.unshift({ word: tw, status: 'mismatched', spokenWord: sw });
         }
         i--;
         j--;
       } else if (i > 0 && (j === 0 || path[i][j] === 'up')) {
-        alignedTarget.unshift({
-          word: targetWords[i - 1],
-          status: 'missing'
-        });
+        const tw = targetWords[i - 1];
+        // Kiểm tra xem có phải từ gần kề trong spokenWords hoặc trong alternativeTranscripts bị tách/ghép lệch không
+        const nearbySpoken = spokenWords.find(
+          (sw, idx) => Math.abs(idx - j) <= 1 && this.isPhoneticMatch(tw, sw)
+        );
+        if (nearbySpoken) {
+          alignedTarget.unshift({ word: tw, status: 'correct', spokenWord: nearbySpoken });
+        } else {
+          alignedTarget.unshift({
+            word: tw,
+            status: 'missing'
+          });
+        }
         i--;
       } else {
         // Extra spoken word by student, skip in backtrack
@@ -550,12 +771,19 @@ export class AISpeechService {
 
     const totalMistakes = mismatchedCount + missingCount;
 
-    if (accuracy >= 85 || totalMistakes === 0) {
+    if (totalMistakes === 0) {
       rating = 'excellent';
-      cheeringTitle = '🌟 Xuất Sắc! Phát Âm Rất Chuẩn';
+      cheeringTitle = '🌟 Xuất Sắc! Phát Âm Chuẩn 100%';
       detailedFeedback =
-        'Bé phát âm rất chuẩn xác, tròn vành rõ chữ, giọng đọc lưu loát và đúng theo chuẩn SGK Tiếng Việt 1.';
+        'Bé phát âm rất chuẩn xác tất cả các tiếng trong bài, tròn vành rõ chữ, giọng đọc lưu loát và đúng chuẩn SGK Tiếng Việt 1.';
       phoneticTips.push('Bé hãy giữ vững phong độ này khi đọc bài cùng Cô giáo trên lớp nhé!');
+    } else if (accuracy >= 85) {
+      rating = 'excellent';
+      const mistakeSummary = mistakesList.map(m => m.errorType === 'missing' ? `sót tiếng "${m.word}"` : `tiếng "${m.word}" đọc thành "${m.spokenWord || ''}"`).join(', ');
+      cheeringTitle = `🌟 Rất Giỏi! Đạt ${score} Điểm`;
+      detailedFeedback =
+        `Bé đọc rất tốt (${correctCount}/${targetWords.length} tiếng đúng chuẩn). Chỉ còn ${totalMistakes} chỗ cần lưu ý nhỏ: ${mistakeSummary}. Bé bấm vào từ màu đỏ bên dưới để nghe mẫu và đọc lại cho thật hoàn hảo nhé!`;
+      phoneticTips.push('Bé hãy bấm vào từ màu đỏ/cam bên dưới để nghe cô đọc mẫu nhé.');
     } else if (accuracy >= 70) {
       rating = 'great';
       cheeringTitle = `👏 Khá Tốt! Đạt ${score} Điểm`;
