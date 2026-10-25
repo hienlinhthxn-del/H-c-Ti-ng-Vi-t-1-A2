@@ -717,7 +717,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 space-y-3">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 border-b border-amber-100 pb-3">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-amber-950 font-serif text-sm">CÙNG EM HỌC TIẾNG VIỆT - AI</span>
+              <span className="font-bold text-amber-950 font-serif text-sm">HỌC TIẾNG VIỆT CÙNG AI</span>
               <span>•</span>
               <span className="text-slate-700 font-medium">Bộ sách Kết nối tri thức với cuộc sống (NXB Giáo dục Việt Nam)</span>
             </div>

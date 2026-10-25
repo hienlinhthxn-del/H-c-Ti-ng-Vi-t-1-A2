@@ -14,7 +14,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectRole }) => {
           <BookOpen className="w-12 h-12 sm:w-16 sm:h-16" />
         </div>
         <h1 className="text-3xl sm:text-5xl font-extrabold bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 bg-clip-text text-transparent font-serif mb-3">
-          CÙNG EM HỌC TIẾNG VIỆT - AI
+          HỌC TIẾNG VIỆT CÙNG AI
         </h1>
         <p className="text-amber-800 text-lg font-medium">Bạn muốn vào trang của ai?</p>
       </div>
