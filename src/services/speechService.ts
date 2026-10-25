@@ -355,6 +355,73 @@ export function convertToPhoneticVietnamese(text: string, context?: string): str
     }
   }
 
+  // 5. Space-separated or hyphen-separated writing samples / letters / rhymes
+  // e.g. "a ă â b c d đ", "ch gh gi kh nh ng", "on ôn ơn con chồn sơn ca"
+  const words = clean.split(/\s+/);
+  const hasIsolatedLetterToken = words.some(w => {
+    const wClean = w.replace(/[.,;!?-]/g, '').toLowerCase();
+    return Boolean(VIETNAMESE_PHONETIC_CONSONANTS[wClean] || VIETNAMESE_PHONETIC_VOWELS[wClean]);
+  });
+
+  if (hasIsolatedLetterToken || context === 'writing') {
+    // Check if the entire string is a list of isolated letters/consonants (like "a ă â b c d đ" or "ch gh gi kh nh ng")
+    const allIsolatedSounds = words.every(w => {
+      const wClean = w.replace(/[.,;!?-]/g, '').toLowerCase();
+      return !wClean || Boolean(VIETNAMESE_PHONETIC_CONSONANTS[wClean] || VIETNAMESE_PHONETIC_VOWELS[wClean]);
+    });
+
+    if (allIsolatedSounds) {
+      return words
+        .map(w => {
+          const wClean = w.replace(/[.,;!?-]/g, '');
+          return getPhoneticSound(wClean);
+        })
+        .filter(Boolean)
+        .join(', ');
+    }
+
+    // Mixed writing sample (e.g. "b, ba, bà", "c, cá, cà", "on, ôn, ơn, con chồn, sơn ca")
+    // Convert any standalone consonant/vowel token (b -> bờ, c -> cờ, ă -> á, â -> ớ)
+    // and insert short pauses between standalone rhymes and multi-syllable words
+    if (clean.includes(',')) {
+      const groups = clean.split(',').map(g => g.trim()).filter(Boolean);
+      return groups
+        .map(g => {
+          const gLower = g.toLowerCase();
+          if (VIETNAMESE_PHONETIC_CONSONANTS[gLower] || VIETNAMESE_PHONETIC_VOWELS[gLower]) {
+            return getPhoneticSound(g);
+          }
+          return g
+            .split(/\s+/)
+            .map(w => {
+              const wLower = w.toLowerCase();
+              return VIETNAMESE_PHONETIC_CONSONANTS[wLower] || VIETNAMESE_PHONETIC_VOWELS[wLower]
+                ? getPhoneticSound(w)
+                : w;
+            })
+            .join(' ');
+        })
+        .join(', ');
+    }
+
+    // If it's a full sentence (starts with uppercase letter and has >= 4 words, or ends with punctuation), keep natural sentence flow
+    const isSentence = /^[A-ZĂÂĐÊÔƠƯ]/.test(clean) && (words.length >= 4 || /[.!?]$/.test(clean));
+    if (isSentence) {
+      return clean;
+    }
+
+    return words
+      .map(w => {
+        const wClean = w.replace(/[.,;!?-]/g, '');
+        const wLower = wClean.toLowerCase();
+        if (VIETNAMESE_PHONETIC_CONSONANTS[wLower] || VIETNAMESE_PHONETIC_VOWELS[wLower]) {
+          return getPhoneticSound(wClean);
+        }
+        return w;
+      })
+      .join(', ');
+  }
+
   // Otherwise keep normal text / full sentences intact
   return clean;
 }

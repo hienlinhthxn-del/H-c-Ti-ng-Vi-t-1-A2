@@ -1025,14 +1025,19 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 </button>
                 <div className="flex flex-wrap gap-2">
                   {lesson.part3_SentenceAndPractice.writingSamples.map((w, i) => (
-                    <span key={i} className="px-3.5 py-1 bg-white font-handwriting text-2xl sm:text-3xl font-bold text-purple-900 rounded-lg border border-purple-200 shadow-2xs">
+                    <span
+                      key={i}
+                      onClick={() => speechService.speak(w, undefined, 0.75, 'writing', lesson.id)}
+                      title="Bấm để nghe đọc mẫu chữ tập viết"
+                      className="px-3.5 py-1 bg-white hover:bg-purple-100 font-handwriting text-2xl sm:text-3xl font-bold text-purple-900 rounded-lg border border-purple-200 shadow-2xs cursor-pointer transition-colors"
+                    >
                       {w}
                     </span>
                   ))}
                 </div>
               </div>
               <button
-                onClick={() => onOpenWritingPractice(lesson.part3_SentenceAndPractice.writingSamples!.join(' '))}
+                onClick={() => onOpenWritingPractice(lesson.part3_SentenceAndPractice.writingSamples!.join(', '))}
                 className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <span>Mở Vở Ô Ly</span>

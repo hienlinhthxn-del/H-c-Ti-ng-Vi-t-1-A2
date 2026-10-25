@@ -25,13 +25,13 @@ export const WritingBoard: React.FC<WritingBoardProps> = ({
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 960, height: 480 });
 
   const presets = [
-    { title: 'Chữ cái a b c', text: 'a ă â b c d đ' },
-    { title: 'Chữ e ê g h', text: 'e ê g h i k l' },
-    { title: 'Chữ m n o ô ơ', text: 'm n o ô ơ p q' },
-    { title: 'Chữ r s t u ư', text: 'r s t u ư v x y' },
-    { title: 'Âm ghép ch th ph', text: 'ch gh gi kh nh ng' },
-    { title: 'Từ ngữ: ba bà bố mẹ', text: 'ba bà bố mẹ bé' },
-    { title: 'Từ ngữ: hoa đào, quả na', text: 'hoa đào quả na' },
+    { title: 'Chữ cái a b c', text: 'a, ă, â, b, c, d, đ' },
+    { title: 'Chữ e ê g h', text: 'e, ê, g, h, i, k, l' },
+    { title: 'Chữ m n o ô ơ', text: 'm, n, o, ô, ơ, p, q' },
+    { title: 'Chữ r s t u ư', text: 'r, s, t, u, ư, v, x, y' },
+    { title: 'Âm ghép ch th ph', text: 'ch, gh, gi, kh, nh, ng' },
+    { title: 'Từ ngữ: ba bà bố mẹ', text: 'ba, bà, bố, mẹ, bé' },
+    { title: 'Từ ngữ: hoa đào, quả na', text: 'hoa đào, quả na' },
     { title: 'Môi trường: Trồng cây xanh', text: 'Trồng cây gây rừng xanh' },
     { title: 'Môi trường: Giữ nước sạch', text: 'Giữ sạch nguồn nước mát' },
     { title: 'Thiên nhiên: Rừng hoa ban', text: 'Rừng xanh hoa ban nở trắng' },
@@ -202,7 +202,7 @@ export const WritingBoard: React.FC<WritingBoardProps> = ({
   const handleSelectPreset = (idx: number) => {
     setPresetIndex(idx);
     setSampleText(presets[idx].text);
-    speechService.speak(presets[idx].text);
+    speechService.speak(presets[idx].text, undefined, 0.75, 'writing');
   };
 
   const handleFinish = () => {
@@ -245,7 +245,7 @@ export const WritingBoard: React.FC<WritingBoardProps> = ({
         <div className="flex items-center gap-2 flex-wrap">
           <button
             id="speak-sample-text-btn"
-            onClick={() => speechService.speak(sampleText)}
+            onClick={() => speechService.speak(sampleText, undefined, 0.75, 'writing')}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl font-bold text-xs transition-colors cursor-pointer"
           >
             <Volume2 className="w-4 h-4 text-amber-700" />
@@ -421,13 +421,13 @@ export const WritingBoard: React.FC<WritingBoardProps> = ({
             style={{ letterSpacing: '0.08em' }}
           >
             <div className="text-4xl sm:text-6xl font-bold leading-relaxed border-b-2 border-dashed border-purple-300 pb-1 sm:pb-2 truncate">
-              {sampleText}
+              {sampleText.replace(/,\s*/g, '   ')}
             </div>
             <div className="text-4xl sm:text-6xl font-bold leading-relaxed border-b-2 border-dashed border-purple-300 pb-1 sm:pb-2 truncate">
-              {sampleText}
+              {sampleText.replace(/,\s*/g, '   ')}
             </div>
             <div className="text-4xl sm:text-6xl font-bold leading-relaxed truncate">
-              {sampleText}
+              {sampleText.replace(/,\s*/g, '   ')}
             </div>
           </div>
         )}

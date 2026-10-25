@@ -61,7 +61,7 @@ export default function App() {
   const [selectedVol1Lesson, setSelectedVol1Lesson] = useState<Volume1Lesson | null>(null);
   const [selectedVol2Lesson, setSelectedVol2Lesson] = useState<Volume2Lesson | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [writingSampleText, setWritingSampleText] = useState<string>('a ă â b c d đ');
+  const [writingSampleText, setWritingSampleText] = useState<string>('a, ă, â, b, c, d, đ');
   const [starsCount, setStarsCount] = useState<number>(() => {
     const saved = localStorage.getItem('tv1_stars');
     return saved ? parseInt(saved, 10) : 5;
