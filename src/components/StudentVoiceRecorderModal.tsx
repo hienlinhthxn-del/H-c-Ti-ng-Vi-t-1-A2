@@ -625,20 +625,14 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                         {/* SGK Block Models */}
                         <div className="flex flex-wrap items-end justify-center gap-5 sm:gap-8">
                           {targetInfo.syllableModels.map((model, idx) => {
-                            const toneSymbol = getToneSymbol(model.tone);
                             const normLetters = (targetInfo.lessonLetters || []).map(l => l.toLowerCase().trim());
                             const initialIsHighlight = normLetters.includes((model.initial || '').toLowerCase().trim());
                             const vowelIsHighlight = normLetters.includes((model.vowel || '').toLowerCase().trim());
 
                             return (
                               <div key={idx} className="flex flex-col items-center">
-                                {/* Dấu thanh ở trên nếu có (e.g. dấu huyền ` màu đỏ như SGK) */}
-                                <div className="h-6 sm:h-7 flex items-center justify-center text-xl sm:text-2xl font-bold font-sgk text-[#e11d48]">
-                                  {toneSymbol || '\u00A0'}
-                                </div>
-
                                 {/* Khối mô hình 2 tầng chuẩn SGK (nền xanh ngọc nhạt #daf0ee) */}
-                                <div className="w-28 sm:w-32 md:w-36 bg-[#daf0ee] rounded-md p-0.5 shadow-2xs border border-[#bce3de]">
+                                <div className="w-28 sm:w-32 md:w-36 bg-white rounded-md p-[2px] shadow-2xs border border-[#bce3de]">
                                   {/* Hàng 1: 2 ô (Âm đầu | Âm chính / Vần) */}
                                   <div className="grid grid-cols-2 gap-[2px]">
                                     <div className="h-10 sm:h-11 bg-[#daf0ee] flex items-center justify-center text-lg sm:text-xl font-sgk font-bold">

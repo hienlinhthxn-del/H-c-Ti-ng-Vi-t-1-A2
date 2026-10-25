@@ -49,9 +49,9 @@ export const renderResultColored = (model: SyllableModel, lessonLetters: string[
 
   const vowel = (model.vowel || '').trim();
   const vowelIsNew = normLetters.includes(vowel.toLowerCase());
-  if (vowel && vowelIsNew && res.toLowerCase().endsWith(vowel.toLowerCase())) {
-    const initPart = res.slice(0, res.length - vowel.length);
-    const vowelPart = res.slice(res.length - vowel.length);
+  if (vowel && vowelIsNew && init && res.toLowerCase().startsWith(init.toLowerCase())) {
+    const initPart = res.slice(0, init.length);
+    const vowelPart = res.slice(init.length);
     return (
       <span className="font-sgk font-bold">
         <span className="text-slate-900">{initPart}</span>
@@ -635,7 +635,6 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 <div className="flex flex-wrap items-end justify-center gap-6 sm:gap-10 py-3 bg-gradient-to-b from-orange-50/40 via-amber-50/20 to-transparent rounded-2xl border border-orange-100/80 p-4 sm:p-5">
                   {lesson.part2_SyllablesAndWords.models.map((model, idx) => {
                     const hasTeacherAudio = teacherAudioService.hasAudioForText(model.result, 'syllable', lesson.id);
-                    const toneSymbol = getToneSymbol(model.tone);
                     const normLetters = (lesson.part1_Letters?.letters || []).map(l => l.toLowerCase().trim());
                     const initialIsHighlight = normLetters.includes((model.initial || '').toLowerCase().trim());
                     const vowelIsHighlight = normLetters.includes((model.vowel || '').toLowerCase().trim());
@@ -675,13 +674,8 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                           </button>
                         )}
 
-                        {/* Dấu thanh ở trên nếu có (e.g. dấu huyền ` màu đỏ như SGK) */}
-                        <div className="h-7 sm:h-8 flex items-center justify-center text-2xl sm:text-3xl font-bold font-sgk text-[#e11d48]">
-                          {toneSymbol || '\u00A0'}
-                        </div>
-
                         {/* Khối mô hình 2 tầng chuẩn SGK (nền xanh ngọc nhạt #daf0ee) */}
-                        <div className="w-32 sm:w-36 md:w-40 bg-[#daf0ee] rounded-md p-0.5 shadow-2xs border border-[#bce3de]">
+                        <div className="w-32 sm:w-36 md:w-40 bg-white rounded-md p-[2px] shadow-2xs border border-[#bce3de]">
                           {/* Hàng 1: 2 ô (Âm đầu | Âm chính / Vần) */}
                           <div className="grid grid-cols-2 gap-[2px]">
                             <div className="h-11 sm:h-12 bg-[#daf0ee] flex items-center justify-center text-xl sm:text-2xl font-sgk font-bold">
