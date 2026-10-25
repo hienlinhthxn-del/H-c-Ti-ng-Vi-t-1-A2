@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordingTargetInfo, StudentRecording, AchievementBadge } from '../types';
 import { speechService, getToneSymbol } from '../services/speechService';
-import { renderResultColored } from './Volume1LessonView';
+import { renderResultColored, normalizeSyllableModelDisplay } from './Volume1LessonView';
 import { recordingStorageService } from '../services/recordingStorageService';
 import { achievementService } from '../services/achievementService';
 import { userProfileService } from '../services/userProfileService';
@@ -625,9 +625,10 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                         {/* SGK Block Models */}
                         <div className="flex flex-wrap items-end justify-center gap-5 sm:gap-8">
                           {targetInfo.syllableModels.map((model, idx) => {
+                            const normModel = normalizeSyllableModelDisplay(model);
                             const normLetters = (targetInfo.lessonLetters || []).map(l => l.toLowerCase().trim());
-                            const initialIsHighlight = normLetters.includes((model.initial || '').toLowerCase().trim());
-                            const vowelIsHighlight = normLetters.includes((model.vowel || '').toLowerCase().trim());
+                            const initialIsHighlight = normLetters.includes(normModel.initial.toLowerCase());
+                            const vowelIsHighlight = normLetters.includes(normModel.vowel.toLowerCase()) || (!initialIsHighlight && Boolean(normModel.vowel));
 
                             return (
                               <div key={idx} className="flex flex-col items-center">
@@ -637,12 +638,12 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
                                   <div className="grid grid-cols-2 gap-[2px]">
                                     <div className="h-10 sm:h-11 bg-[#daf0ee] flex items-center justify-center text-lg sm:text-xl font-sgk font-bold">
                                       <span className={initialIsHighlight ? 'text-[#e11d48]' : 'text-slate-900'}>
-                                        {model.initial || '—'}
+                                        {normModel.initial || '—'}
                                       </span>
                                     </div>
                                     <div className="h-10 sm:h-11 bg-[#daf0ee] flex items-center justify-center text-lg sm:text-xl font-sgk font-bold">
                                       <span className={vowelIsHighlight ? 'text-[#e11d48]' : 'text-slate-900'}>
-                                        {model.vowel}
+                                        {normModel.vowel}
                                       </span>
                                     </div>
                                   </div>

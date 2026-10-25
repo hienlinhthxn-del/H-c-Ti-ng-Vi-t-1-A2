@@ -30,11 +30,58 @@ import {
   HelpCircle
 } from 'lucide-react';
 
+export const normalizeSyllableModelDisplay = (model: SyllableModel): { initial: string; vowel: string; result: string } => {
+  let rawInit = (model.initial || '').trim();
+  const res = (model.result || '').replace(/\s*\([^)]*\)/g, '').trim();
+
+  // Reverse phonetic consonant names back to single/compound letters (e.g. "mờ" -> "m", "bờ" -> "b", "chờ" -> "ch")
+  const phoneticReverse: Record<string, string> = {
+    'bờ': 'b', 'cờ': 'c', 'ca': 'k', 'dờ': 'd', 'đờ': 'đ', 'gờ': 'g', 'gờ ghép': 'gh',
+    'hờ': 'h', 'lờ': 'l', 'mờ': 'm', 'nờ': 'n', 'pờ': 'p', 'cu': 'q', 'quờ': 'qu',
+    'rờ': 'r', 'sờ': 's', 'tờ': 't', 'vờ': 'v', 'xờ': 'x',
+    'chờ': 'ch', 'khờ': 'kh', 'nhờ': 'nh', 'ngờ': 'ng', 'ngờ ghép': 'ngh',
+    'phờ': 'ph', 'thờ': 'th', 'trờ': 'tr'
+  };
+  if (phoneticReverse[rawInit.toLowerCase()]) {
+    rawInit = phoneticReverse[rawInit.toLowerCase()];
+  } else if (rawInit && res && !res.toLowerCase().startsWith(rawInit.toLowerCase())) {
+    // Extract actual initial consonant from result if initial was typed as phonetic sound
+    const initials = [
+      'ngh', 'ng', 'gh', 'ch', 'tr', 'nh', 'th', 'ph', 'kh', 'gi', 'qu',
+      'b', 'c', 'd', 'đ', 'g', 'h', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'x'
+    ];
+    for (const cand of initials) {
+      if (res.toLowerCase().startsWith(cand)) {
+        rawInit = cand;
+        break;
+      }
+    }
+  }
+
+  let rawVowel = (model.vowel || '').trim();
+  // If vowel accidentally contains multiple tokens like "ua mua" or "ua - mua", keep only the rhyme token
+  if (rawVowel.includes(' ') || rawVowel.includes('\n') || rawVowel.includes('-')) {
+    const parts = rawVowel.split(/[\s\-]+/).map(p => p.trim()).filter(Boolean);
+    if (parts.length > 0) {
+      rawVowel = parts[0];
+    }
+  }
+
+  return {
+    initial: rawInit,
+    vowel: rawVowel,
+    result: model.result || ''
+  };
+};
+
 export const renderResultColored = (model: SyllableModel, lessonLetters: string[] = []) => {
+  const normModel = normalizeSyllableModelDisplay(model);
   const normLetters = lessonLetters.map(l => l.toLowerCase().trim());
-  const init = (model.initial || '').trim();
+  const init = normModel.initial;
   const initIsNew = normLetters.includes(init.toLowerCase());
-  const res = model.result || '';
+  const res = normModel.result;
+  const vowel = normModel.vowel;
+  const vowelIsNew = normLetters.includes(vowel.toLowerCase()) || (!initIsNew && Boolean(vowel));
 
   if (init && initIsNew && res.toLowerCase().startsWith(init.toLowerCase())) {
     const initPart = res.slice(0, init.length);
@@ -47,8 +94,6 @@ export const renderResultColored = (model: SyllableModel, lessonLetters: string[
     );
   }
 
-  const vowel = (model.vowel || '').trim();
-  const vowelIsNew = normLetters.includes(vowel.toLowerCase());
   if (vowel && vowelIsNew && init && res.toLowerCase().startsWith(init.toLowerCase())) {
     const initPart = res.slice(0, init.length);
     const vowelPart = res.slice(init.length);
@@ -635,10 +680,11 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                 <div className="flex flex-wrap items-end justify-center gap-6 sm:gap-10 py-3 bg-gradient-to-b from-orange-50/40 via-amber-50/20 to-transparent rounded-2xl border border-orange-100/80 p-4 sm:p-5">
                   {lesson.part2_SyllablesAndWords.models.map((model, idx) => {
                     const hasTeacherAudio = teacherAudioService.hasAudioForText(model.result, 'syllable', lesson.id);
+                    const normModel = normalizeSyllableModelDisplay(model);
                     const normLetters = (lesson.part1_Letters?.letters || []).map(l => l.toLowerCase().trim());
-                    const initialIsHighlight = normLetters.includes((model.initial || '').toLowerCase().trim());
-                    const vowelIsHighlight = normLetters.includes((model.vowel || '').toLowerCase().trim());
-                    const steps = generateSpellingSteps(model);
+                    const initialIsHighlight = normLetters.includes(normModel.initial.toLowerCase());
+                    const vowelIsHighlight = normLetters.includes(normModel.vowel.toLowerCase()) || (!initialIsHighlight && Boolean(normModel.vowel));
+                    const steps = generateSpellingSteps({ ...model, initial: normModel.initial, vowel: normModel.vowel });
 
                     return (
                       <div
@@ -680,12 +726,12 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                           <div className="grid grid-cols-2 gap-[2px]">
                             <div className="h-11 sm:h-12 bg-[#daf0ee] flex items-center justify-center text-xl sm:text-2xl font-sgk font-bold">
                               <span className={initialIsHighlight ? 'text-[#e11d48]' : 'text-slate-900'}>
-                                {model.initial || '—'}
+                                {normModel.initial || '—'}
                               </span>
                             </div>
                             <div className="h-11 sm:h-12 bg-[#daf0ee] flex items-center justify-center text-xl sm:text-2xl font-sgk font-bold">
                               <span className={vowelIsHighlight ? 'text-[#e11d48]' : 'text-slate-900'}>
-                                {model.vowel}
+                                {normModel.vowel}
                               </span>
                             </div>
                           </div>

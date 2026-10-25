@@ -44,7 +44,33 @@ class LessonStorageService {
     if (typeof window === 'undefined') return {};
     try {
       const data = localStorage.getItem(VOL1_STORAGE_KEY);
-      return data ? JSON.parse(data) : {};
+      if (!data) return {};
+      const parsed: Record<number, Volume1Lesson> = JSON.parse(data);
+      // Clean up any accidentally malformed syllable models (e.g. initial="mờ" -> "m", vowel="ua mua" -> "ua")
+      const phoneticReverse: Record<string, string> = {
+        'bờ': 'b', 'cờ': 'c', 'ca': 'k', 'dờ': 'd', 'đờ': 'đ', 'gờ': 'g', 'gờ ghép': 'gh',
+        'hờ': 'h', 'lờ': 'l', 'mờ': 'm', 'nờ': 'n', 'pờ': 'p', 'cu': 'q', 'quờ': 'qu',
+        'rờ': 'r', 'sờ': 's', 'tờ': 't', 'vờ': 'v', 'xờ': 'x',
+        'chờ': 'ch', 'khờ': 'kh', 'nhờ': 'nh', 'ngờ': 'ng', 'ngờ ghép': 'ngh',
+        'phờ': 'ph', 'thờ': 'th', 'trờ': 'tr'
+      };
+      Object.values(parsed).forEach(lesson => {
+        if (lesson?.part2_SyllablesAndWords?.models) {
+          lesson.part2_SyllablesAndWords.models = lesson.part2_SyllablesAndWords.models.map(m => {
+            let init = (m.initial || '').trim();
+            if (phoneticReverse[init.toLowerCase()]) {
+              init = phoneticReverse[init.toLowerCase()];
+            }
+            let vow = (m.vowel || '').trim();
+            if (vow.includes(' ') || vow.includes('\n') || vow.includes('-')) {
+              const parts = vow.split(/[\s\-]+/).map(p => p.trim()).filter(Boolean);
+              if (parts.length > 0) vow = parts[0];
+            }
+            return { ...m, initial: init, vowel: vow };
+          });
+        }
+      });
+      return parsed;
     } catch (e) {
       console.error('Failed to parse custom vol1 lessons from localStorage', e);
       return {};
