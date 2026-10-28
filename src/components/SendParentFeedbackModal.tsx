@@ -181,12 +181,16 @@ export const SendParentFeedbackModal: React.FC<SendParentFeedbackModalProps> = (
         recordingId
       });
 
-      speechService.playSoundEffect('fanfare');
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.6 }
-      });
+      try {
+        speechService.playSoundEffect('fanfare');
+        if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+          confetti({
+            particleCount: 40,
+            spread: 60,
+            origin: { y: 0.6 }
+          });
+        }
+      } catch {}
 
       if (onSuccess) onSuccess();
       onClose();
@@ -198,8 +202,8 @@ export const SendParentFeedbackModal: React.FC<SendParentFeedbackModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-amber-100 animate-in fade-in zoom-in-95 duration-150 my-6">
+    <div className="fixed inset-0 z-50 bg-slate-900/75 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-xl w-full p-5 sm:p-8 shadow-2xl border border-amber-100 max-h-[92vh] overflow-y-auto my-auto">
         
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-amber-100">

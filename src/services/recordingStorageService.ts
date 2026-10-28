@@ -11,6 +11,8 @@ class RecordingStorageService {
   private dbPromise: Promise<IDBDatabase> | null = null;
   private memoryRecordings: StudentRecording[] = [];
   private cloudRecordingsMap: Map<string, StudentRecording> = new Map();
+  private blobUrlCache: Map<string, string> = new Map();
+  private hasHydratedIDB: boolean = false;
   private listeners: (() => void)[] = [];
 
   constructor() {
@@ -225,6 +227,11 @@ class RecordingStorageService {
 
   // Fetch all recordings
   async getAllRecordings(): Promise<StudentRecording[]> {
+    if (this.hasHydratedIDB && this.memoryRecordings.length > 0) {
+      this.mergeCloudIntoMemory();
+      return [...this.memoryRecordings];
+    }
+
     try {
       const idb = await this.initDB();
       const items = await new Promise<any[]>((resolve, reject) => {
@@ -235,12 +242,13 @@ class RecordingStorageService {
         req.onerror = () => reject(req.error);
       });
 
-      // Map back to StudentRecording with object URLs
+      // Map back to StudentRecording with cached object URLs (prevents iOS WebKit memory leak)
       const localResults: StudentRecording[] = items.map(item => {
-        let audioBlobUrl = item.audioBlobUrl;
-        if (item.audioBlob instanceof Blob) {
+        let audioBlobUrl = this.blobUrlCache.get(item.id) || item.audioBlobUrl;
+        if (!this.blobUrlCache.has(item.id) && item.audioBlob instanceof Blob) {
           audioBlobUrl = URL.createObjectURL(item.audioBlob);
-        } else if (item.audioBase64) {
+          this.blobUrlCache.set(item.id, audioBlobUrl);
+        } else if (!audioBlobUrl && item.audioBase64) {
           audioBlobUrl = item.audioBase64;
         }
         return {
@@ -267,6 +275,8 @@ class RecordingStorageService {
         };
       });
 
+      this.hasHydratedIDB = true;
+
       // Merge local IndexedDB recordings and Cloud Firestore recordings
       const mergedMap = new Map<string, StudentRecording>();
       localResults.forEach((r) => mergedMap.set(r.id, r));
@@ -286,11 +296,11 @@ class RecordingStorageService {
       const results = Array.from(mergedMap.values());
       results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       this.memoryRecordings = results;
-      return results;
+      return [...results];
     } catch (err) {
       console.warn('Failed to get recordings from IndexedDB, returning memory:', err);
       this.mergeCloudIntoMemory();
-      return this.memoryRecordings;
+      return [...this.memoryRecordings];
     }
   }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Volume1Lesson, 
   Volume2Lesson, 
@@ -26,6 +26,7 @@ import {
   Search, 
   RotateCcw, 
   Play, 
+  Pause,
   Square, 
   Trash2, 
   Download, 
@@ -49,7 +50,8 @@ import {
   FileSpreadsheet,
   Bot,
   Send,
-  AlertTriangle
+  AlertTriangle,
+  X
 } from 'lucide-react';
 
 interface TeacherPortalViewProps {
@@ -96,6 +98,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   const [recordings, setRecordings] = useState<StudentRecording[]>([]);
   const [loadingRecordings, setLoadingRecordings] = useState<boolean>(true);
   const [selectedRecording, setSelectedRecording] = useState<StudentRecording | null>(null);
+  const [isMobileReviewOpen, setIsMobileReviewOpen] = useState<boolean>(false);
   const [reviewComment, setReviewComment] = useState<string>('');
   const [reviewScore, setReviewScore] = useState<number>(5);
   const [savingReview, setSavingReview] = useState<boolean>(false);
@@ -105,10 +108,53 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   const [feedbackTargetStudent, setFeedbackTargetStudent] = useState<{ id: string; name: string; studentCode?: string } | null>(null);
   const [selectedStudentFilter, setSelectedStudentFilter] = useState<string>('all');
   const [selectedClassroomFilter, setSelectedClassroomFilter] = useState<string>('all');
+  const [playingStudentRecId, setPlayingStudentRecId] = useState<string | null>(null);
+  const [visibleRecordingsLimit, setVisibleRecordingsLimit] = useState<number>(10);
+  const studentAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const allStudentProfiles = userProfileService.getAllProfiles().filter(p => p.role === 'student');
-  const availableClassrooms = Array.from(
-    new Set(allStudentProfiles.map(p => (p.classroom || 'Lớp 1A2').trim()).filter(Boolean))
+  const handleTogglePlayStudentRecording = (rec: StudentRecording) => {
+    const src = rec.audioBlobUrl || rec.audioBase64;
+    if (!src) return;
+    if (playingStudentRecId === rec.id && studentAudioRef.current) {
+      studentAudioRef.current.pause();
+      studentAudioRef.current.currentTime = 0;
+      studentAudioRef.current = null;
+      setPlayingStudentRecId(null);
+      return;
+    }
+    if (studentAudioRef.current) {
+      studentAudioRef.current.pause();
+      studentAudioRef.current.currentTime = 0;
+      studentAudioRef.current = null;
+    }
+    try {
+      const audio = new Audio(src);
+      studentAudioRef.current = audio;
+      setPlayingStudentRecId(rec.id);
+      audio.onended = () => {
+        setPlayingStudentRecId(null);
+        studentAudioRef.current = null;
+      };
+      audio.onerror = () => {
+        setPlayingStudentRecId(null);
+        studentAudioRef.current = null;
+      };
+      audio.play().catch(() => {
+        setPlayingStudentRecId(null);
+        studentAudioRef.current = null;
+      });
+    } catch {
+      setPlayingStudentRecId(null);
+    }
+  };
+
+  const allStudentProfiles = useMemo(
+    () => userProfileService.getAllProfiles().filter(p => p.role === 'student'),
+    [recordings.length, activeTab]
+  );
+  const availableClassrooms = useMemo(
+    () => Array.from(new Set(allStudentProfiles.map(p => (p.classroom || 'Lớp 1A2').trim()).filter(Boolean))),
+    [allStudentProfiles]
   );
 
   const getRecordingStudent = (rec: StudentRecording) => {
@@ -143,21 +189,34 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
     };
   };
 
-  const studentsInSelectedClass = allStudentProfiles.filter(
-    s => selectedClassroomFilter === 'all' || (s.classroom || 'Lớp 1A2').trim() === selectedClassroomFilter
+  const studentsInSelectedClass = useMemo(
+    () =>
+      allStudentProfiles.filter(
+        s => selectedClassroomFilter === 'all' || (s.classroom || 'Lớp 1A2').trim() === selectedClassroomFilter
+      ),
+    [allStudentProfiles, selectedClassroomFilter]
   );
 
-  const filteredRecordings = recordings.filter(rec => {
-    const student = getRecordingStudent(rec);
-    const stuClass = (student.classroom || 'Lớp 1A2').trim();
-    if (selectedClassroomFilter !== 'all' && stuClass !== selectedClassroomFilter) {
-      return false;
-    }
-    if (selectedStudentFilter !== 'all') {
-      return student.id === selectedStudentFilter || rec.studentId === selectedStudentFilter;
-    }
-    return true;
-  });
+  const filteredRecordings = useMemo(
+    () =>
+      recordings.filter(rec => {
+        const student = getRecordingStudent(rec);
+        const stuClass = (student.classroom || 'Lớp 1A2').trim();
+        if (selectedClassroomFilter !== 'all' && stuClass !== selectedClassroomFilter) {
+          return false;
+        }
+        if (selectedStudentFilter !== 'all') {
+          return student.id === selectedStudentFilter || rec.studentId === selectedStudentFilter;
+        }
+        return true;
+      }),
+    [recordings, selectedClassroomFilter, selectedStudentFilter, allStudentProfiles]
+  );
+
+  const displayedRecordings = useMemo(
+    () => filteredRecordings.slice(0, visibleRecordingsLimit),
+    [filteredRecordings, visibleRecordingsLimit]
+  );
 
   const handleExportGradebookCsv = () => {
     const headers = [
@@ -261,6 +320,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
   const handleOpenReview = (rec: StudentRecording) => {
     setSelectedRecording(rec);
+    setIsMobileReviewOpen(true);
     const student = getRecordingStudent(rec);
     const evalScore = rec.aiEvaluation?.score ?? (rec.teacherScore ? rec.teacherScore * 20 : 80);
     
@@ -1194,13 +1254,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                     </button>
                   </div>
                 ) : (
-                  filteredRecordings.map(rec => {
+                  displayedRecordings.map(rec => {
                     const isSelected = selectedRecording?.id === rec.id;
                     const studentInfo = getRecordingStudent(rec);
+                    const isPlayingThis = playingStudentRecId === rec.id;
                     return (
                     <div 
                       key={rec.id} 
-                      className={`bg-white rounded-3xl p-5 border transition-all hover:shadow-md ${
+                      className={`bg-white rounded-3xl p-4 sm:p-5 border transition-all hover:shadow-md ${
                         isSelected ? 'border-amber-500 ring-2 ring-amber-400 bg-amber-50/10' : 'border-slate-200'
                       }`}
                     >
@@ -1262,18 +1323,34 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                               })()}
                             </span>
                           </div>
-                          <div className="text-lg font-black text-slate-900 font-reading mt-2">
+                          <div className="text-base sm:text-lg font-black text-slate-900 font-reading mt-2">
                             "{rec.targetText}"
                           </div>
                         </div>
 
-                        {/* Player / Audio control */}
-                        {rec.audioBlobUrl && (
-                          <audio 
-                            controls 
-                            src={rec.audioBlobUrl} 
-                            className="h-10 w-full sm:w-60"
-                          />
+                        {/* On-demand Single Audio Player Button (prevents iOS WebKit OOM crash) */}
+                        {(rec.audioBlobUrl || rec.audioBase64) && (
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePlayStudentRecording(rec)}
+                            className={`px-4 py-2.5 rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer shrink-0 ${
+                              isPlayingThis
+                                ? 'bg-rose-600 text-white ring-2 ring-rose-300'
+                                : 'bg-orange-500 hover:bg-orange-600 text-white'
+                            }`}
+                          >
+                            {isPlayingThis ? (
+                              <>
+                                <Pause className="w-4 h-4" />
+                                <span>Dừng nghe</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-4 h-4 fill-white" />
+                                <span>Nghe bài đọc ({rec.durationSeconds || 3}s)</span>
+                              </>
+                            )}
+                          </button>
                         )}
                       </div>
 
@@ -1470,167 +1547,221 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                     </div>
                   );
                 }))}
-              </div>
 
-              {/* Review Sidebar Form (Right 1 col) */}
-              <div className="bg-white rounded-3xl p-6 border border-amber-200 shadow-sm h-fit sticky top-24 space-y-4">
-                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
-                  <span>Bảng Chấm & Nhận Xét Bài</span>
-                </h3>
-
-                {selectedRecording ? (
-                  <div className="space-y-4">
-                    {/* Student Info Card in Sidebar */}
-                    {(() => {
-                      const selStudent = getRecordingStudent(selectedRecording);
-                      return (
-                        <div className="p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl border border-indigo-200/80 flex items-center justify-between shadow-xs">
-                          <div className="flex items-center gap-2.5">
-                            <span className="w-9 h-9 rounded-full bg-white border border-indigo-200 flex items-center justify-center text-xl shadow-xs">
-                              {selStudent.avatar || '🐰'}
-                            </span>
-                            <div>
-                              <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider block">Học sinh:</span>
-                              <span className="text-sm font-black text-indigo-950">{selStudent.name}</span>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className="px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-900 font-mono text-xs font-bold block">
-                              {selStudent.studentCode || 'HS01'}
-                            </span>
-                            <span className="text-[10px] text-slate-500 font-medium">
-                              {selStudent.classroom || 'Lớp 1A2'}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    <div className="p-3 bg-amber-50 rounded-2xl border border-amber-100 text-xs space-y-1.5">
-                      <div className="font-bold text-amber-900">{selectedRecording.lessonTitle}</div>
-                      <div className="text-slate-700 italic">"{selectedRecording.targetText}"</div>
-                      {selectedRecording.aiEvaluation && (
-                        <div className="pt-2 border-t border-amber-200/60 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                          <div className="flex items-center gap-1.5">
-                            <Bot className="w-3.5 h-3.5 text-purple-600" />
-                            <span className="font-bold text-purple-900">Điểm (/100):</span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={selectedRecording.aiEvaluation.score}
-                              onChange={async (e) => {
-                                if (!selectedRecording.aiEvaluation) return;
-                                const newScore = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                const updatedEval = aiSpeechService.recalculateFromTeacherOverride(
-                                  selectedRecording.aiEvaluation,
-                                  selectedRecording.aiEvaluation.wordAnalysis,
-                                  newScore
-                                );
-                                const updatedRec = { ...selectedRecording, aiEvaluation: updatedEval };
-                                setSelectedRecording(updatedRec);
-                                await recordingStorageService.updateAiEvaluation(selectedRecording.id, updatedEval);
-                                await refreshRecordings();
-                              }}
-                              className="w-14 px-1.5 py-0.5 rounded-lg border border-purple-300 bg-white font-black text-purple-800 text-center focus:outline-none focus:ring-1 focus:ring-purple-500"
-                              title="Giáo viên có thể sửa trực tiếp điểm số thang 100 tại đây"
-                            />
-                            <span className="text-slate-500 font-bold">/100đ</span>
-                          </div>
-                          <span className="font-semibold text-rose-700">
-                            {selectedRecording.aiEvaluation.wordAnalysis?.filter(w => w.status !== 'correct').length ?? 0} lỗi
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-bold text-slate-700">
-                          Chấm điểm / Đánh giá sao:
-                        </label>
-                        <span className="text-[11px] font-semibold text-amber-700">
-                          {reviewScore === 5 ? '🌟 Xuất sắc (5 sao)' : reviewScore === 4 ? '⭐ Khá tốt (4 sao)' : reviewScore === 3 ? '⭐ Đạt yêu cầu (3 sao)' : reviewScore === 2 ? 'Cần rèn thêm (2 sao)' : 'Cần cố gắng (1 sao)'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {[1, 2, 3, 4, 5].map(num => (
-                          <button
-                            key={num}
-                            type="button"
-                            onClick={() => setReviewScore(num)}
-                            className={`p-2 rounded-xl border text-base transition-all cursor-pointer ${
-                              reviewScore >= num 
-                                ? 'bg-amber-400 border-amber-500 text-amber-950 scale-105' 
-                                : 'bg-slate-100 border-slate-200 text-slate-400'
-                            }`}
-                          >
-                            ⭐
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-bold text-slate-700">
-                          Lời khen & Nhận xét của Cô giáo:
-                        </label>
-                        <button
-                          type="button"
-                          id="ai-suggest-comment-btn"
-                          onClick={() => {
-                            if (!selectedRecording) return;
-                            const student = getRecordingStudent(selectedRecording);
-                            const suggestion = generateAiTeacherComment(selectedRecording, student.name);
-                            setReviewComment(suggestion);
-                          }}
-                          className="text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
-                          title="Tự động tạo nhận xét sư phạm chi tiết theo số điểm và lỗi sai của bé"
-                        >
-                          <Bot className="w-3 h-3 text-purple-600" />
-                          <span>AI Gợi ý nhận xét</span>
-                        </button>
-                      </div>
-                      <textarea
-                        rows={5}
-                        value={reviewComment}
-                        onChange={(e) => setReviewComment(e.target.value)}
-                        placeholder="VD: Cô khen con đọc rất to, rõ ràng, ngắt nghỉ đúng dấu chấm. Chăm chỉ phát huy nhé!..."
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Nhận xét này sẽ tự động chuyển sang Sổ liên lạc Cổng Phụ Huynh của bé</span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        id="save-teacher-review-btn"
-                        disabled={savingReview || !reviewComment.trim()}
-                        onClick={() => handleSaveReview(selectedRecording)}
-                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-black transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
-                      >
-                        <Send className="w-4 h-4" />
-                        <span>{savingReview ? 'Đang gửi...' : 'Gửi Sang Phụ Huynh'}</span>
-                      </button>
-                      <button
-                        onClick={() => setSelectedRecording(null)}
-                        className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
-                      >
-                        Đóng
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-8 text-center text-slate-400 text-xs space-y-2">
-                    <HelpCircle className="w-8 h-8 mx-auto text-slate-300" />
-                    <p>Hãy bấm nút "Chấm điểm & Nhận xét" trên bất kỳ bài nộp nào của học sinh để gửi lời khen đến bé và phụ huynh.</p>
+                {filteredRecordings.length > visibleRecordingsLimit && (
+                  <div className="pt-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleRecordingsLimit((prev) => prev + 10)}
+                      className="px-5 py-2.5 bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 rounded-2xl font-black text-xs sm:text-sm shadow-xs transition-all cursor-pointer"
+                    >
+                      Xem thêm bài nộp ({filteredRecordings.length - visibleRecordingsLimit} bài còn lại)
+                    </button>
                   </div>
                 )}
+              </div>
+
+              {/* Review Sidebar Form (Desktop Right 1 col, plus Mobile Modal Popup) */}
+              <div
+                className={`${
+                  isMobileReviewOpen && selectedRecording
+                    ? 'fixed inset-0 z-50 bg-slate-900/75 flex items-end sm:items-center justify-center p-3 lg:static lg:bg-transparent lg:p-0 lg:block'
+                    : 'hidden lg:block'
+                }`}
+              >
+                <div className="bg-white rounded-3xl p-5 sm:p-6 border border-amber-200 shadow-xl lg:shadow-sm w-full max-w-lg lg:max-w-none max-h-[90vh] lg:max-h-none overflow-y-auto h-fit lg:sticky lg:top-24 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                      <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
+                      <span>Bảng Chấm & Nhận Xét Bài</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileReviewOpen(false)}
+                      className="lg:hidden p-1.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer"
+                      title="Đóng bảng chấm"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {selectedRecording ? (
+                    <div className="space-y-4">
+                      {/* Student Info Card in Sidebar */}
+                      {(() => {
+                        const selStudent = getRecordingStudent(selectedRecording);
+                        const isPlayingSelected = playingStudentRecId === selectedRecording.id;
+                        return (
+                          <div className="p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl border border-indigo-200/80 flex items-center justify-between gap-2 shadow-xs">
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-9 h-9 rounded-full bg-white border border-indigo-200 flex items-center justify-center text-xl shadow-xs">
+                                {selStudent.avatar || '🐰'}
+                              </span>
+                              <div>
+                                <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider block">Học sinh:</span>
+                                <span className="text-sm font-black text-indigo-950">{selStudent.name}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {(selectedRecording.audioBlobUrl || selectedRecording.audioBase64) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePlayStudentRecording(selectedRecording)}
+                                  className={`px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1 shadow-2xs cursor-pointer ${
+                                    isPlayingSelected
+                                      ? 'bg-rose-600 text-white'
+                                      : 'bg-orange-500 hover:bg-orange-600 text-white'
+                                  }`}
+                                >
+                                  {isPlayingSelected ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+                                  <span>{isPlayingSelected ? 'Dừng' : 'Nghe'}</span>
+                                </button>
+                              )}
+                              <div className="text-right">
+                                <span className="px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-900 font-mono text-xs font-bold block">
+                                  {selStudent.studentCode || 'HS01'}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-medium">
+                                  {selStudent.classroom || 'Lớp 1A2'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <div className="p-3 bg-amber-50 rounded-2xl border border-amber-100 text-xs space-y-1.5">
+                        <div className="font-bold text-amber-900">{selectedRecording.lessonTitle}</div>
+                        <div className="text-slate-700 italic">"{selectedRecording.targetText}"</div>
+                        {selectedRecording.aiEvaluation && (
+                          <div className="pt-2 border-t border-amber-200/60 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                            <div className="flex items-center gap-1.5">
+                              <Bot className="w-3.5 h-3.5 text-purple-600" />
+                              <span className="font-bold text-purple-900">Điểm (/100):</span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={selectedRecording.aiEvaluation.score}
+                                onChange={async (e) => {
+                                  if (!selectedRecording.aiEvaluation) return;
+                                  const newScore = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                  const updatedEval = aiSpeechService.recalculateFromTeacherOverride(
+                                    selectedRecording.aiEvaluation,
+                                    selectedRecording.aiEvaluation.wordAnalysis,
+                                    newScore
+                                  );
+                                  const updatedRec = { ...selectedRecording, aiEvaluation: updatedEval };
+                                  setSelectedRecording(updatedRec);
+                                  await recordingStorageService.updateAiEvaluation(selectedRecording.id, updatedEval);
+                                  await refreshRecordings();
+                                }}
+                                className="w-16 px-1.5 py-0.5 rounded-lg border border-purple-300 bg-white font-black text-purple-800 text-center text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                title="Giáo viên có thể sửa trực tiếp điểm số thang 100 tại đây"
+                              />
+                              <span className="text-slate-500 font-bold">/100đ</span>
+                            </div>
+                            <span className="font-semibold text-rose-700">
+                              {selectedRecording.aiEvaluation.wordAnalysis?.filter(w => w.status !== 'correct').length ?? 0} lỗi
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-slate-700">
+                            Chấm điểm / Đánh giá sao:
+                          </label>
+                          <span className="text-[11px] font-semibold text-amber-700">
+                            {reviewScore === 5 ? '🌟 Xuất sắc (5 sao)' : reviewScore === 4 ? '⭐ Khá tốt (4 sao)' : reviewScore === 3 ? '⭐ Đạt yêu cầu (3 sao)' : reviewScore === 2 ? 'Cần rèn thêm (2 sao)' : 'Cần cố gắng (1 sao)'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {[1, 2, 3, 4, 5].map(num => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setReviewScore(num)}
+                              className={`p-2 rounded-xl border text-base transition-all cursor-pointer ${
+                                reviewScore >= num 
+                                  ? 'bg-amber-400 border-amber-500 text-amber-950 scale-105' 
+                                  : 'bg-slate-100 border-slate-200 text-slate-400'
+                              }`}
+                            >
+                              ⭐
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-slate-700">
+                            Lời khen & Nhận xét của Cô giáo:
+                          </label>
+                          <button
+                            type="button"
+                            id="ai-suggest-comment-btn"
+                            onClick={() => {
+                              if (!selectedRecording) return;
+                              const student = getRecordingStudent(selectedRecording);
+                              const suggestion = generateAiTeacherComment(selectedRecording, student.name);
+                              setReviewComment(suggestion);
+                            }}
+                            className="text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+                            title="Tự động tạo nhận xét sư phạm chi tiết theo số điểm và lỗi sai của bé"
+                          >
+                            <Bot className="w-3 h-3 text-purple-600" />
+                            <span>AI Gợi ý nhận xét</span>
+                          </button>
+                        </div>
+                        <textarea
+                          rows={4}
+                          value={reviewComment}
+                          onChange={(e) => setReviewComment(e.target.value)}
+                          placeholder="VD: Cô khen con đọc rất to, rõ ràng, ngắt nghỉ đúng dấu chấm. Chăm chỉ phát huy nhé!..."
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Nhận xét này sẽ tự động chuyển sang Sổ liên lạc Cổng Phụ Huynh của bé</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          id="save-teacher-review-btn"
+                          disabled={savingReview || !reviewComment.trim()}
+                          onClick={() => {
+                            handleSaveReview(selectedRecording);
+                            setIsMobileReviewOpen(false);
+                          }}
+                          className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-black transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        >
+                          <Send className="w-4 h-4" />
+                          <span>{savingReview ? 'Đang gửi...' : 'Gửi Sang Phụ Huynh'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedRecording(null);
+                            setIsMobileReviewOpen(false);
+                          }}
+                          className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                        >
+                          Đóng
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-slate-400 text-xs space-y-2">
+                      <HelpCircle className="w-8 h-8 mx-auto text-slate-300" />
+                      <p>Hãy bấm nút "Chấm điểm" trên bất kỳ bài nộp nào của học sinh để gửi lời khen đến bé và phụ huynh.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

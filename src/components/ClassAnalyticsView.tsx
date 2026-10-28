@@ -195,8 +195,10 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
     showToast(`Đã xuất file báo cáo lớp ${currentClass?.name}!`);
   };
 
-  // Matrix data
-  const matrixData = classAnalyticsService.getLessonCompletionMatrix(currentClassId, matrixVolume, matrixVolume === 'vol1' ? 83 : 8);
+  // Matrix data (only compute when matrix subtab is active to keep mobile typing 60fps smooth)
+  const matrixData = subTab === 'matrix'
+    ? classAnalyticsService.getLessonCompletionMatrix(currentClassId, matrixVolume, matrixVolume === 'vol1' ? 83 : 8)
+    : [];
 
   // Status badge helper
   const getStatusBadge = (status: StudentStatus, completedCount?: number) => {
@@ -711,8 +713,109 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
             </div>
           </div>
 
-          {/* Roster Table */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* Mobile Student Cards (Smooth on Phones) */}
+          <div className="md:hidden space-y-3">
+            {filteredStudents.length === 0 ? (
+              <div className="bg-white rounded-3xl p-8 text-center text-slate-400 border border-slate-200">
+                <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p className="text-xs">Không tìm thấy học sinh nào phù hợp.</p>
+              </div>
+            ) : (
+              filteredStudents.map((student, idx) => {
+                const vol1Count = student.completedLessons.filter(l => l.volume === 'vol1').length;
+                const vol2Count = student.completedLessons.filter(l => l.volume === 'vol2').length;
+                return (
+                  <div
+                    key={student.id}
+                    className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-xs font-bold text-slate-400 w-5">{idx + 1}.</span>
+                        <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 overflow-hidden">
+                          <UserAvatar avatar={student.avatar} name={student.name} size="sm" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-black text-slate-900 text-sm truncate">
+                            {maskStudentName(student.name, student.studentCode)}
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-400 font-semibold">
+                            Mã: {student.studentCode} • T1: {vol1Count}/83 • T2: {vol2Count}/8
+                          </div>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        {getStatusBadge(student.status, student.completedLessons.length)}
+                      </div>
+                    </div>
+
+                    {student.teacherNotes && (
+                      <div className="text-xs text-slate-600 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 italic">
+                        "{student.teacherNotes}"
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                      <div className="flex items-center gap-3 font-bold text-slate-600">
+                        <span className="text-rose-600 flex items-center gap-1">
+                          <Mic className="w-3.5 h-3.5" /> {student.recordingsCount}
+                        </span>
+                        <span className="text-sky-600 flex items-center gap-1">
+                          <PenTool className="w-3.5 h-3.5" /> {student.writingCount}
+                        </span>
+                        <span className="text-amber-600 flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" /> {student.starsCount}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedFeedbackStudent(student);
+                            setIsFeedbackModalOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 bg-rose-500 text-white font-bold rounded-xl text-[11px] flex items-center gap-1 cursor-pointer"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Phụ huynh</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedStudentDetail(student);
+                            setFormData({
+                              name: student.name,
+                              studentCode: student.studentCode,
+                              gender: student.gender,
+                              status: student.status,
+                              teacherNotes: student.teacherNotes || '',
+                              dob: student.dob || '2018-01-01'
+                            });
+                            setIsEditStudentOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 bg-amber-100 text-amber-900 font-bold rounded-xl text-[11px] flex items-center gap-1 cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Nhận xét</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentDetail(student)}
+                          className="p-1.5 bg-slate-100 text-slate-700 rounded-xl cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Roster Table (Desktop & Tablet) */}
+          <div className="hidden md:block bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs sm:text-sm border-collapse">
                 <thead>
@@ -971,7 +1074,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
 
           {/* Matrix Lesson Drilldown Popup/Modal */}
           {selectedMatrixLesson && (
-            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 bg-slate-900/75 flex items-center justify-center p-4">
               <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
                 <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                   <div className="flex items-center gap-3">
@@ -1258,7 +1361,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
 
       {/* --- MODAL 1: STUDENT PROFILE DETAIL MODAL --- */}
       {selectedStudentDetail && !isEditStudentOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/75 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-start justify-between pb-4 border-b border-slate-100">
@@ -1411,7 +1514,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
 
       {/* --- MODAL 2: ADD / EDIT STUDENT MODAL --- */}
       {(isAddStudentOpen || isEditStudentOpen) && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/75 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-lg font-black text-slate-900">
@@ -1516,7 +1619,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
 
       {/* --- MODAL 3: BATCH RECORD LESSON FOR CLASS --- */}
       {isBatchLessonModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/75 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
@@ -1592,7 +1695,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
 
       {/* --- MODAL 4: PRINT READY CLASS REPORT --- */}
       {isPrintModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/75 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-3xl w-full p-8 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div className="flex items-center gap-2">
@@ -1695,7 +1798,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
 
       {/* --- MODAL 5: CREATE NEW CLASS + BULK ROSTER --- */}
       {isClassModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/75 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
@@ -1837,7 +1940,7 @@ export const ClassAnalyticsView: React.FC<ClassAnalyticsViewProps> = () => {
 
       {/* --- MODAL 6: BULK IMPORT STUDENTS INTO CURRENT CLASS --- */}
       {isBulkImportOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/75 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
