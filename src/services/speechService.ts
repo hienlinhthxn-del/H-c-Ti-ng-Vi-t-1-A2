@@ -497,6 +497,203 @@ export function generateSpellingSteps(model: SpellingModelInput): string[] {
 class SpeechService {
   private isSpeaking = false;
   private slowMode = true; // default true for Grade 1 kids
+  private cloudAudioElement: HTMLAudioElement | null = null;
+  private cachedVoices: SpeechSynthesisVoice[] = [];
+
+  constructor() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const loadVoices = () => {
+        this.cachedVoices = window.speechSynthesis.getVoices();
+      };
+      loadVoices();
+      if ('onvoiceschanged' in window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+    }
+  }
+
+  /**
+   * Selects the best Northern Female Vietnamese voice (Giọng nữ miền Bắc chuẩn)
+   * Priority:
+   * 1. Microsoft HoaiMy Online (Natural) - Giọng nữ miền Bắc chuẩn
+   * 2. Google Tiếng Việt (Female Northern standard) / vi-vn-x-vie / vi-vn-x-vic
+   * 3. Apple Linh (iOS / macOS Female Vietnamese)
+   * 4. Other female Vietnamese voices (excluding male voices like Microsoft An, NamMinh)
+   */
+  private selectNorthernFemaleViVoice(): { voice: SpeechSynthesisVoice | null; isConfirmedFemale: boolean } {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      return { voice: null, isConfirmedFemale: false };
+    }
+    const voices = this.cachedVoices.length > 0 ? this.cachedVoices : window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) {
+      return { voice: null, isConfirmedFemale: false };
+    }
+
+    const viVoices = voices.filter(
+      (v) =>
+        v.lang.toLowerCase().includes('vi') ||
+        v.name.toLowerCase().includes('vietnam') ||
+        v.name.toLowerCase().includes('tiếng việt')
+    );
+
+    if (viVoices.length === 0) {
+      return { voice: null, isConfirmedFemale: false };
+    }
+
+    const scoreVoice = (v: SpeechSynthesisVoice): number => {
+      const name = v.name.toLowerCase();
+      const uri = (v.voiceURI || '').toLowerCase();
+      let score = 0;
+
+      // Strongly penalize known Male Vietnamese voices (Microsoft An, NamMinh, male variants)
+      if (
+        name.includes('namminh') ||
+        name.includes('nam minh') ||
+        /\bmicrosoft an\b/i.test(v.name) ||
+        /\ban\s*-/i.test(v.name) ||
+        name.includes('male') ||
+        uri.includes('vi-vn-x-vid') ||
+        uri.includes('vi-vn-x-gft')
+      ) {
+        return -100;
+      }
+
+      // Top priority: Microsoft HoaiMy (Neural Northern Female Vietnamese)
+      if (name.includes('hoaimy') || name.includes('hoài my') || name.includes('hoai my')) {
+        score += 120;
+      }
+      // Second priority: Google Tiếng Việt (Standard Northern Female)
+      else if (name.includes('google tiếng việt') || name.includes('google vietnamese')) {
+        score += 100;
+      }
+      // Google Android/Chrome female voices
+      else if (uri.includes('vi-vn-x-vie') || uri.includes('vi-vn-x-vic') || uri.includes('sfg')) {
+        score += 95;
+      }
+      // Apple iOS/macOS female voice (Linh)
+      else if (name.includes('linh')) {
+        score += 90;
+      }
+      // Explicit female keywords
+      else if (
+        name.includes('female') ||
+        name.includes('nữ') ||
+        name.includes('mai') ||
+        name.includes('lan') ||
+        name.includes('hương') ||
+        name.includes('huong') ||
+        name.includes('thảo') ||
+        name.includes('thao') ||
+        name.includes('chi') ||
+        name.includes('my')
+      ) {
+        score += 80;
+      } else {
+        score += 10;
+      }
+
+      if (name.includes('natural') || name.includes('neural') || name.includes('online')) {
+        score += 15;
+      }
+
+      return score;
+    };
+
+    const sorted = [...viVoices].sort((a, b) => scoreVoice(b) - scoreVoice(a));
+    const best = sorted[0];
+    const bestScore = scoreVoice(best);
+
+    return {
+      voice: best,
+      isConfirmedFemale: bestScore >= 80
+    };
+  }
+
+  /**
+   * Plays standard Northern Female Vietnamese voice via Google TTS stream when the browser
+   * lacks a built-in female Vietnamese voice (e.g. when Windows only has male 'Microsoft An').
+   */
+  private playCloudNorthernFemaleVoice(
+    text: string,
+    rateOverride?: number,
+    onEnd?: () => void,
+    onFallback?: () => void
+  ) {
+    try {
+      // Split text into natural chunks <= 180 chars
+      const rawChunks = text
+        .split(/(?<=[.!?;\n])\s+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const chunks: string[] = [];
+      for (const part of rawChunks) {
+        if (part.length <= 180) {
+          chunks.push(part);
+        } else {
+          const subParts = part.split(/,\s+/).filter(Boolean);
+          let current = '';
+          for (const sub of subParts) {
+            if ((current + ', ' + sub).length <= 180) {
+              current = current ? `${current}, ${sub}` : sub;
+            } else {
+              if (current) chunks.push(current);
+              current = sub;
+            }
+          }
+          if (current) chunks.push(current);
+        }
+      }
+      if (chunks.length === 0) chunks.push(text.slice(0, 180));
+
+      let currentIdx = 0;
+      this.isSpeaking = true;
+
+      const playNextChunk = () => {
+        if (!this.isSpeaking || currentIdx >= chunks.length) {
+          this.isSpeaking = false;
+          this.cloudAudioElement = null;
+          if (onEnd) onEnd();
+          return;
+        }
+
+        const chunkText = chunks[currentIdx++];
+        const encoded = encodeURIComponent(chunkText);
+        const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=${encoded}`;
+        const audio = new Audio(url);
+        audio.playbackRate = rateOverride ?? (this.slowMode ? 0.86 : 0.96);
+        this.cloudAudioElement = audio;
+
+        audio.onended = () => {
+          playNextChunk();
+        };
+
+        audio.onerror = () => {
+          this.cloudAudioElement = null;
+          if (currentIdx === 1 && onFallback) {
+            onFallback();
+          } else {
+            this.isSpeaking = false;
+            if (onEnd) onEnd();
+          }
+        };
+
+        audio.play().catch(() => {
+          this.cloudAudioElement = null;
+          if (currentIdx === 1 && onFallback) {
+            onFallback();
+          } else {
+            this.isSpeaking = false;
+            if (onEnd) onEnd();
+          }
+        });
+      };
+
+      playNextChunk();
+    } catch {
+      if (onFallback) onFallback();
+      else if (onEnd) onEnd();
+    }
+  }
 
   setSlowMode(enabled: boolean) {
     this.slowMode = enabled;
@@ -535,6 +732,11 @@ class SpeechService {
 
   stop() {
     teacherAudioService.stopCurrentAudio();
+    if (this.cloudAudioElement) {
+      this.cloudAudioElement.pause();
+      this.cloudAudioElement.currentTime = 0;
+      this.cloudAudioElement = null;
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -553,7 +755,41 @@ class SpeechService {
     return teacherAudioService.getAudioByText(text, context, lessonId);
   }
 
-  // Speak text with priority for teacher's recorded sample audio
+  // Speak using Web Speech API with Northern Female Vietnamese voice selection
+  private speakWithWebSpeech(phoneticText: string, onEnd?: () => void, rateOverride?: number) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      if (onEnd) onEnd();
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(phoneticText);
+    utterance.lang = 'vi-VN';
+
+    const { voice, isConfirmedFemale } = this.selectNorthernFemaleViVoice();
+    if (voice) {
+      utterance.voice = voice;
+    }
+
+    // Speed & pitch adapted for Northern Female Grade 1 teacher voice
+    utterance.rate = rateOverride ?? (this.slowMode ? 0.78 : 0.92);
+    utterance.pitch = isConfirmedFemale ? 1.05 : 1.2;
+
+    this.isSpeaking = true;
+
+    utterance.onend = () => {
+      this.isSpeaking = false;
+      if (onEnd) onEnd();
+    };
+
+    utterance.onerror = () => {
+      this.isSpeaking = false;
+      if (onEnd) onEnd();
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  // Speak text with priority for teacher's recorded sample audio, then Northern Female Vietnamese voice
   speak(text: string, onEnd?: () => void, rateOverride?: number, context?: string, lessonId?: string | number) {
     this.stop();
     soundEffects.playPop();
@@ -591,39 +827,21 @@ class SpeechService {
       }
     }
 
-    // 2. Fallback to Web Speech API synthesis
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      if (onEnd) onEnd();
+    // 2. Check if browser has a confirmed Northern Female Vietnamese voice (e.g. HoaiMy, Google Tiếng Việt, Linh)
+    const { isConfirmedFemale } = this.selectNorthernFemaleViVoice();
+    if (isConfirmedFemale) {
+      this.speakWithWebSpeech(phoneticText, onEnd, rateOverride);
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(phoneticText);
-    utterance.lang = 'vi-VN';
-    
-    // Speed adapted for Grade 1 children
-    utterance.rate = rateOverride ?? (this.slowMode ? 0.76 : 0.92);
-    utterance.pitch = 1.05; // Cheerful, kid-friendly pitch
-
-    // Try to find a Vietnamese voice
-    const voices = window.speechSynthesis.getVoices();
-    const viVoice = voices.find(v => v.lang.includes('vi') || v.lang.includes('VI'));
-    if (viVoice) {
-      utterance.voice = viVoice;
-    }
-
-    this.isSpeaking = true;
-
-    utterance.onend = () => {
-      this.isSpeaking = false;
-      if (onEnd) onEnd();
-    };
-
-    utterance.onerror = () => {
-      this.isSpeaking = false;
-      if (onEnd) onEnd();
-    };
-
-    window.speechSynthesis.speak(utterance);
+    // 3. If device only has a male voice (e.g. Microsoft An / NamMinh) or no local vi-VN voice,
+    // use standard Cloud Northern Female Vietnamese voice with instant fallback to Web Speech
+    this.playCloudNorthernFemaleVoice(
+      phoneticText,
+      rateOverride,
+      onEnd,
+      () => this.speakWithWebSpeech(phoneticText, onEnd, rateOverride)
+    );
   }
 
   // Force speaking using AI only (ignoring teacher recording, useful for preview/comparison)
@@ -637,34 +855,24 @@ class SpeechService {
     }
 
     const cleanText = text.trim();
-    if (!cleanText || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    if (!cleanText) {
       if (onEnd) onEnd();
       return;
     }
 
     const phoneticText = convertToPhoneticVietnamese(cleanText, context);
-    const utterance = new SpeechSynthesisUtterance(phoneticText);
-    utterance.lang = 'vi-VN';
-    utterance.rate = rateOverride ?? (this.slowMode ? 0.76 : 0.92);
-    utterance.pitch = 1.05;
-
-    const voices = window.speechSynthesis.getVoices();
-    const viVoice = voices.find(v => v.lang.includes('vi') || v.lang.includes('VI'));
-    if (viVoice) {
-      utterance.voice = viVoice;
+    const { isConfirmedFemale } = this.selectNorthernFemaleViVoice();
+    if (isConfirmedFemale) {
+      this.speakWithWebSpeech(phoneticText, onEnd, rateOverride);
+      return;
     }
 
-    this.isSpeaking = true;
-    utterance.onend = () => {
-      this.isSpeaking = false;
-      if (onEnd) onEnd();
-    };
-    utterance.onerror = () => {
-      this.isSpeaking = false;
-      if (onEnd) onEnd();
-    };
-
-    window.speechSynthesis.speak(utterance);
+    this.playCloudNorthernFemaleVoice(
+      phoneticText,
+      rateOverride,
+      onEnd,
+      () => this.speakWithWebSpeech(phoneticText, onEnd, rateOverride)
+    );
   }
 
   // Spell out a syllable step by step: e.g. "b", "a", "ba", "huyá»n", "bÃ "
