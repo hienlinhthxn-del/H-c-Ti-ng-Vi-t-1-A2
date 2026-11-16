@@ -809,11 +809,14 @@ class SpeechService {
     window.speechSynthesis.speak(utterance);
   }
 
-  // Speak text with priority for teacher's recorded sample audio, then Northern Female Vietnamese voice
-  speak(text: string, onEnd?: () => void, rateOverride?: number, context?: string, lessonId?: string | number) {
-    this.stop();
-    soundEffects.playPop();
-
+  // Internal speak without calling this.stop() so multi-step spellOut keeps the same sessionId
+  private speakInternal(
+    text: string,
+    onEnd?: () => void,
+    rateOverride?: number,
+    context?: string,
+    lessonId?: string | number
+  ) {
     if (!text || typeof text !== 'string') {
       if (onEnd) onEnd();
       return;
@@ -864,6 +867,13 @@ class SpeechService {
     );
   }
 
+  // Speak text with priority for teacher's recorded sample audio, then Northern Female Vietnamese voice
+  speak(text: string, onEnd?: () => void, rateOverride?: number, context?: string, lessonId?: string | number) {
+    this.stop();
+    soundEffects.playPop();
+    this.speakInternal(text, onEnd, rateOverride, context, lessonId);
+  }
+
   // Force speaking using AI only (ignoring teacher recording, useful for preview/comparison)
   speakWithAIOnly(text: string, onEnd?: () => void, rateOverride?: number, context?: string) {
     this.stop();
@@ -900,9 +910,11 @@ class SpeechService {
     this.stop();
     const sessionId = this.currentSessionId;
 
+    soundEffects.playPop();
+
     if (!steps || steps.length === 0) {
       if (fullResult) {
-        this.speak(fullResult, onDone, 0.78, 'syllable', lessonId);
+        this.speakInternal(fullResult, onDone, 0.78, 'syllable', lessonId);
       } else if (onDone) {
         onDone();
       }
@@ -916,7 +928,7 @@ class SpeechService {
       if (this.currentSessionId !== sessionId) return;
       const step = phoneticSteps[i];
       await new Promise<void>((resolve) => {
-        this.speak(step, () => {
+        this.speakInternal(step, () => {
           setTimeout(resolve, 320);
         }, 0.72, 'letter', lessonId);
       });
@@ -934,7 +946,7 @@ class SpeechService {
               resolve();
               return;
             }
-            this.speak(cleanFullResult, () => {
+            this.speakInternal(cleanFullResult, () => {
               resolve();
               if (onDone) onDone();
             }, 0.78, 'syllable', lessonId);
