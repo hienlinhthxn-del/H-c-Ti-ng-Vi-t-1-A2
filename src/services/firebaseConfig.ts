@@ -1,5 +1,5 @@
 ﻿import { initializeApp, getApp, getApps } from 'firebase/app';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBsOXXDcvpPOOxvJDU215p-mnc16z4ljYE",
@@ -13,15 +13,5 @@ const firebaseConfig = {
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
-
-if (typeof window !== 'undefined') {
-  try {
-    enableIndexedDbPersistence(db).catch((err) => {
-      console.warn('Firebase persistence warning:', err);
-    });
-  } catch (e) {
-    console.warn('Error enabling Firebase persistence', e);
-  }
-}
 
 export { app, db };

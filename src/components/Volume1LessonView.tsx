@@ -470,7 +470,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                       onClick={() => {
                         if (window.confirm(`Thầy Cô có muốn khôi phục Bài ${lesson.lessonNumber} về nội dung chuẩn sách giáo khoa ban đầu không?`)) {
                           lessonStorageService.resetVolume1Lesson(lesson.id);
-                          window.location.reload();
+                          speechService.playSoundEffect('pop');
                         }
                       }}
                       className="text-xs text-orange-700 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2 py-0.5 rounded-full font-semibold transition-all cursor-pointer flex items-center gap-1"

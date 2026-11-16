@@ -59,16 +59,27 @@ class TeacherAudioService {
     try {
       const q = query(collection(db, COLLECTION_NAME));
       onSnapshot(q, (snapshot) => {
-        // Merge cloud audios into memoryMap, preserving any locally recorded items
-        snapshot.forEach((doc) => {
-          const item = doc.data() as TeacherAudioItem;
-          if (item && item.key) {
-            this.memoryMap[item.key] = item;
+        let changed = false;
+        snapshot.docChanges().forEach((change) => {
+          const item = change.doc.data() as TeacherAudioItem;
+          if (change.type === 'removed') {
+            if (item && item.key && this.memoryMap[item.key]) {
+              delete this.memoryMap[item.key];
+              changed = true;
+            }
+          } else if (item && item.key) {
+            const existing = this.memoryMap[item.key];
+            if (!existing || existing.id !== item.id || existing.createdAt !== item.createdAt) {
+              this.memoryMap[item.key] = item;
+              changed = true;
+            }
           }
         });
-        this.saveToLocalStorage();
         this.isInitialized = true;
-        this.notify();
+        if (changed) {
+          this.saveToLocalStorage();
+          this.notify();
+        }
       }, (error) => {
         console.error('Lỗi khi đồng bộ âm thanh giáo viên từ Firebase:', error);
       });

@@ -174,25 +174,39 @@ export class AISpeechService {
         }
       };
 
+      let hasFatalError = false;
       this.recognition.onerror = (event: any) => {
         console.warn('Speech recognition event error:', event.error);
-        if (event.error === 'not-allowed') {
-          if (onError) onError('Microphone bị từ chối cấp quyền.');
+        if (
+          event.error === 'not-allowed' ||
+          event.error === 'service-not-allowed' ||
+          event.error === 'audio-capture' ||
+          event.error === 'aborted'
+        ) {
+          hasFatalError = true;
+          this.isListening = false;
+          if (event.error === 'not-allowed' && onError) {
+            onError('Microphone bị từ chối cấp quyền.');
+          }
         }
       };
 
       this.recognition.onend = () => {
-        // Stop stream and analyser
         if (this._latestSessionFinal) {
           this.finalizedTranscript = (this.finalizedTranscript + ' ' + this._latestSessionFinal).replace(/\s+/g, ' ').trim();
           this._latestSessionFinal = '';
         }
-        if (this.isListening) {
-          try {
-            this.recognition.start();
-          } catch {
-            // Already active or stopped
-          }
+        // Prevent infinite synchronous restart loop on iOS/Android when getUserMedia holds the mic
+        if (this.isListening && !hasFatalError) {
+          setTimeout(() => {
+            if (this.isListening && !hasFatalError) {
+              try {
+                this.recognition.start();
+              } catch {
+                this.isListening = false;
+              }
+            }
+          }, 300);
         }
       };
 

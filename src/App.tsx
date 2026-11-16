@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { MobileNavBar } from './components/MobileNavBar';
 import { Volume1Grid } from './components/Volume1Grid';
@@ -57,11 +57,62 @@ export default function App() {
     return active.role || 'student';
   });
 
-  const [currentTab, setCurrentTab] = useState<'intro' | 'volume1' | 'volume2' | 'alphabet' | 'practice'>('volume1');
-  const [selectedVol1Lesson, setSelectedVol1Lesson] = useState<Volume1Lesson | null>(null);
-  const [selectedVol2Lesson, setSelectedVol2Lesson] = useState<Volume2Lesson | null>(null);
+  const [currentTab, setCurrentTab] = useState<'intro' | 'volume1' | 'volume2' | 'alphabet' | 'practice'>(() => {
+    try {
+      const savedTab = localStorage.getItem('tv1_active_tab');
+      if (savedTab && ['intro', 'volume1', 'volume2', 'alphabet', 'practice'].includes(savedTab)) {
+        return savedTab as 'intro' | 'volume1' | 'volume2' | 'alphabet' | 'practice';
+      }
+    } catch {}
+    return 'volume1';
+  });
+  const [selectedVol1Lesson, setSelectedVol1Lesson] = useState<Volume1Lesson | null>(() => {
+    try {
+      const savedId = localStorage.getItem('tv1_selected_vol1_id');
+      if (savedId) {
+        return lessonStorageService.getVolume1Lesson(parseInt(savedId, 10)) || null;
+      }
+    } catch {}
+    return null;
+  });
+  const [selectedVol2Lesson, setSelectedVol2Lesson] = useState<Volume2Lesson | null>(() => {
+    try {
+      const savedId = localStorage.getItem('tv1_selected_vol2_id');
+      if (savedId) {
+        return lessonStorageService.getVolume2Lesson(parseInt(savedId, 10)) || null;
+      }
+    } catch {}
+    return null;
+  });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [writingSampleText, setWritingSampleText] = useState<string>('a, ă, â, b, c, d, đ');
+
+  // Persist current tab and active lesson so browser refreshes never reset student progress back to the start
+  useEffect(() => {
+    try {
+      localStorage.setItem('tv1_active_tab', currentTab);
+    } catch {}
+  }, [currentTab]);
+
+  useEffect(() => {
+    try {
+      if (selectedVol1Lesson) {
+        localStorage.setItem('tv1_selected_vol1_id', String(selectedVol1Lesson.id));
+      } else {
+        localStorage.removeItem('tv1_selected_vol1_id');
+      }
+    } catch {}
+  }, [selectedVol1Lesson]);
+
+  useEffect(() => {
+    try {
+      if (selectedVol2Lesson) {
+        localStorage.setItem('tv1_selected_vol2_id', String(selectedVol2Lesson.id));
+      } else {
+        localStorage.removeItem('tv1_selected_vol2_id');
+      }
+    } catch {}
+  }, [selectedVol2Lesson]);
   const [starsCount, setStarsCount] = useState<number>(() => {
     const saved = localStorage.getItem('tv1_stars');
     return saved ? parseInt(saved, 10) : 5;
@@ -148,17 +199,38 @@ export default function App() {
     }
   }, [location.pathname]);
 
-  // Subscribe to storage & achievement & teacher audio changes
+  const selectedVol1Ref = useRef<Volume1Lesson | null>(selectedVol1Lesson);
+  const selectedVol2Ref = useRef<Volume2Lesson | null>(selectedVol2Lesson);
+  const userRoleRef = useRef<UserRole>(userRole);
+  const locationPathRef = useRef<string>(location.pathname);
+
+  useEffect(() => {
+    selectedVol1Ref.current = selectedVol1Lesson;
+  }, [selectedVol1Lesson]);
+
+  useEffect(() => {
+    selectedVol2Ref.current = selectedVol2Lesson;
+  }, [selectedVol2Lesson]);
+
+  useEffect(() => {
+    userRoleRef.current = userRole;
+  }, [userRole]);
+
+  useEffect(() => {
+    locationPathRef.current = location.pathname;
+  }, [location.pathname]);
+
+  // Subscribe to storage & achievement & teacher audio changes once on mount
   useEffect(() => {
     const unsubscribeLessons = lessonStorageService.subscribe(() => {
       setCustomizedCount(lessonStorageService.getStats().totalCustomCount);
       
-      if (selectedVol1Lesson) {
-        const fresh = lessonStorageService.getVolume1Lesson(selectedVol1Lesson.id);
+      if (selectedVol1Ref.current) {
+        const fresh = lessonStorageService.getVolume1Lesson(selectedVol1Ref.current.id);
         if (fresh) setSelectedVol1Lesson(fresh);
       }
-      if (selectedVol2Lesson) {
-        const fresh = lessonStorageService.getVolume2Lesson(selectedVol2Lesson.id);
+      if (selectedVol2Ref.current) {
+        const fresh = lessonStorageService.getVolume2Lesson(selectedVol2Ref.current.id);
         if (fresh) setSelectedVol2Lesson(fresh);
       }
     });
@@ -177,7 +249,14 @@ export default function App() {
 
     const unsubscribeUserProfile = userProfileService.subscribe((current) => {
       setActiveUser(current);
-      if (current.role) {
+      // Keep role locked to URL route when student is studying on /student
+      if (locationPathRef.current.startsWith('/student')) {
+        setUserRole('student');
+      } else if (locationPathRef.current.startsWith('/teacher')) {
+        setUserRole(teacherAuthService.isAuthenticated() ? 'teacher' : 'student');
+      } else if (locationPathRef.current.startsWith('/parent')) {
+        setUserRole('parent');
+      } else if (current.role) {
         if (current.role === 'teacher' && !teacherAuthService.isAuthenticated()) {
           setUserRole('student');
         } else {
@@ -192,7 +271,7 @@ export default function App() {
     const unsubscribeTeacherAuth = teacherAuthService.subscribe((session) => {
       setIsTeacherAuthenticated(session !== null && session.isAuthenticated);
       if (!session || !session.isAuthenticated) {
-        if (userRole === 'teacher') {
+        if (userRoleRef.current === 'teacher') {
           setUserRole('student');
         }
       }
@@ -205,7 +284,7 @@ export default function App() {
       unsubscribeUserProfile();
       unsubscribeTeacherAuth();
     };
-  }, [selectedVol1Lesson?.id, selectedVol2Lesson?.id, userRole]);
+  }, []);
 
   const handleAddStar = () => {
     setStarsCount(prev => {
@@ -214,9 +293,10 @@ export default function App() {
       return next;
     });
 
-    if (activeUser.role === 'student') {
-      userProfileService.updateUser(activeUser.id, {
-        starsCount: (activeUser.starsCount || 0) + 1
+    const currentActive = userProfileService.getActiveUser();
+    if (currentActive.role === 'student') {
+      userProfileService.updateUser(currentActive.id, {
+        starsCount: (currentActive.starsCount || 0) + 1
       });
     }
 

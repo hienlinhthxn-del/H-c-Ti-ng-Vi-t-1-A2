@@ -13,15 +13,18 @@ class RecordingStorageService {
   private cloudRecordingsMap: Map<string, StudentRecording> = new Map();
   private blobUrlCache: Map<string, string> = new Map();
   private hasHydratedIDB: boolean = false;
+  private hasStartedFirebaseSync: boolean = false;
   private listeners: (() => void)[] = [];
 
   constructor() {
-    if (typeof window !== 'undefined') {
-      if ('indexedDB' in window) {
-        this.initDB();
-      }
-      this.initFirebaseSync();
-    }
+    // Lazy-init IndexedDB and Firebase sync only when recordings are requested
+    // to prevent Out-Of-Memory (OOM) tab auto-reloads on mobile devices while students are studying.
+  }
+
+  private ensureFirebaseSync() {
+    if (this.hasStartedFirebaseSync || typeof window === 'undefined') return;
+    this.hasStartedFirebaseSync = true;
+    this.initFirebaseSync();
   }
 
   private initFirebaseSync() {
@@ -30,21 +33,28 @@ class RecordingStorageService {
       onSnapshot(
         q,
         (snapshot) => {
+          let changed = false;
           snapshot.docChanges().forEach((change) => {
             const data = change.doc.data() as StudentRecording;
             if (change.type === 'removed') {
-              this.cloudRecordingsMap.delete(change.doc.id);
-              this.memoryRecordings = this.memoryRecordings.filter((r) => r.id !== change.doc.id);
+              if (this.cloudRecordingsMap.has(change.doc.id)) {
+                this.cloudRecordingsMap.delete(change.doc.id);
+                this.memoryRecordings = this.memoryRecordings.filter((r) => r.id !== change.doc.id);
+                changed = true;
+              }
             } else if (data && data.id) {
               const hydrated: StudentRecording = {
                 ...data,
                 audioBlobUrl: data.audioBase64 || data.audioBlobUrl
               };
               this.cloudRecordingsMap.set(data.id, hydrated);
+              changed = true;
             }
           });
-          this.mergeCloudIntoMemory();
-          this.notify();
+          if (changed) {
+            this.mergeCloudIntoMemory();
+            this.notify();
+          }
         },
         (err) => {
           console.warn('Firebase sync warning for student recordings:', err);
@@ -159,6 +169,7 @@ class RecordingStorageService {
   ): Promise<StudentRecording> {
     const id = 'rec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     const audioBlobUrl = URL.createObjectURL(audioBlob);
+    this.blobUrlCache.set(id, audioBlobUrl);
     let audioBase64: string | undefined;
     try {
       audioBase64 = await this.blobToBase64(audioBlob);
@@ -227,6 +238,7 @@ class RecordingStorageService {
 
   // Fetch all recordings
   async getAllRecordings(): Promise<StudentRecording[]> {
+    this.ensureFirebaseSync();
     if (this.hasHydratedIDB && this.memoryRecordings.length > 0) {
       this.mergeCloudIntoMemory();
       return [...this.memoryRecordings];

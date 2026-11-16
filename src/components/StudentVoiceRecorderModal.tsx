@@ -100,21 +100,17 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 
   // Load history on open or change
   useEffect(() => {
-    if (isOpen) {
-      loadRecordings();
-    } else {
+    if (!isOpen) {
       cleanupAudioStream();
       resetRecordingState();
+      return;
     }
-  }, [isOpen]);
-
-  // Subscribe to storage updates
-  useEffect(() => {
+    loadRecordings();
     const unsubscribe = recordingStorageService.subscribe(() => {
       loadRecordings();
     });
     return unsubscribe;
-  }, []);
+  }, [isOpen]);
 
   const loadRecordings = async () => {
     const all = await recordingStorageService.getAllRecordings();
@@ -206,23 +202,27 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
       source.connect(analyser);
       analyserRef.current = analyser;
 
-      // Start visualizer loop
-      const updateVisualizer = () => {
+      // Start visualizer loop (throttled to ~10fps to prevent 60fps full-modal React re-renders and mobile OOM)
+      let lastVisualizerTime = 0;
+      const updateVisualizer = (timestamp: number = 0) => {
         if (!analyserRef.current) return;
-        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-        analyserRef.current.getByteFrequencyData(dataArray);
+        if (timestamp - lastVisualizerTime >= 100) {
+          lastVisualizerTime = timestamp;
+          const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+          analyserRef.current.getByteFrequencyData(dataArray);
 
-        // Take 16 frequency points
-        const levels: number[] = [];
-        const step = Math.floor(dataArray.length / 16);
-        for (let i = 0; i < 16; i++) {
-          const val = dataArray[i * step] || 0;
-          levels.push(Math.max(10, Math.min(100, Math.round((val / 255) * 100))));
+          // Take 16 frequency points
+          const levels: number[] = [];
+          const step = Math.floor(dataArray.length / 16);
+          for (let i = 0; i < 16; i++) {
+            const val = dataArray[i * step] || 0;
+            levels.push(Math.max(10, Math.min(100, Math.round((val / 255) * 100))));
+          }
+          setAudioLevels(levels);
         }
-        setAudioLevels(levels);
         animFrameRef.current = requestAnimationFrame(updateVisualizer);
       };
-      updateVisualizer();
+      animFrameRef.current = requestAnimationFrame(updateVisualizer);
 
       // Detect best supported mime type
       const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
@@ -251,7 +251,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
 
-        // Stop stream and analyser
+        // Stop stream, analyser, and AudioContext to prevent hardware/context leak
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((t) => t.stop());
           streamRef.current = null;
@@ -259,6 +259,10 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
         if (animFrameRef.current) {
           cancelAnimationFrame(animFrameRef.current);
           animFrameRef.current = null;
+        }
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+          audioContextRef.current.close().catch(() => {});
+          audioContextRef.current = null;
         }
 
         // AI Speech Evaluation (đợi 450ms để nhận đủ những tiếng cuối cùng bé vừa đọc trước khi bấm Dừng)
