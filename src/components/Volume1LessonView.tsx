@@ -525,6 +525,7 @@ export const Volume1LessonView: React.FC<Volume1LessonViewProps> = ({
                   onClick={() => {
                     const lettersSpoken = lesson.part1_Letters.letters
                       .map(l => getPhoneticSound(l))
+                      .filter((v, i, a) => a.indexOf(v) === i)
                       .join(', ');
                     speechService.speak(lettersSpoken, undefined, 0.75, 'letter', lesson.id);
                   }}

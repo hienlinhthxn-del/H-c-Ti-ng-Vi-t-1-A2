@@ -497,8 +497,8 @@ export function generateSpellingSteps(model: SpellingModelInput): string[] {
 class SpeechService {
   private isSpeaking = false;
   private slowMode = true; // default true for Grade 1 kids
-  private cloudAudioElement: HTMLAudioElement | null = null;
   private cachedVoices: SpeechSynthesisVoice[] = [];
+  private currentSessionId = 0;
 
   constructor() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -619,6 +619,15 @@ class SpeechService {
     onEnd?: () => void,
     onFallback?: () => void
   ) {
+    const sessionId = this.currentSessionId;
+    let fallbackTriggered = false;
+    const triggerFallbackOnce = () => {
+      if (fallbackTriggered || this.currentSessionId !== sessionId) return;
+      fallbackTriggered = true;
+      if (onFallback) onFallback();
+      else if (onEnd) onEnd();
+    };
+
     try {
       // Split text into natural chunks <= 180 chars
       const rawChunks = text
@@ -649,10 +658,12 @@ class SpeechService {
       this.isSpeaking = true;
 
       const playNextChunk = () => {
-        if (!this.isSpeaking || currentIdx >= chunks.length) {
-          this.isSpeaking = false;
-          this.cloudAudioElement = null;
-          if (onEnd) onEnd();
+        if (this.currentSessionId !== sessionId || !this.isSpeaking || currentIdx >= chunks.length) {
+          if (this.currentSessionId === sessionId) {
+            this.isSpeaking = false;
+            this.cloudAudioElement = null;
+            if (onEnd) onEnd();
+          }
           return;
         }
 
@@ -663,14 +674,19 @@ class SpeechService {
         audio.playbackRate = rateOverride ?? (this.slowMode ? 0.86 : 0.96);
         this.cloudAudioElement = audio;
 
+        let chunkHandled = false;
         audio.onended = () => {
+          if (chunkHandled || this.currentSessionId !== sessionId) return;
+          chunkHandled = true;
           playNextChunk();
         };
 
         audio.onerror = () => {
+          if (chunkHandled || this.currentSessionId !== sessionId) return;
+          chunkHandled = true;
           this.cloudAudioElement = null;
           if (currentIdx === 1 && onFallback) {
-            onFallback();
+            triggerFallbackOnce();
           } else {
             this.isSpeaking = false;
             if (onEnd) onEnd();
@@ -678,9 +694,11 @@ class SpeechService {
         };
 
         audio.play().catch(() => {
+          if (chunkHandled || this.currentSessionId !== sessionId) return;
+          chunkHandled = true;
           this.cloudAudioElement = null;
           if (currentIdx === 1 && onFallback) {
-            onFallback();
+            triggerFallbackOnce();
           } else {
             this.isSpeaking = false;
             if (onEnd) onEnd();
@@ -690,8 +708,7 @@ class SpeechService {
 
       playNextChunk();
     } catch {
-      if (onFallback) onFallback();
-      else if (onEnd) onEnd();
+      triggerFallbackOnce();
     }
   }
 
@@ -731,6 +748,7 @@ class SpeechService {
   }
 
   stop() {
+    this.currentSessionId++;
     teacherAudioService.stopCurrentAudio();
     if (this.cloudAudioElement) {
       this.cloudAudioElement.pause();
@@ -762,6 +780,8 @@ class SpeechService {
       return;
     }
 
+    window.speechSynthesis.cancel();
+
     const utterance = new SpeechSynthesisUtterance(phoneticText);
     utterance.lang = 'vi-VN';
 
@@ -775,16 +795,16 @@ class SpeechService {
     utterance.pitch = isConfirmedFemale ? 1.05 : 1.2;
 
     this.isSpeaking = true;
-
-    utterance.onend = () => {
+    let finished = false;
+    const finishOnce = () => {
+      if (finished) return;
+      finished = true;
       this.isSpeaking = false;
       if (onEnd) onEnd();
     };
 
-    utterance.onerror = () => {
-      this.isSpeaking = false;
-      if (onEnd) onEnd();
-    };
+    utterance.onend = finishOnce;
+    utterance.onerror = finishOnce;
 
     window.speechSynthesis.speak(utterance);
   }
@@ -877,6 +897,9 @@ class SpeechService {
 
   // Spell out a syllable step by step: e.g. "b", "a", "ba", "huyá»n", "bÃ "
   async spellOut(steps?: string[], fullResult?: string, onDone?: () => void, lessonId?: string | number) {
+    this.stop();
+    const sessionId = this.currentSessionId;
+
     if (!steps || steps.length === 0) {
       if (fullResult) {
         this.speak(fullResult, onDone, 0.78, 'syllable', lessonId);
@@ -890,6 +913,7 @@ class SpeechService {
     const phoneticSteps = steps.map(s => getPhoneticSound(s));
 
     for (let i = 0; i < phoneticSteps.length; i++) {
+      if (this.currentSessionId !== sessionId) return;
       const step = phoneticSteps[i];
       await new Promise<void>((resolve) => {
         this.speak(step, () => {
@@ -898,12 +922,18 @@ class SpeechService {
       });
     }
 
+    if (this.currentSessionId !== sessionId) return;
+
     if (cleanFullResult) {
       const lastStep = phoneticSteps[phoneticSteps.length - 1].toLowerCase();
       // Only read extra final result if last step wasn't already the final result
       if (lastStep !== cleanFullResult.toLowerCase()) {
         await new Promise<void>((resolve) => {
           setTimeout(() => {
+            if (this.currentSessionId !== sessionId) {
+              resolve();
+              return;
+            }
             this.speak(cleanFullResult, () => {
               resolve();
               if (onDone) onDone();
