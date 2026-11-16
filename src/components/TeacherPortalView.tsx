@@ -594,10 +594,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                 id="teacher-logout-portal-btn"
                 onClick={onLogout}
                 className="px-3.5 py-2.5 bg-black/30 hover:bg-black/50 text-white font-bold text-xs sm:text-sm rounded-2xl border border-white/30 backdrop-blur-md transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                title="Đăng xuất và khóa Cổng Giáo Viên"
+                title="Thoát Cổng Giáo Viên và quay về Trang Chủ"
               >
-                <span>🔒</span>
-                <span>Khóa / Đăng Xuất</span>
+                <span>🏠</span>
+                <span>Thoát / Về Trang Chủ</span>
               </button>
             )}
 

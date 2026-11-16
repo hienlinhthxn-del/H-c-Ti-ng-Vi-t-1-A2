@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, BookCheck, Volume2, Edit3, Award, Users, GraduationCap, Sparkles } from 'lucide-react';
+import { BookOpen, BookCheck, Volume2, Edit3, Award, Users, GraduationCap, Sparkles, Home } from 'lucide-react';
 import { UserRole, AppUserProfile } from '../types';
 import { UserAvatar } from './UserAvatar';
 
@@ -13,6 +13,7 @@ interface MobileNavBarProps {
   starsCount: number;
   activeUser?: AppUserProfile;
   onOpenProfileModal?: () => void;
+  onExitToHome?: () => void;
 }
 
 export const MobileNavBar: React.FC<MobileNavBarProps> = ({
@@ -24,7 +25,8 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
   onOpenVoiceStudio,
   starsCount,
   activeUser,
-  onOpenProfileModal
+  onOpenProfileModal,
+  onExitToHome
 }) => {
   return (
     <nav 
@@ -136,6 +138,20 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({
           </div>
           <span className="text-[9px] mt-0.5 whitespace-nowrap max-w-[48px] truncate font-bold">{activeUser?.name?.split(' ').pop() || 'Đổi hồ sơ'}</span>
         </button>
+
+        {/* Tab 6: Exit to Home */}
+        {onExitToHome && (
+          <button
+            id="mobile-nav-exit-home"
+            onClick={onExitToHome}
+            className="flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all text-rose-600 font-bold hover:text-rose-700 cursor-pointer"
+          >
+            <div className="p-1.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-200/80">
+              <Home className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] mt-0.5 whitespace-nowrap">Thoát</span>
+          </button>
+        )}
 
       </div>
     </nav>

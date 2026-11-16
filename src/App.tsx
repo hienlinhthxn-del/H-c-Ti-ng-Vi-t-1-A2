@@ -166,11 +166,26 @@ export default function App() {
   };
 
   const handleTeacherLogout = () => {
+    speechService.stop();
     teacherAuthService.logout();
     setIsTeacherAuthenticated(false);
+    setSelectedVol1Lesson(null);
+    setSelectedVol2Lesson(null);
     setUserRole('student');
     navigate('/');
     speechService.playSoundEffect('pop');
+  };
+
+  const handleExitToHome = () => {
+    speechService.stop();
+    speechService.playSoundEffect('pop');
+    if (userRole === 'teacher') {
+      teacherAuthService.logout();
+      setIsTeacherAuthenticated(false);
+    }
+    setSelectedVol1Lesson(null);
+    setSelectedVol2Lesson(null);
+    navigate('/');
   };
 
   const handleTeacherLoginSuccess = (teacher: AppUserProfile) => {
@@ -495,6 +510,7 @@ export default function App() {
         onOpenTeacherAudioStudio={() => setIsTeacherAudioStudioOpen(true)}
         onOpenVoiceStudio={handleOpenVoiceStudio}
         onOpenAchievements={() => setIsAchievementModalOpen(true)}
+        onExitToHome={handleExitToHome}
       />
 
       {/* Main View Area based on User Role */}
@@ -563,6 +579,7 @@ export default function App() {
               onOpenAchievements={() => setIsAchievementModalOpen(true)}
               onOpenVoiceStudio={handleOpenVoiceStudio}
               onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
+              onExitToHome={handleExitToHome}
               onSelectVolume1={() => {
                 navigate('/student');
                 setUserRole('student');
@@ -828,6 +845,7 @@ export default function App() {
         starsCount={starsCount}
         activeUser={activeUser}
         onOpenProfileModal={() => setIsProfileModalOpen(true)}
+        onExitToHome={handleExitToHome}
       />
 
     </div>

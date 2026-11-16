@@ -35,7 +35,9 @@ import {
   Send,
   Check,
   Bot,
-  AlertTriangle
+  AlertTriangle,
+  Home,
+  LogOut
 } from 'lucide-react';
 
 interface ParentPortalViewProps {
@@ -45,6 +47,7 @@ interface ParentPortalViewProps {
   onSelectVolume2: () => void;
   starsCount: number;
   onOpenGoogleWorkspace?: () => void;
+  onExitToHome?: () => void;
 }
 
 export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
@@ -53,7 +56,8 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
   onSelectVolume1,
   onSelectVolume2,
   starsCount,
-  onOpenGoogleWorkspace
+  onOpenGoogleWorkspace,
+  onExitToHome
 }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'feedbacks' | 'recordings' | 'handbook' | 'timer'>('dashboard');
   const [recordings, setRecordings] = useState<StudentRecording[]>([]);
@@ -210,6 +214,18 @@ export const ParentPortalView: React.FC<ParentPortalViewProps> = ({
               <Award className="w-4 h-4 text-amber-500" />
               <span>Xem Tủ Huy Hiệu Của Con</span>
             </button>
+
+            {onExitToHome && (
+              <button
+                id="parent-exit-to-home-btn"
+                onClick={onExitToHome}
+                className="px-4 py-2.5 bg-rose-600/90 hover:bg-rose-700 text-white font-black text-xs sm:text-sm rounded-2xl shadow-lg border border-white/30 transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
+                title="Thoát Cổng Phụ Huynh và quay về Trang Chủ"
+              >
+                <LogOut className="w-4 h-4 text-white" />
+                <span>Thoát / Về Trang Chủ</span>
+              </button>
+            )}
           </div>
         </div>
 

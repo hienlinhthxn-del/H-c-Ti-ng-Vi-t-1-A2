@@ -16,7 +16,9 @@ import {
   Minimize2,
   Tv,
   X,
-  Cloud
+  Cloud,
+  Home,
+  LogOut
 } from 'lucide-react';
 import { UserRole, AppUserProfile } from '../types';
 import { UserAvatar } from './UserAvatar';
@@ -41,6 +43,7 @@ interface HeaderProps {
   onOpenTeacherAudioStudio?: () => void;
   onOpenVoiceStudio?: () => void;
   onOpenAchievements?: () => void;
+  onExitToHome?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -62,7 +65,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTeacherManagement,
   onOpenTeacherAudioStudio,
   onOpenVoiceStudio,
-  onOpenAchievements
+  onOpenAchievements,
+  onExitToHome
 }) => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState<boolean>(false);
@@ -91,9 +95,19 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Top Role Selector Bar - Optimized for Mobile, Tablet & Interactive TV */}
       <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white px-2 sm:px-4 py-1 sm:py-1.5 shadow-xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 text-xs">
-          <div className="flex items-center gap-1 font-bold">
-            <span className="hidden sm:inline">✨ Chế độ:</span>
-            <span className="sm:hidden text-[11px] font-extrabold">✨ Phân hệ:</span>
+          <div className="flex items-center gap-1.5 font-bold">
+            {onExitToHome && (
+              <button
+                id="top-exit-to-home-btn"
+                onClick={onExitToHome}
+                className="flex items-center gap-1 px-2.5 py-1 bg-white text-rose-700 hover:bg-rose-50 rounded-xl text-[11px] sm:text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
+                title="Thoát khỏi phân hệ hiện tại và quay về Trang Chủ"
+              >
+                <Home className="w-3.5 h-3.5 text-rose-600" />
+                <span>Trang Chủ</span>
+              </button>
+            )}
+            <span className="hidden md:inline">✨ Chế độ:</span>
           </div>
 
           <div className="inline-flex p-0.5 bg-black/20 backdrop-blur-md rounded-xl border border-white/20 overflow-x-auto max-w-full no-scrollbar">
@@ -318,6 +332,19 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="font-black text-amber-900 text-xs sm:text-sm">{starsCount}</span>
               <span className="text-xs text-amber-700 font-semibold hidden sm:inline">Sao</span>
             </div>
+
+            {/* Exit to Home button */}
+            {onExitToHome && (
+              <button
+                id="header-exit-home-btn"
+                onClick={onExitToHome}
+                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 rounded-xl font-bold text-xs sm:text-sm shadow-2xs transition-all active:scale-95 cursor-pointer"
+                title="Thoát và quay về Trang Chủ chọn lại vai trò"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Thoát</span>
+              </button>
+            )}
           </div>
 
         </div>
