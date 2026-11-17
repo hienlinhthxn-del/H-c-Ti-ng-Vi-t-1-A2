@@ -1549,13 +1549,20 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                 }))}
 
                 {filteredRecordings.length > visibleRecordingsLimit && (
-                  <div className="pt-2 text-center">
+                  <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setVisibleRecordingsLimit((prev) => prev + 10)}
+                      onClick={() => setVisibleRecordingsLimit((prev) => prev + 20)}
                       className="px-5 py-2.5 bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 rounded-2xl font-black text-xs sm:text-sm shadow-xs transition-all cursor-pointer"
                     >
-                      Xem thêm bài nộp ({filteredRecordings.length - visibleRecordingsLimit} bài còn lại)
+                      Xem thêm 20 bài ({filteredRecordings.length - visibleRecordingsLimit} bài còn lại)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVisibleRecordingsLimit(filteredRecordings.length)}
+                      className="px-4 py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 rounded-2xl font-bold text-xs sm:text-sm shadow-xs transition-all cursor-pointer"
+                    >
+                      Hiện tất cả ({filteredRecordings.length} bài)
                     </button>
                   </div>
                 )}

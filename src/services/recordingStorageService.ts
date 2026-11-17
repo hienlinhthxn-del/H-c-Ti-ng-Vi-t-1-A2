@@ -1,6 +1,6 @@
 import { StudentRecording, RecordingTargetInfo } from '../types';
 import { db } from './firebaseConfig';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 
 const DB_NAME = 'tieng_viet_1_recordings_db';
 const DB_VERSION = 1;
@@ -29,7 +29,9 @@ class RecordingStorageService {
 
   private initFirebaseSync() {
     try {
-      const q = query(collection(db, CLOUD_COLLECTION));
+      // Load the latest 250 recordings ordered by createdAt desc so large class archives
+      // (hundreds/thousands of base64 audio docs) don't stall or crash the browser on a single snapshot.
+      const q = query(collection(db, CLOUD_COLLECTION), orderBy('createdAt', 'desc'), limit(250));
       onSnapshot(
         q,
         (snapshot) => {
@@ -227,6 +229,11 @@ class RecordingStorageService {
       const cloudDoc: StudentRecording = { ...recording };
       delete cloudDoc.audioBlobUrl; // Do not store temporary local blob:// URL in cloud
       const cleanDoc = this.sanitizeForFirestore(cloudDoc);
+      // Firestore hard limit is 1,048,576 bytes (~1 MiB) per document.
+      // If audioBase64 pushes the document over ~880 KB, strip audioBase64 so metadata & AI score still sync!
+      if (JSON.stringify(cleanDoc).length > 880000) {
+        delete cleanDoc.audioBase64;
+      }
       await setDoc(doc(db, CLOUD_COLLECTION, id), cleanDoc);
     } catch (err) {
       console.warn('Failed to sync recording to Firebase Cloud:', err);
