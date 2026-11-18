@@ -97,6 +97,8 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
   const streamRef = useRef<MediaStream | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const historyAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const recordingSecondsRef = useRef<number>(0);
+  const maxAudioLevelRef = useRef<number>(0);
 
   // Load history on open or change
   useEffect(() => {
@@ -216,12 +218,17 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
           const step = Math.floor(dataArray.length / 16);
           for (let i = 0; i < 16; i++) {
             const val = dataArray[i * step] || 0;
-            levels.push(Math.max(10, Math.min(100, Math.round((val / 255) * 100))));
+            const pct = Math.max(10, Math.min(100, Math.round((val / 255) * 100)));
+            if (pct > maxAudioLevelRef.current) {
+              maxAudioLevelRef.current = pct;
+            }
+            levels.push(pct);
           }
           setAudioLevels(levels);
         }
         animFrameRef.current = requestAnimationFrame(updateVisualizer);
       };
+      maxAudioLevelRef.current = 0;
       animFrameRef.current = requestAnimationFrame(updateVisualizer);
 
       // Prefer audio/mp4 (AAC) first so recordings play across iOS Safari, Android, and desktop Chrome/Edge
@@ -234,7 +241,16 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
         }
       }
 
-      const mediaRecorder = new MediaRecorder(stream, selectedMimeType ? { mimeType: selectedMimeType } : undefined);
+      // Use 32 kbps voice bitrate so even 2-minute recordings stay well under Firestore's 1MB limit
+      let mediaRecorder: MediaRecorder;
+      try {
+        const recOptions: MediaRecorderOptions = selectedMimeType
+          ? { mimeType: selectedMimeType, audioBitsPerSecond: 32000 }
+          : { audioBitsPerSecond: 32000 };
+        mediaRecorder = new MediaRecorder(stream, recOptions);
+      } catch {
+        mediaRecorder = new MediaRecorder(stream, selectedMimeType ? { mimeType: selectedMimeType } : undefined);
+      }
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -272,12 +288,19 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
 
         let evalResult: AIEvaluationResult | undefined = undefined;
         if (targetInfo) {
-          evalResult = await aiSpeechService.evaluateWithGeminiAudio(
-            targetInfo.targetText,
-            blob,
-            finalSpoken,
-            targetInfo.sectionTitle || targetInfo.lessonTitle
-          );
+          const isLikelySilent =
+            blob.size < 400 ||
+            (recordingSecondsRef.current < 1 && maxAudioLevelRef.current < 18 && !finalSpoken.trim());
+          if (isLikelySilent) {
+            evalResult = aiSpeechService.evaluatePronunciation(targetInfo.targetText, '');
+          } else {
+            evalResult = await aiSpeechService.evaluateWithGeminiAudio(
+              targetInfo.targetText,
+              blob,
+              finalSpoken,
+              targetInfo.sectionTitle || targetInfo.lessonTitle
+            );
+          }
           setAiEvaluation(evalResult);
         }
         setIsEvaluatingGemini(false);
@@ -288,7 +311,7 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
           const saved = await recordingStorageService.saveRecording(
             targetInfo,
             blob,
-            recordingSeconds,
+            recordingSecondsRef.current,
             evalResult,
             activeUser.name,
             activeUser.id,
@@ -339,8 +362,10 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
       speechService.playSoundEffect('pop');
 
       // Start stopwatch
+      recordingSecondsRef.current = 0;
       setRecordingSeconds(0);
       timerIntervalRef.current = window.setInterval(() => {
+        recordingSecondsRef.current += 1;
         setRecordingSeconds((prev) => prev + 1);
       }, 1000);
     } catch (err: any) {

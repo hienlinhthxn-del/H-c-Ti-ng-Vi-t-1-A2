@@ -943,15 +943,19 @@ Ngữ cảnh phần học: "${sectionContext || 'Luyện đọc Tiếng Việt L
 Văn bản đề bài yêu cầu học sinh đọc: "${targetText}"
 Danh sách ${targetWords.length} tiếng cần kiểm tra theo thứ tự: ${JSON.stringify(targetWords)}
 
-QUY TẮC CHẤM PHÁT ÂM LỚP 1:
-1. Nếu đề bài có các chữ cái hoặc âm đứng rời (b, c, d, đ, g, gh, h, k, l, m, n, ng, ngh, nh, p, ph, q, qu, r, s, t, th, tr, v, x, ă, â), học sinh đọc theo ÂM ("bờ", "cờ", "dờ", "đờ", "gờ", "hờ", "lờ", "mờ", "nờ", "ngờ", "nhờ", "pờ", "phờ", "quờ", "rờ", "sờ", "tờ", "thờ", "trờ", "vờ", "xờ", "á", "ớ") hoặc đọc đánh vần đều được tính là ĐÚNG ("correct").
-2. Với các tiếng rời rạc (ví dụ: "khèn", "sen", "nến", "nghển", "chín", "mịn", "cún", "vun"), hãy lắng nghe âm thanh thực tế trong file ghi âm:
-   - Nếu người đọc phát âm rõ tiếng đó (dù giọng vùng miền hơi nhẹ hoặc có tạp âm nhỏ của micro) -> đánh giá status = "correct" và spokenWord = đúng chữ mục tiêu.
-   - Chỉ đánh giá status = "mismatched" khi người đọc phát âm SAI RÕ RÀNG sang một âm/vần/thanh khác (ví dụ: ngọng l/n, tr/ch, s/x, hoặc sai hẳn dấu thanh), khi đó ghi rõ âm nghe được vào spokenWord.
-   - Chỉ đánh giá status = "missing" khi người đọc thực sự BỎ QUA không đọc tiếng đó hoặc file ghi âm hoàn toàn im lặng.
+QUY TẮC CHẤM PHÁT ÂM LỚP 1 (BẮT BUỘC TUÂN THỦ):
+1. KIỂM TRA CÓ TIẾNG NGƯỜI ĐỌC HAY KHÔNG (QUAN TRỌNG NHẤT):
+   - Trước tiên, kiểm tra xem trong file ghi âm có thực sự có giọng nói của người đọc tiếng Việt rõ ràng hay không.
+   - Nếu file ghi âm im lặng, chỉ có tiếng ồn/tiếng quạt/tạp âm nền, tiếng thở hoặc chưa nghe thấy học sinh đọc chữ nào: BẮT BUỘC đặt "hasClearSpeech": false và đặt TẤT CẢ các từ thành "missing" (TUYỆT ĐỐI KHÔNG tự suy đoán hoặc chấm "correct" khi không nghe thấy giọng đọc!).
+2. CHẤM CÔNG BẰNG KHI HỌC SINH ĐỌC ĐÚNG:
+   - Nếu đề bài có chữ cái hoặc âm đứng rời (b, c, d, đ, g, gh, h, k, l, m, n, ng, ngh, nh, p, ph, q, qu, r, s, t, th, tr, v, x, ă, â), học sinh đọc theo ÂM ("bờ", "cờ", "dờ", "đờ", "gờ", "hờ", "lờ", "mờ", "nờ", "ngờ", "nhờ", "pờ", "phờ", "quờ", "rờ", "sờ", "tờ", "thờ", "trờ", "vờ", "xờ", "á", "ớ") hoặc đọc đánh vần đều là ĐÚNG ("correct").
+   - Nếu học sinh phát âm đúng tiếng mục tiêu (kể cả giọng Bắc/Trung/Nam hoặc giọng trẻ em hơi nhỏ/ngọng nhẹ tự nhiên ở lớp 1 nhưng nghe rõ đúng từ đó) -> ĐÁNH GIÁ "correct" và spokenWord = đúng từ mục tiêu.
+   - Chỉ đánh giá "mismatched" khi nghe RÕ RÀNG học sinh đọc nhầm sang tiếng/âm/dấu thanh khác hẳn (ví dụ: ngọng l/n, tr/ch, s/x, sai hẳn dấu hỏi/ngã/sắc/nặng).
+   - Chỉ đánh giá "missing" khi học sinh thực sự bỏ sót không đọc từ đó.
 
 Chỉ trả về DUY NHẤT một đối tượng JSON hợp lệ theo cấu trúc sau (không thêm markdown):
 {
+  "hasClearSpeech": true | false,
   "words": [
     {
       "word": "từ mục tiêu trong đề bài",
@@ -963,12 +967,13 @@ Chỉ trả về DUY NHẤT một đối tượng JSON hợp lệ theo cấu tr�
 }`;
 
       const models = [
-        'gemini-3.5-flash-lite',
-        'gemini-flash-lite-latest',
-        'gemini-3.5-flash',
-        'gemini-flash-latest'
+        'gemini-2.5-flash',
+        'gemini-flash-latest',
+        'gemini-2.5-flash-lite',
+        'gemini-flash-lite-latest'
       ];
       let geminiData: {
+        hasClearSpeech?: boolean;
         words?: Array<{ word: string; status: 'correct' | 'mismatched' | 'missing'; spokenWord?: string }>;
         spokenTranscript?: string;
         teacherEncourageNote?: string;
@@ -1022,13 +1027,33 @@ Chỉ trả về DUY NHẤT một đối tượng JSON hợp lệ theo cấu tr�
         }
       }
 
+      if (geminiData && geminiData.hasClearSpeech === false) {
+        const silentResult = this.evaluatePronunciation(targetText, '');
+        silentResult.aiEngine = 'gemini';
+        return silentResult;
+      }
+
       if (geminiData && Array.isArray(geminiData.words) && geminiData.words.length > 0) {
         // Reconstruct the clean spoken transcript from Gemini's direct audio evaluation of each target word
         const reconstructedTokens: string[] = [];
+        const usedIndices = new Set<number>();
         targetWords.forEach((tw, idx) => {
-          const gw =
-            geminiData!.words![idx] ||
-            geminiData!.words!.find((item) => item.word?.toLowerCase().trim() === tw.toLowerCase().trim());
+          const normTw = tw.toLowerCase().trim();
+          let matchIdx = -1;
+          const atIdx = geminiData!.words![idx];
+          if (atIdx && !usedIndices.has(idx) && atIdx.word?.toLowerCase().trim() === normTw) {
+            matchIdx = idx;
+          } else {
+            matchIdx = geminiData!.words!.findIndex(
+              (item, wIdx) => !usedIndices.has(wIdx) && item.word?.toLowerCase().trim() === normTw
+            );
+          }
+          if (matchIdx === -1 && atIdx && !usedIndices.has(idx)) {
+            matchIdx = idx;
+          }
+          if (matchIdx === -1) return;
+          usedIndices.add(matchIdx);
+          const gw = geminiData!.words![matchIdx];
           if (!gw) return;
           if (gw.status === 'correct' || this.isPhoneticMatch(tw, gw.spokenWord || '')) {
             reconstructedTokens.push(tw);
