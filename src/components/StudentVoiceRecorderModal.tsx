@@ -224,8 +224,8 @@ export const StudentVoiceRecorderModal: React.FC<StudentVoiceRecorderModalProps>
       };
       animFrameRef.current = requestAnimationFrame(updateVisualizer);
 
-      // Detect best supported mime type
-      const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+      // Prefer audio/mp4 (AAC) first so recordings play across iOS Safari, Android, and desktop Chrome/Edge
+      const mimeTypes = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
       let selectedMimeType = '';
       for (const mime of mimeTypes) {
         if (MediaRecorder.isTypeSupported(mime)) {

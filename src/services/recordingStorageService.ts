@@ -47,7 +47,9 @@ class RecordingStorageService {
             } else if (data && data.id) {
               const hydrated: StudentRecording = {
                 ...data,
-                audioBlobUrl: data.audioBase64 || data.audioBlobUrl
+                audioBlobUrl: data.audioBase64
+                  ? this.dataUrlToBlobUrl(data.id, data.audioBase64)
+                  : data.audioBlobUrl
               };
               this.cloudRecordingsMap.set(data.id, hydrated);
               changed = true;
@@ -87,6 +89,32 @@ class RecordingStorageService {
     const list = Array.from(mergedMap.values());
     list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     this.memoryRecordings = list;
+  }
+
+  private dataUrlToBlobUrl(id: string, dataUrl: string): string {
+    const cached = this.blobUrlCache.get(id);
+    if (cached) return cached;
+    if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl;
+    try {
+      const commaIdx = dataUrl.indexOf(',');
+      if (commaIdx === -1) return dataUrl;
+      const header = dataUrl.slice(5, commaIdx);
+      const mimeType = header.split(';')[0] || 'audio/webm';
+      const b64 = dataUrl.slice(commaIdx + 1);
+      const binaryStr = atob(b64);
+      const len = binaryStr.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: mimeType });
+      const blobUrl = URL.createObjectURL(blob);
+      this.blobUrlCache.set(id, blobUrl);
+      return blobUrl;
+    } catch (e) {
+      console.warn('Could not convert dataUrl to blobUrl:', e);
+      return dataUrl;
+    }
   }
 
   private blobToBase64(blob: Blob): Promise<string> {
@@ -267,8 +295,8 @@ class RecordingStorageService {
         if (!this.blobUrlCache.has(item.id) && item.audioBlob instanceof Blob) {
           audioBlobUrl = URL.createObjectURL(item.audioBlob);
           this.blobUrlCache.set(item.id, audioBlobUrl);
-        } else if (!audioBlobUrl && item.audioBase64) {
-          audioBlobUrl = item.audioBase64;
+        } else if ((!audioBlobUrl || audioBlobUrl.startsWith('data:')) && item.audioBase64) {
+          audioBlobUrl = this.dataUrlToBlobUrl(item.id, item.audioBase64);
         }
         return {
           id: item.id,
@@ -603,7 +631,12 @@ class RecordingStorageService {
     a.href = href;
     const dateStr = new Date(recording.createdAt).toLocaleDateString('vi-VN').replace(/\//g, '-');
     const safeTitle = (recording.lessonTitle || 'bai_doc').replace(/\s+/g, '_').toLowerCase();
-    a.download = `Ghi_am_${safeTitle}_${dateStr}.webm`;
+    const ext = recording.mimeType?.includes('mp4')
+      ? 'mp4'
+      : recording.mimeType?.includes('ogg')
+      ? 'ogg'
+      : 'webm';
+    a.download = `Ghi_am_${safeTitle}_${dateStr}.${ext}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

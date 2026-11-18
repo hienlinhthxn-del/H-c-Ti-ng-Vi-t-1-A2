@@ -113,8 +113,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   const studentAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleTogglePlayStudentRecording = (rec: StudentRecording) => {
-    const src = rec.audioBlobUrl || rec.audioBase64;
-    if (!src) return;
+    const rawSrc = rec.audioBlobUrl || rec.audioBase64;
+    if (!rawSrc) {
+      showToast('Bài nộp này chưa có tệp âm thanh (chỉ có kết quả chấm AI).');
+      return;
+    }
+
     if (playingStudentRecId === rec.id && studentAudioRef.current) {
       studentAudioRef.current.pause();
       studentAudioRef.current.currentTime = 0;
@@ -122,29 +126,71 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
       setPlayingStudentRecId(null);
       return;
     }
+
+    speechService.stop();
+
     if (studentAudioRef.current) {
       studentAudioRef.current.pause();
       studentAudioRef.current.currentTime = 0;
       studentAudioRef.current = null;
     }
+
+    let playSrc = rawSrc;
+    let tempBlobUrl: string | null = null;
+    if (rawSrc.startsWith('data:')) {
+      try {
+        const commaIdx = rawSrc.indexOf(',');
+        if (commaIdx !== -1) {
+          const header = rawSrc.slice(5, commaIdx);
+          const mimeType = header.split(';')[0] || rec.mimeType || 'audio/webm';
+          const binaryStr = atob(rawSrc.slice(commaIdx + 1));
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+          tempBlobUrl = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+          playSrc = tempBlobUrl;
+        }
+      } catch (e) {
+        console.warn('Failed to decode base64 audio:', e);
+      }
+    }
+
+    const cleanupAudio = () => {
+      setPlayingStudentRecId(null);
+      studentAudioRef.current = null;
+      if (tempBlobUrl) {
+        URL.revokeObjectURL(tempBlobUrl);
+        tempBlobUrl = null;
+      }
+    };
+
     try {
-      const audio = new Audio(src);
+      const audio = new Audio(playSrc);
+      audio.preload = 'auto';
+      audio.volume = 1;
       studentAudioRef.current = audio;
       setPlayingStudentRecId(rec.id);
-      audio.onended = () => {
-        setPlayingStudentRecId(null);
-        studentAudioRef.current = null;
-      };
+
+      audio.onended = cleanupAudio;
       audio.onerror = () => {
-        setPlayingStudentRecId(null);
-        studentAudioRef.current = null;
+        cleanupAudio();
+        const isWebmOnApple =
+          (rec.mimeType?.includes('webm') || rawSrc.includes('audio/webm')) &&
+          /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent);
+        showToast(
+          isWebmOnApple
+            ? 'Trình duyệt Safari/iPhone chưa hỗ trợ phát trực tiếp file .webm của học sinh. Thầy Cô vui lòng mở bằng Chrome hoặc bấm Tải file để nghe.'
+            : 'Không phát được tệp âm thanh này. Thầy Cô thử bấm "Tải file" về máy để nghe nhé!'
+        );
       };
-      audio.play().catch(() => {
-        setPlayingStudentRecId(null);
-        studentAudioRef.current = null;
+      audio.play().catch((err) => {
+        console.warn('Play student recording failed:', err);
+        cleanupAudio();
+        showToast('Trình duyệt đang chặn hoặc không hỗ trợ phát tệp âm thanh này. Hãy thử bấm Tải file để nghe!');
       });
     } catch {
-      setPlayingStudentRecId(null);
+      cleanupAudio();
     }
   };
 
@@ -1329,7 +1375,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                         </div>
 
                         {/* On-demand Single Audio Player Button (prevents iOS WebKit OOM crash) */}
-                        {(rec.audioBlobUrl || rec.audioBase64) && (
+                        {(rec.audioBlobUrl || rec.audioBase64) ? (
                           <button
                             type="button"
                             onClick={() => handleTogglePlayStudentRecording(rec)}
@@ -1351,6 +1397,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                               </>
                             )}
                           </button>
+                        ) : (
+                          <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-500 text-[11px] font-semibold border border-slate-200 shrink-0">
+                            Chỉ lưu kết quả AI (file &gt;1MB)
+                          </span>
                         )}
                       </div>
 
