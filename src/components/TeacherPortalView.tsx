@@ -1586,13 +1586,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                           </button>
                         </div>
 
-                        <button
-                          id={`download-rec-${rec.id}`}
-                          onClick={() => recordingStorageService.downloadRecording(rec)}
-                          className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
-                        >
-                          <Download className="w-3.5 h-3.5" /> Tải file
-                        </button>
+                        {(rec.audioBlobUrl || rec.audioBase64) && (
+                          <button
+                            id={`download-rec-${rec.id}`}
+                            onClick={() => recordingStorageService.downloadRecording(rec)}
+                            className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Tải file
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
